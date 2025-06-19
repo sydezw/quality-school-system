@@ -15,7 +15,8 @@ import {
   FileText,
   Package,
   Building2,
-  FileSignature
+  FileSignature,
+  UserCheck
 } from 'lucide-react';
 
 // Corrige a definição do array menuItems
@@ -33,6 +34,7 @@ const menuItems = [
   { icon: Package, label: 'Materiais', path: '/app/materials' },
   { icon: FileText, label: 'Documentos', path: '/app/documents' },
   { icon: Calendar, label: 'Aniversariantes do Mês', path: '/app/birthdays' },
+  { icon: UserCheck, label: 'Aprovar Logins', path: '/app/approve-logins' },
 ];
 
 export const Sidebar = () => {

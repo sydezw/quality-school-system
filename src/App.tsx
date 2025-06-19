@@ -20,6 +20,7 @@ import Contracts from "./pages/app/Contracts";
 import ContractGenerator from "./pages/app/ContractGenerator";
 import Rooms from "./pages/app/Rooms";
 import Birthdays from "./pages/app/Birthdays";
+import ApproveLogins from "./pages/app/ApproveLogins";
 
 const queryClient = new QueryClient();
 
@@ -75,6 +76,7 @@ const App = () => (
               <Route path="documents" element={<Documents />} />
               <Route path="rooms" element={<Rooms />} />
               <Route path="birthdays" element={<Birthdays />} />
+              <Route path="approve-logins" element={<ApproveLogins />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
