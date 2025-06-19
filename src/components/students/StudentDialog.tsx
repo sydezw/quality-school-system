@@ -1,0 +1,77 @@
+
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
+import { Plus } from 'lucide-react';
+import StudentForm from './StudentForm';
+
+interface Student {
+  id: string;
+  nome: string;
+  cpf: string | null;
+  telefone: string | null;
+  email: string | null;
+  endereco: string | null;
+  numero_endereco: string | null;
+  status: string;
+  idioma: string;
+  turma_id: string | null;
+  responsavel_id: string | null;
+  data_nascimento: Date | null;
+}
+
+interface Class {
+  id: string;
+  nome: string;
+  idioma: string;
+  nivel: string;
+}
+
+interface StudentDialogProps {
+  isOpen: boolean;
+  editingStudent: Student | null;
+  classes: Class[];
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (data: any) => void;
+  onOpenCreate: () => void;
+}
+
+const StudentDialog = ({ 
+  isOpen, 
+  editingStudent, 
+  classes, 
+  onOpenChange, 
+  onSubmit, 
+  onOpenCreate 
+}: StudentDialogProps) => {
+  return (
+    <Sheet open={isOpen} onOpenChange={onOpenChange}>
+      <SheetTrigger asChild>
+        <Button onClick={onOpenCreate} className="bg-brand-red hover:bg-brand-red/90">
+          <Plus />
+          Novo Aluno
+        </Button>
+      </SheetTrigger>
+      <SheetContent className="overflow-y-auto sm:max-w-xl">
+        <SheetHeader>
+          <SheetTitle>
+            {editingStudent ? 'Editar Aluno' : 'Adicionar Aluno'}
+          </SheetTitle>
+        </SheetHeader>
+        <StudentForm
+          editingStudent={editingStudent}
+          classes={classes}
+          onSubmit={onSubmit}
+          onCancel={() => onOpenChange(false)}
+        />
+      </SheetContent>
+    </Sheet>
+  );
+};
+
+export default StudentDialog;
