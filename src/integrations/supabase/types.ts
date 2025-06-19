@@ -1106,6 +1106,42 @@ export type Database = {
         }
         Relationships: []
       }
+      usuarios_pendentes: {
+        Row: {
+          cargo: Database["public"]["Enums"]["cargo_usuario"]
+          created_at: string
+          email: string
+          id: string
+          nome: string
+          permissoes: string | null
+          senha: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cargo?: Database["public"]["Enums"]["cargo_usuario"]
+          created_at?: string
+          email: string
+          id?: string
+          nome: string
+          permissoes?: string | null
+          senha: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          cargo?: Database["public"]["Enums"]["cargo_usuario"]
+          created_at?: string
+          email?: string
+          id?: string
+          nome?: string
+          permissoes?: string | null
+          senha?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       contratos_vencendo: {

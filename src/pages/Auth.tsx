@@ -51,13 +51,23 @@ const Auth = () => {
     setRegisterLoading(true);
     
     try {
-      // Por enquanto, simular o cadastro até a tabela ser criada
-      // TODO: Implementar inserção na tabela usuarios_pendentes quando estiver disponível
+      // Inserir o usuário na tabela usuarios_pendentes
+      const { error } = await supabase
+        .from('usuarios_pendentes')
+        .insert([{
+          nome: registerName,
+          email: registerEmail,
+          senha: registerPassword,
+          cargo: registerCargo as any,
+          status: 'pendente'
+        }]);
+
+      if (error) {
+        console.error('Erro ao cadastrar usuário:', error);
+        toast.error('Erro ao cadastrar usuário. Tente novamente.');
+        return;
+      }
       
-      // Simular delay de rede
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Simular sucesso
       toast.success('Cadastro realizado com sucesso! Aguarde a aprovação do administrador.');
       
       // Limpar formulário
@@ -67,6 +77,7 @@ const Auth = () => {
       setRegisterCargo('Secretária');
       
     } catch (error) {
+      console.error('Erro inesperado ao cadastrar usuário:', error);
       toast.error('Erro inesperado ao cadastrar usuário');
     } finally {
       setRegisterLoading(false);

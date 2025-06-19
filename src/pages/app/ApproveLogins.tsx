@@ -3,14 +3,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle, Clock, Users, FileText, UserCheck } from "lucide-react";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
 interface PendingUser {
   id: string;
   nome: string;
   email: string;
   cargo: string;
+  senha: string;
+  permissoes: string | null;
   status: string;
   created_at: string;
 }
@@ -18,6 +21,7 @@ interface PendingUser {
 export default function ApproveLogins() {
   const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
   const [pendingLoading, setPendingLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchPendingUsers();
@@ -27,88 +31,110 @@ export default function ApproveLogins() {
     setPendingLoading(true);
     
     try {
-      // Como a tabela usuarios_pendentes ainda não foi criada, 
-      // vamos usar dados simulados por enquanto
-      console.log('Usando dados simulados - tabela usuarios_pendentes ainda não criada');
-      
-      // Dados simulados de usuários aguardando aprovação
-      const mockPendingUsers: PendingUser[] = [
-        {
-          id: '1',
-          nome: 'Maria Silva Santos',
-          email: 'maria.silva@email.com',
-          cargo: 'Secretária',
-          status: 'pendente',
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          nome: 'João Pedro Oliveira',
-          email: 'joao.pedro@email.com',
-          cargo: 'Admin',
-          status: 'pendente',
-          created_at: new Date(Date.now() - 86400000).toISOString()
-        },
-        {
-          id: '3',
-          nome: 'Ana Carolina Ferreira',
-          email: 'ana.carolina@email.com',
-          cargo: 'Gerente',
-          status: 'pendente',
-          created_at: new Date(Date.now() - 172800000).toISOString()
-        }
-      ];
-      
-      // Simular delay de rede
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      setPendingUsers(mockPendingUsers);
+      const { data, error } = await supabase
+        .from('usuarios_pendentes')
+        .select('*')
+        .eq('status', 'pendente')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+         console.error('Erro ao buscar usuários pendentes:', error);
+         toast({
+           title: "Erro",
+           description: "Erro ao carregar usuários pendentes",
+           variant: "destructive",
+         });
+         return;
+       }
+
+      setPendingUsers(data || []);
     } catch (error) {
-      console.error('Erro ao buscar usuários pendentes:', error);
-      toast.error('Erro ao carregar usuários pendentes');
-    } finally {
+       console.error('Erro ao buscar usuários pendentes:', error);
+       toast({
+         title: "Erro",
+         description: "Erro ao carregar usuários pendentes",
+         variant: "destructive",
+       });
+     } finally {
       setPendingLoading(false);
     }
   };
 
-  const handleUserAction = async (userId: string, action: 'aprovado' | 'rejeitado') => {
+  const handleUserAction = async (userId: string, action: 'approve' | 'reject') => {
     try {
       const user = pendingUsers.find(u => u.id === userId);
       if (!user) return;
-      
-      // Simular processamento
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      if (action === 'aprovado') {
-        // Tentar adicionar à tabela usuarios existente
+
+      if (action === 'approve') {
+        // Inserir o usuário na tabela usuarios
         const { error: insertError } = await supabase
           .from('usuarios')
           .insert({
             nome: user.nome,
             email: user.email,
-            cargo: user.cargo as 'Secretária' | 'Gerente' | 'Admin',
-            senha: 'senha_temporaria_123', // Senha temporária que deve ser alterada no primeiro login
-            funcao: null,
-            permissoes: null
+            cargo: user.cargo as Database['public']['Enums']['cargo_usuario'],
+            senha: user.senha, // Usar a senha que o usuário cadastrou
+            permissoes: user.permissoes || (user.cargo === 'Admin' ? 'admin' : 'user')
           });
-        
+
         if (insertError) {
-          console.error('Erro ao inserir usuário na tabela usuarios:', insertError);
-          toast.error('Erro ao aprovar usuário. Tente novamente.');
+          console.error('Erro ao aprovar usuário:', insertError);
+          toast({
+            title: "Erro",
+            description: "Erro ao aprovar usuário",
+            variant: "destructive",
+          });
           return;
         }
-        
-        toast.success(`Usuário ${user.nome} aprovado com sucesso! Ele pode fazer login com a senha temporária.`);
+
+        // Deletar da tabela usuarios_pendentes
+        const { error: deleteError } = await supabase
+          .from('usuarios_pendentes')
+          .delete()
+          .eq('id', userId);
+
+        if (deleteError) {
+          console.error('Erro ao remover usuário pendente:', deleteError);
+        }
+
+        toast({
+          title: "Usuário aprovado!",
+          description: `${user.nome} foi aprovado com sucesso e pode fazer login.`,
+        });
       } else {
-        toast.success(`Solicitação de ${user.nome} foi rejeitada e removida da lista.`);
+        // Deletar da tabela usuarios_pendentes
+        const { error: deleteError } = await supabase
+          .from('usuarios_pendentes')
+          .delete()
+          .eq('id', userId);
+
+        if (deleteError) {
+          console.error('Erro ao rejeitar usuário:', deleteError);
+          toast({
+            title: "Erro",
+            description: "Erro ao rejeitar usuário",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        toast({
+          title: "Usuário rejeitado",
+          description: `${user.nome} foi rejeitado e removido da lista.`,
+          variant: "destructive",
+        });
       }
-      
-      // Remover usuário da lista local
-      setPendingUsers(prev => prev.filter(u => u.id !== userId));
+
+      // Atualizar a lista local removendo o usuário processado
+      setPendingUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
       
     } catch (error) {
-      console.error('Erro ao processar ação:', error);
-      toast.error('Erro inesperado ao processar solicitação');
+      console.error('Erro ao processar ação do usuário:', error);
+      toast({
+        title: "Erro",
+        description: "Ocorreu um erro ao processar a solicitação. Tente novamente.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -173,7 +199,7 @@ export default function ApproveLogins() {
                           size="sm"
                           variant="outline"
                           className="text-green-600 border-green-600 hover:bg-green-50 hover:border-green-700"
-                          onClick={() => handleUserAction(user.id, 'aprovado')}
+                          onClick={() => handleUserAction(user.id, 'approve')}
                         >
                           <CheckCircle className="h-4 w-4 mr-1" />
                           Aprovar
@@ -182,7 +208,7 @@ export default function ApproveLogins() {
                           size="sm"
                           variant="outline"
                           className="text-red-600 border-red-600 hover:bg-red-50 hover:border-red-700"
-                          onClick={() => handleUserAction(user.id, 'rejeitado')}
+                          onClick={() => handleUserAction(user.id, 'reject')}
                         >
                           <XCircle className="h-4 w-4 mr-1" />
                           Rejeitar
