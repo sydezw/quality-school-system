@@ -14,6 +14,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, Building2, BarChart3 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import RoomOccupancyReport from '@/components/rooms/RoomOccupancyReport';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PermissionButton } from '@/components/shared/PermissionButton';
+import { PermissionGuard } from '@/components/guards/PermissionGuard';
 
 interface Room {
   id: string;
@@ -28,6 +31,7 @@ const Rooms = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
   const { toast } = useToast();
+  const { hasPermission, isOwner } = usePermissions();
   const { register, handleSubmit, reset, setValue } = useForm();
 
   useEffect(() => {
@@ -172,17 +176,22 @@ const Rooms = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Salas</h1>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={openCreateDialog} className="bg-brand-red hover:bg-brand-red/90">
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Sala
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
+    <PermissionGuard permission="visualizarSalas">
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold">Salas</h1>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <PermissionButton 
+                permission="gerenciarSalas"
+                className="bg-brand-red hover:bg-brand-red/90"
+                onClick={openCreateDialog}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Sala
+              </PermissionButton>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>
                 {editingRoom ? 'Editar Sala' : 'Nova Sala'}
@@ -231,8 +240,8 @@ const Rooms = () => {
                 </Button>
               </div>
             </form>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
       </div>
 
       <Tabs defaultValue="list" className="w-full">
@@ -283,20 +292,25 @@ const Rooms = () => {
                         <TableCell>{room.capacidade} alunos</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            <Button
-                              size="sm"
+                            <PermissionButton
+                              permission="gerenciarSalas"
                               variant="outline"
+                              size="sm"
                               onClick={() => openEditDialog(room)}
+                              showLockIcon={false}
                             >
                               <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
+                            </PermissionButton>
+                            <PermissionButton
+                              permission="gerenciarSalas"
                               variant="outline"
+                              size="sm"
                               onClick={() => deleteRoom(room.id)}
+                              className="text-red-600 hover:text-red-700"
+                              showLockIcon={false}
                             >
                               <Trash2 className="h-4 w-4" />
-                            </Button>
+                            </PermissionButton>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -313,6 +327,7 @@ const Rooms = () => {
         </TabsContent>
       </Tabs>
     </div>
+    </PermissionGuard>
   );
 };
 

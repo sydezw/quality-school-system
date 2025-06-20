@@ -1079,6 +1079,27 @@ export type Database = {
           id: string
           nome: string
           permissoes: string | null
+          perm_aprovar_contratos: boolean | null
+          perm_criar_alunos: boolean | null
+          perm_criar_aulas: boolean | null
+          perm_criar_avaliacoes: boolean | null
+          perm_criar_contratos: boolean | null
+          perm_criar_turmas: boolean | null
+          perm_editar_alunos: boolean | null
+          perm_editar_aulas: boolean | null
+          perm_editar_avaliacoes: boolean | null
+          perm_editar_contratos: boolean | null
+          perm_editar_turmas: boolean | null
+          perm_gerenciar_boletos: boolean | null
+          perm_gerenciar_despesas: boolean | null
+          perm_gerenciar_folha: boolean | null
+          perm_gerenciar_presencas: boolean | null
+          perm_gerenciar_usuarios: boolean | null
+          perm_remover_alunos: boolean | null
+          perm_remover_aulas: boolean | null
+          perm_remover_avaliacoes: boolean | null
+          perm_remover_contratos: boolean | null
+          perm_remover_turmas: boolean | null
           senha: string
           updated_at: string
         }
@@ -1090,6 +1111,27 @@ export type Database = {
           id?: string
           nome: string
           permissoes?: string | null
+          perm_aprovar_contratos?: boolean | null
+          perm_criar_alunos?: boolean | null
+          perm_criar_aulas?: boolean | null
+          perm_criar_avaliacoes?: boolean | null
+          perm_criar_contratos?: boolean | null
+          perm_criar_turmas?: boolean | null
+          perm_editar_alunos?: boolean | null
+          perm_editar_aulas?: boolean | null
+          perm_editar_avaliacoes?: boolean | null
+          perm_editar_contratos?: boolean | null
+          perm_editar_turmas?: boolean | null
+          perm_gerenciar_boletos?: boolean | null
+          perm_gerenciar_despesas?: boolean | null
+          perm_gerenciar_folha?: boolean | null
+          perm_gerenciar_presencas?: boolean | null
+          perm_gerenciar_usuarios?: boolean | null
+          perm_remover_alunos?: boolean | null
+          perm_remover_aulas?: boolean | null
+          perm_remover_avaliacoes?: boolean | null
+          perm_remover_contratos?: boolean | null
+          perm_remover_turmas?: boolean | null
           senha: string
           updated_at?: string
         }
@@ -1101,6 +1143,27 @@ export type Database = {
           id?: string
           nome?: string
           permissoes?: string | null
+          perm_aprovar_contratos?: boolean | null
+          perm_criar_alunos?: boolean | null
+          perm_criar_aulas?: boolean | null
+          perm_criar_avaliacoes?: boolean | null
+          perm_criar_contratos?: boolean | null
+          perm_criar_turmas?: boolean | null
+          perm_editar_alunos?: boolean | null
+          perm_editar_aulas?: boolean | null
+          perm_editar_avaliacoes?: boolean | null
+          perm_editar_contratos?: boolean | null
+          perm_editar_turmas?: boolean | null
+          perm_gerenciar_boletos?: boolean | null
+          perm_gerenciar_despesas?: boolean | null
+          perm_gerenciar_folha?: boolean | null
+          perm_gerenciar_presencas?: boolean | null
+          perm_gerenciar_usuarios?: boolean | null
+          perm_remover_alunos?: boolean | null
+          perm_remover_aulas?: boolean | null
+          perm_remover_avaliacoes?: boolean | null
+          perm_remover_contratos?: boolean | null
+          perm_remover_turmas?: boolean | null
           senha?: string
           updated_at?: string
         }
@@ -1114,6 +1177,27 @@ export type Database = {
           id: string
           nome: string
           permissoes: string | null
+          perm_aprovar_contratos: boolean | null
+          perm_criar_alunos: boolean | null
+          perm_criar_aulas: boolean | null
+          perm_criar_avaliacoes: boolean | null
+          perm_criar_contratos: boolean | null
+          perm_criar_turmas: boolean | null
+          perm_editar_alunos: boolean | null
+          perm_editar_aulas: boolean | null
+          perm_editar_avaliacoes: boolean | null
+          perm_editar_contratos: boolean | null
+          perm_editar_turmas: boolean | null
+          perm_gerenciar_boletos: boolean | null
+          perm_gerenciar_despesas: boolean | null
+          perm_gerenciar_folha: boolean | null
+          perm_gerenciar_presencas: boolean | null
+          perm_gerenciar_usuarios: boolean | null
+          perm_remover_alunos: boolean | null
+          perm_remover_aulas: boolean | null
+          perm_remover_avaliacoes: boolean | null
+          perm_remover_contratos: boolean | null
+          perm_remover_turmas: boolean | null
           senha: string
           status: string
           updated_at: string
@@ -1125,6 +1209,27 @@ export type Database = {
           id?: string
           nome: string
           permissoes?: string | null
+          perm_aprovar_contratos?: boolean | null
+          perm_criar_alunos?: boolean | null
+          perm_criar_aulas?: boolean | null
+          perm_criar_avaliacoes?: boolean | null
+          perm_criar_contratos?: boolean | null
+          perm_criar_turmas?: boolean | null
+          perm_editar_alunos?: boolean | null
+          perm_editar_aulas?: boolean | null
+          perm_editar_avaliacoes?: boolean | null
+          perm_editar_contratos?: boolean | null
+          perm_editar_turmas?: boolean | null
+          perm_gerenciar_boletos?: boolean | null
+          perm_gerenciar_despesas?: boolean | null
+          perm_gerenciar_folha?: boolean | null
+          perm_gerenciar_presencas?: boolean | null
+          perm_gerenciar_usuarios?: boolean | null
+          perm_remover_alunos?: boolean | null
+          perm_remover_aulas?: boolean | null
+          perm_remover_avaliacoes?: boolean | null
+          perm_remover_contratos?: boolean | null
+          perm_remover_turmas?: boolean | null
           senha: string
           status?: string
           updated_at?: string
@@ -1136,6 +1241,27 @@ export type Database = {
           id?: string
           nome?: string
           permissoes?: string | null
+          perm_aprovar_contratos?: boolean | null
+          perm_criar_alunos?: boolean | null
+          perm_criar_aulas?: boolean | null
+          perm_criar_avaliacoes?: boolean | null
+          perm_criar_contratos?: boolean | null
+          perm_criar_turmas?: boolean | null
+          perm_editar_alunos?: boolean | null
+          perm_editar_aulas?: boolean | null
+          perm_editar_avaliacoes?: boolean | null
+          perm_editar_contratos?: boolean | null
+          perm_editar_turmas?: boolean | null
+          perm_gerenciar_boletos?: boolean | null
+          perm_gerenciar_despesas?: boolean | null
+          perm_gerenciar_folha?: boolean | null
+          perm_gerenciar_presencas?: boolean | null
+          perm_gerenciar_usuarios?: boolean | null
+          perm_remover_alunos?: boolean | null
+          perm_remover_aulas?: boolean | null
+          perm_remover_avaliacoes?: boolean | null
+          perm_remover_contratos?: boolean | null
+          perm_remover_turmas?: boolean | null
           senha?: string
           status?: string
           updated_at?: string

@@ -3,6 +3,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Edit, Trash2 } from 'lucide-react';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PermissionButton } from '@/components/shared/PermissionButton';
 
 interface Student {
   id: string;
@@ -26,6 +28,8 @@ interface StudentTableProps {
 }
 
 const StudentTable = ({ students, onEdit, onDelete }: StudentTableProps) => {
+  const { hasPermission, isOwner } = usePermissions();
+  
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Ativo': return 'bg-green-100 text-green-800';
@@ -78,21 +82,26 @@ const StudentTable = ({ students, onEdit, onDelete }: StudentTableProps) => {
               </div>
             </TableCell>
             <TableCell>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
+              <div className="flex space-x-2">
+                <PermissionButton
+                  permission="editarAlunos"
                   variant="outline"
+                  size="sm"
                   onClick={() => onEdit(student)}
+                  showLockIcon={false}
                 >
                   <Edit className="h-4 w-4" />
-                </Button>
-                <Button
-                  size="sm"
+                </PermissionButton>
+                <PermissionButton
+                  permission="removerAlunos"
                   variant="outline"
+                  size="sm"
                   onClick={() => onDelete(student.id)}
+                  className="text-red-600 hover:text-red-700"
+                  showLockIcon={false}
                 >
                   <Trash2 className="h-4 w-4" />
-                </Button>
+                </PermissionButton>
               </div>
             </TableCell>
           </TableRow>

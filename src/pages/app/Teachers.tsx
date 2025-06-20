@@ -11,6 +11,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, Users } from 'lucide-react';
 import { useForm } from 'react-hook-form';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PermissionButton } from '@/components/shared/PermissionButton';
 
 interface Teacher {
   id: string;
@@ -30,6 +32,7 @@ const Teachers = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
   const { toast } = useToast();
+  const { hasPermission, isOwner } = usePermissions();
   const { register, handleSubmit, reset, setValue, watch } = useForm();
   const cpfValue = watch('cpf');
 
@@ -169,10 +172,14 @@ const Teachers = () => {
         <h1 className="text-3xl font-bold">Professores</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={openCreateDialog} className="bg-brand-red hover:bg-brand-red/90">
+            <PermissionButton 
+              permission="gerenciarUsuarios"
+              className="bg-brand-red hover:bg-brand-red/90"
+              onClick={openCreateDialog}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Novo Professor
-            </Button>
+            </PermissionButton>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
@@ -325,20 +332,25 @@ const Teachers = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <Button
-                          size="sm"
+                        <PermissionButton
+                          permission="gerenciarUsuarios"
                           variant="outline"
+                          size="sm"
                           onClick={() => openEditDialog(teacher)}
+                          showLockIcon={false}
                         >
                           <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
+                        </PermissionButton>
+                        <PermissionButton
+                          permission="gerenciarUsuarios"
                           variant="outline"
+                          size="sm"
                           onClick={() => deleteTeacher(teacher.id)}
+                          className="text-red-600 hover:text-red-700"
+                          showLockIcon={false}
                         >
                           <Trash2 className="h-4 w-4" />
-                        </Button>
+                        </PermissionButton>
                       </div>
                     </TableCell>
                   </TableRow>

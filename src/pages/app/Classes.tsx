@@ -12,6 +12,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, BookCopy } from 'lucide-react';
 import { useForm } from 'react-hook-form';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PermissionGuard } from '@/components/guards/PermissionGuard';
+import { PermissionButton } from '@/components/shared/PermissionButton';
 
 interface Class {
   id: string;
@@ -47,6 +50,7 @@ const Classes = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
   const { toast } = useToast();
+  const { hasPermission, isOwner } = usePermissions();
   const { register, handleSubmit, reset, setValue, watch } = useForm();
 
   const selectedIdioma = watch('idioma');
@@ -224,17 +228,22 @@ const Classes = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Turmas</h1>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={openCreateDialog} className="bg-brand-red hover:bg-brand-red/90">
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Turma
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
+    <PermissionGuard permission="visualizarTurmas">
+      <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold">Turmas</h1>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <PermissionButton 
+                    permission="gerenciarTurmas"
+                  className="bg-brand-red hover:bg-brand-red/90"
+                  onClick={openCreateDialog}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nova Turma
+                </PermissionButton>
+              </DialogTrigger>
+               <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>
                 {editingClass ? 'Editar Turma' : 'Nova Turma'}
@@ -347,8 +356,8 @@ const Classes = () => {
               </div>
             </form>
           </DialogContent>
-        </Dialog>
-      </div>
+          </Dialog>
+        </div>
 
       <Card>
         <CardHeader>
@@ -404,20 +413,25 @@ const Classes = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <Button
-                          size="sm"
+                        <PermissionButton
+                          permission="gerenciarTurmas"
                           variant="outline"
+                          size="sm"
                           onClick={() => openEditDialog(classItem)}
+                          showLockIcon={false}
                         >
                           <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
+                        </PermissionButton>
+                        <PermissionButton
+                          permission="gerenciarTurmas"
                           variant="outline"
+                          size="sm"
                           onClick={() => deleteClass(classItem.id)}
+                          className="text-red-600 hover:text-red-700"
+                          showLockIcon={false}
                         >
                           <Trash2 className="h-4 w-4" />
-                        </Button>
+                        </PermissionButton>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -427,7 +441,8 @@ const Classes = () => {
           )}
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </PermissionGuard>
   );
 };
 

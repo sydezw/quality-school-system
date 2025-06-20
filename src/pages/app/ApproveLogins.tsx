@@ -2,10 +2,14 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Clock, Users, FileText, UserCheck } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CheckCircle, XCircle, Clock, Users, FileText, UserCheck, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
+import type { Database, Tables } from "@/integrations/supabase/types";
+import { PermissionToggle } from "@/components/shared/PermissionToggle";
+import { usePermissions, UserPermissions } from "@/hooks/usePermissions";
+import { PermissionGuard } from "@/components/guards/PermissionGuard";
 
 interface PendingUser {
   id: string;
@@ -18,13 +22,20 @@ interface PendingUser {
   created_at: string;
 }
 
+type ApprovedUser = Tables<'usuarios'>;
+
 export default function ApproveLogins() {
   const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
+  const [approvedUsers, setApprovedUsers] = useState<ApprovedUser[]>([]);
   const [pendingLoading, setPendingLoading] = useState(true);
+  const [approvedLoading, setApprovedLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('pending');
   const { toast } = useToast();
+  const { isOwner } = usePermissions();
 
   useEffect(() => {
     fetchPendingUsers();
+    fetchApprovedUsers();
   }, []);
 
   const fetchPendingUsers = async () => {
@@ -57,6 +68,38 @@ export default function ApproveLogins() {
        });
      } finally {
       setPendingLoading(false);
+    }
+  };
+
+  const fetchApprovedUsers = async () => {
+    setApprovedLoading(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+         console.error('Erro ao buscar usuários aprovados:', error);
+         toast({
+           title: "Erro",
+           description: "Erro ao carregar usuários aprovados",
+           variant: "destructive",
+         });
+         return;
+       }
+
+      setApprovedUsers(data || []);
+    } catch (error) {
+       console.error('Erro ao buscar usuários aprovados:', error);
+       toast({
+         title: "Erro",
+         description: "Erro ao carregar usuários aprovados",
+         variant: "destructive",
+       });
+     } finally {
+      setApprovedLoading(false);
     }
   };
 
@@ -125,8 +168,11 @@ export default function ApproveLogins() {
         });
       }
 
-      // Atualizar a lista local removendo o usuário processado
-      setPendingUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
+      // Atualizar as listas
+      fetchPendingUsers();
+      if (action === 'approve') {
+        fetchApprovedUsers();
+      }
       
     } catch (error) {
       console.error('Erro ao processar ação do usuário:', error);
@@ -139,89 +185,137 @@ export default function ApproveLogins() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      <Card>
+    <PermissionGuard permission="gerenciarUsuarios">
+      <div className="container mx-auto p-6">
+        <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <UserCheck className="h-6 w-6" />
-            Aprovar Logins
+            Gestão de Usuários
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-gray-500" />
-                <span className="text-sm text-gray-600">
-                  {pendingUsers.length} solicitação(ões) pendente(s) de aprovação
-                </span>
-              </div>
-              <Badge variant="secondary" className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                Aguardando Análise
-              </Badge>
-            </div>
-            
-            {pendingLoading ? (
-              <div className="py-10 text-center text-muted-foreground">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-red border-t-transparent mx-auto mb-2"></div>
-                Carregando solicitações...
-              </div>
-            ) : pendingUsers.length === 0 ? (
-              <div className="py-10 text-center text-muted-foreground">
-                <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                <p className="text-lg font-medium mb-2">Nenhuma solicitação pendente</p>
-                <p className="text-sm">Todas as solicitações de cadastro foram processadas.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {pendingUsers.map((user) => (
-                  <div key={user.id} className="border rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="font-semibold text-lg">{user.nome}</h3>
-                          <Badge variant="outline" className="text-xs">
-                            {user.cargo}
-                          </Badge>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                          <div>
-                            <span className="font-medium">E-mail:</span> {user.email}
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="pending" className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Aprovações Pendentes
+                {pendingUsers.length > 0 && (
+                  <Badge variant="secondary" className="ml-1">
+                    {pendingUsers.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="permissions" className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                Gerenciar Permissões
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="pending" className="mt-6">
+              {pendingLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : pendingUsers.length === 0 ? (
+                <div className="text-center py-8">
+                  <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium mb-2">Nenhum usuário pendente</h3>
+                  <p className="text-muted-foreground">Não há usuários aguardando aprovação no momento.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {pendingUsers.map((user) => (
+                    <Card key={user.id} className="border-l-4 border-l-yellow-500">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-medium">{user.nome}</h4>
+                              <Badge variant="outline" className="text-yellow-600 border-yellow-600">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Pendente
+                              </Badge>
+                            </div>
+                            <div className="text-sm text-muted-foreground space-y-1">
+                              <p><strong>Email:</strong> {user.email}</p>
+                              <p><strong>Cargo:</strong> {user.cargo}</p>
+                              <p><strong>Data de Solicitação:</strong> {new Date(user.created_at).toLocaleDateString('pt-BR')}</p>
+                            </div>
                           </div>
-                          <div>
-                            <span className="font-medium">Data da Solicitação:</span> {new Date(user.created_at).toLocaleDateString('pt-BR')}
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={() => handleUserAction(user.id, 'approve')}
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              Aprovar
+                            </Button>
+                            <Button
+                              onClick={() => handleUserAction(user.id, 'reject')}
+                              size="sm"
+                              variant="destructive"
+                            >
+                              <XCircle className="h-4 w-4 mr-1" />
+                              Rejeitar
+                            </Button>
                           </div>
                         </div>
-                      </div>
-                      <div className="flex gap-2 ml-4">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-green-600 border-green-600 hover:bg-green-50 hover:border-green-700"
-                          onClick={() => handleUserAction(user.id, 'approve')}
-                        >
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          Aprovar
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-red-600 border-red-600 hover:bg-red-50 hover:border-red-700"
-                          onClick={() => handleUserAction(user.id, 'reject')}
-                        >
-                          <XCircle className="h-4 w-4 mr-1" />
-                          Rejeitar
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="permissions" className="mt-6">
+              {!isOwner ? (
+                <div className="text-center py-8">
+                  <Settings className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium mb-2">Acesso Restrito</h3>
+                  <p className="text-muted-foreground">Apenas administradores podem gerenciar permissões de usuários.</p>
+                </div>
+              ) : approvedLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : approvedUsers.length === 0 ? (
+                <div className="text-center py-8">
+                  <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium mb-2">Nenhum usuário encontrado</h3>
+                  <p className="text-muted-foreground">Não há usuários aprovados no sistema.</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {approvedUsers.map((user) => (
+                    <Card key={user.id}>
+                      <CardHeader>
+                        <CardTitle className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span>{user.nome}</span>
+                            <Badge variant={user.cargo === 'Admin' ? 'default' : 'secondary'}>
+                              {user.cargo}
+                            </Badge>
+                          </div>
+                          <span className="text-sm text-muted-foreground">{user.email}</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <PermissionToggle 
+                          user={user} 
+                          onPermissionChange={fetchApprovedUsers}
+                        />
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </CardContent>
-      </Card>
-    </div>
-  );
+        </Card>
+       </div>
+     </PermissionGuard>
+   );
 }

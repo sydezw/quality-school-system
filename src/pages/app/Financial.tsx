@@ -12,6 +12,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, DollarSign, Receipt, CreditCard } from 'lucide-react';
 import { useForm } from 'react-hook-form';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PermissionButton } from '@/components/shared/PermissionButton';
+import { PermissionGuard } from '@/components/guards/PermissionGuard';
 
 interface Boleto {
   id: string;
@@ -48,6 +51,7 @@ const Financial = () => {
   const [editingBoleto, setEditingBoleto] = useState<Boleto | null>(null);
   const [editingDespesa, setEditingDespesa] = useState<Despesa | null>(null);
   const { toast } = useToast();
+  const { hasPermission, isOwner } = usePermissions();
   const { register: registerBoleto, handleSubmit: handleSubmitBoleto, reset: resetBoleto, setValue: setValueBoleto } = useForm();
   const { register: registerDespesa, handleSubmit: handleSubmitDespesa, reset: resetDespesa, setValue: setValueDespesa } = useForm();
 
@@ -290,20 +294,23 @@ const Financial = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-red border-t-transparent mx-auto"></div>
-          <p className="mt-2 text-gray-600">Carregando dados financeiros...</p>
+      <PermissionGuard permission="gerenciarBoletos">
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-red border-t-transparent mx-auto"></div>
+            <p className="mt-2 text-gray-600">Carregando dados financeiros...</p>
+          </div>
         </div>
-      </div>
+      </PermissionGuard>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Financeiro</h1>
-      </div>
+    <PermissionGuard permission="gerenciarBoletos">
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold">Financeiro</h1>
+        </div>
 
       {/* Cards de Resumo */}
       <div className="grid gap-6 md:grid-cols-3">
@@ -353,10 +360,14 @@ const Financial = () => {
             <h2 className="text-xl font-semibold">Boletos e Receitas</h2>
             <Dialog open={isBoletoDialogOpen} onOpenChange={setIsBoletoDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={() => { setEditingBoleto(null); resetBoleto(); setIsBoletoDialogOpen(true); }} className="bg-brand-red hover:bg-brand-red/90">
+                <PermissionButton
+                  permission="gerenciarBoletos"
+                  onClick={() => { setEditingBoleto(null); resetBoleto(); setIsBoletoDialogOpen(true); }}
+                  className="bg-brand-red hover:bg-brand-red/90"
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Novo Boleto
-                </Button>
+                </PermissionButton>
               </DialogTrigger>
               <DialogContent className="max-w-md">
                 <DialogHeader>
@@ -483,20 +494,22 @@ const Financial = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            <Button
+                            <PermissionButton
+                              permission="editarFinanceiro"
                               size="sm"
                               variant="outline"
                               onClick={() => openEditBoletoDialog(boleto)}
                             >
                               <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
+                            </PermissionButton>
+                            <PermissionButton
+                              permission="removerFinanceiro"
                               size="sm"
                               variant="outline"
                               onClick={() => deleteBoleto(boleto.id)}
                             >
                               <Trash2 className="h-4 w-4" />
-                            </Button>
+                            </PermissionButton>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -513,10 +526,14 @@ const Financial = () => {
             <h2 className="text-xl font-semibold">Despesas</h2>
             <Dialog open={isDespesaDialogOpen} onOpenChange={setIsDespesaDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={() => { setEditingDespesa(null); resetDespesa(); setIsDespesaDialogOpen(true); }} className="bg-brand-red hover:bg-brand-red/90">
+                <PermissionButton
+                  permission="gerenciarDespesas"
+                  onClick={() => { setEditingDespesa(null); resetDespesa(); setIsDespesaDialogOpen(true); }}
+                  className="bg-brand-red hover:bg-brand-red/90"
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Nova Despesa
-                </Button>
+                </PermissionButton>
               </DialogTrigger>
               <DialogContent className="max-w-md">
                 <DialogHeader>
@@ -634,20 +651,22 @@ const Financial = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            <Button
+                            <PermissionButton
+                              permission="editarFinanceiro"
                               size="sm"
                               variant="outline"
                               onClick={() => openEditDespesaDialog(despesa)}
                             >
                               <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
+                            </PermissionButton>
+                            <PermissionButton
+                              permission="removerFinanceiro"
                               size="sm"
                               variant="outline"
                               onClick={() => deleteDespesa(despesa.id)}
                             >
                               <Trash2 className="h-4 w-4" />
-                            </Button>
+                            </PermissionButton>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -658,8 +677,9 @@ const Financial = () => {
             </CardContent>
           </Card>
         </TabsContent>
-      </Tabs>
-    </div>
+        </Tabs>
+      </div>
+    </PermissionGuard>
   );
 };
 

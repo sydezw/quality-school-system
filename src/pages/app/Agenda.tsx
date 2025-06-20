@@ -12,6 +12,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, Calendar, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { useForm } from 'react-hook-form';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PermissionButton } from '@/components/shared/PermissionButton';
+import { PermissionGuard } from '@/components/guards/PermissionGuard';
 
 interface AgendaItem {
   id: string;
@@ -34,6 +37,7 @@ const Agenda = () => {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const { toast } = useToast();
   const { register, handleSubmit, reset, setValue } = useForm();
+  const { hasPermission, isOwner } = usePermissions();
 
   useEffect(() => {
     fetchCurrentUser();
@@ -334,14 +338,18 @@ const Agenda = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">📅 Agenda Escolar</h1>
-        <Button onClick={() => openCreateDialog()}>
-          <Plus className="h-4 w-4 mr-2" />
-          Adicionar Evento
-        </Button>
-      </div>
+    <PermissionGuard permission="visualizarAgenda">
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">📅 Agenda Escolar</h1>
+          <PermissionButton
+            permission="gerenciarAgenda"
+            onClick={() => openCreateDialog()}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Adicionar Evento
+          </PermissionButton>
+        </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Calendário Principal */}
@@ -530,7 +538,8 @@ const Agenda = () => {
                 Cancelar
               </Button>
               {editingItem && (
-                <Button
+                <PermissionButton
+                  permission="gerenciarAgenda"
                   type="button"
                   variant="destructive"
                   onClick={() => {
@@ -540,13 +549,14 @@ const Agenda = () => {
                   }}
                 >
                   <Trash2 className="h-4 w-4" />
-                </Button>
+                </PermissionButton>
               )}
             </div>
           </form>
         </DialogContent>
-      </Dialog>
-    </div>
+        </Dialog>
+      </div>
+    </PermissionGuard>
   );
 };
 

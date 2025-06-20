@@ -39,6 +39,7 @@ interface StudentDialogProps {
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: any) => void;
   onOpenCreate: () => void;
+  hideButton?: boolean;
 }
 
 const StudentDialog = ({ 
@@ -47,16 +48,19 @@ const StudentDialog = ({
   classes, 
   onOpenChange, 
   onSubmit, 
-  onOpenCreate 
+  onOpenCreate,
+  hideButton = false
 }: StudentDialogProps) => {
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetTrigger asChild>
-        <Button onClick={onOpenCreate} className="bg-brand-red hover:bg-brand-red/90">
-          <Plus />
-          Novo Aluno
-        </Button>
-      </SheetTrigger>
+      {!hideButton && (
+        <SheetTrigger asChild>
+          <Button onClick={onOpenCreate} className="bg-brand-red hover:bg-brand-red/90">
+            <Plus />
+            Novo Aluno
+          </Button>
+        </SheetTrigger>
+      )}
       <SheetContent className="overflow-y-auto sm:max-w-xl">
         <SheetHeader>
           <SheetTitle>

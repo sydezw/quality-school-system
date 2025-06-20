@@ -1,9 +1,12 @@
-
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import StudentDialog from '@/components/students/StudentDialog';
 import StudentTable from '@/components/students/StudentTable';
 import { useStudents } from '@/hooks/useStudents';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PermissionButton } from '@/components/shared/PermissionButton';
+import { PermissionGuard } from '@/components/guards/PermissionGuard';
+import { Plus } from 'lucide-react';
 
 interface Student {
   id: string;
@@ -24,6 +27,7 @@ interface Student {
 
 const Students = () => {
   const { students, classes, loading, saveStudent, deleteStudent } = useStudents();
+  const { hasPermission, isOwner } = usePermissions();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [query, setQuery] = useState('');
@@ -66,18 +70,29 @@ const Students = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-3xl font-bold">Alunos</h1>
-        <div className="flex-1 flex items-center gap-2 sm:ml-8">
-          <input
-            type="text"
-            placeholder="Buscar por nome..."
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            className="w-full md:w-64 px-3 py-2 border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-brand-red"
-          />
+    <PermissionGuard permission="visualizarAlunos">
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold tracking-tight">Alunos</h1>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Buscar alunos..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-transparent"
+            />
+            <PermissionButton 
+              permission="gerenciarAlunos"
+              className="bg-brand-red text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors flex items-center gap-2"
+              onClick={handleCreate}
+            >
+              <Plus size={16} />
+              Novo Aluno
+            </PermissionButton>
+          </div>
         </div>
+
         <StudentDialog
           isOpen={isDialogOpen}
           editingStudent={editingStudent}
@@ -85,22 +100,23 @@ const Students = () => {
           onOpenChange={setIsDialogOpen}
           onSubmit={handleSubmit}
           onOpenCreate={handleCreate}
+          hideButton={true}
         />
-      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Lista de Alunos ({filteredStudents.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <StudentTable
-            students={filteredStudents}
-            onEdit={handleEdit}
-            onDelete={deleteStudent}
-          />
-        </CardContent>
-      </Card>
-    </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Lista de Alunos ({filteredStudents.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <StudentTable
+              students={filteredStudents}
+              onEdit={handleEdit}
+              onDelete={deleteStudent}
+            />
+          </CardContent>
+        </Card>
+      </div>
+    </PermissionGuard>
   );
 };
 

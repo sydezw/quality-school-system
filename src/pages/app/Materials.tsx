@@ -13,6 +13,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, BookOpen, Package } from 'lucide-react';
 import { useForm } from 'react-hook-form';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PermissionButton } from '@/components/shared/PermissionButton';
+import { PermissionGuard } from '@/components/guards/PermissionGuard';
 
 interface Material {
   id: string;
@@ -30,6 +33,7 @@ const Materials = () => {
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
   const { toast } = useToast();
   const { register, handleSubmit, reset, setValue } = useForm();
+  const { hasPermission, isOwner } = usePermissions();
 
   useEffect(() => {
     fetchMaterials();
@@ -165,15 +169,20 @@ const Materials = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Materiais Didáticos</h1>
+    <PermissionGuard permission="visualizarMateriais">
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold">Materiais Didáticos</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={openCreateDialog} className="bg-brand-red hover:bg-brand-red/90">
+            <PermissionButton
+              permission="gerenciarMateriais"
+              onClick={openCreateDialog}
+              className="bg-brand-red hover:bg-brand-red/90"
+            >
               <Plus className="h-4 w-4 mr-2" />
               Novo Material
-            </Button>
+            </PermissionButton>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
@@ -303,20 +312,22 @@ const Materials = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <Button
+                        <PermissionButton
+                          permission="gerenciarMateriais"
                           size="sm"
                           variant="outline"
                           onClick={() => openEditDialog(material)}
                         >
                           <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
+                        </PermissionButton>
+                        <PermissionButton
+                          permission="gerenciarMateriais"
                           size="sm"
                           variant="outline"
                           onClick={() => deleteMaterial(material.id)}
                         >
                           <Trash2 className="h-4 w-4" />
-                        </Button>
+                        </PermissionButton>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -325,8 +336,9 @@ const Materials = () => {
             </Table>
           )}
         </CardContent>
-      </Card>
-    </div>
+        </Card>
+      </div>
+    </PermissionGuard>
   );
 };
 
