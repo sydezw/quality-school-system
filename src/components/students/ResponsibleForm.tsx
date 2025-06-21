@@ -23,7 +23,10 @@ interface ResponsibleFormProps {
 }
 
 const ResponsibleForm = ({ editingResponsible, onSubmit, onCancel }: ResponsibleFormProps) => {
-  const { register, handleSubmit, reset, setValue, watch } = useForm();
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm({
+    mode: 'onSubmit',
+    reValidateMode: 'onSubmit'
+  });
   const { toast } = useToast();
   const [loadingCep, setLoadingCep] = useState(false);
   const cpfValue = watch('cpf');
@@ -93,11 +96,25 @@ const ResponsibleForm = ({ editingResponsible, onSubmit, onCancel }: Responsible
   };
 
   const handleFormSubmit = (data: any) => {
+    // Validação manual para evitar mensagens de erro temporárias
+    if (!data.nome || data.nome.trim() === '') {
+      toast({
+        title: "Erro",
+        description: "O nome é obrigatório.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const { cep, ...rest } = data;
     const submitData = {
-      ...rest,
-      cpf: data.cpf ? data.cpf.replace(/\D/g, '') : null
+      nome: data.nome || '',
+      cpf: data.cpf ? data.cpf.replace(/\D/g, '') : null,
+      endereco: data.endereco || null,
+      numero_endereco: data.numero_endereco || null,
+      telefone: data.telefone || null
     };
+    console.log('Dados sendo enviados:', submitData);
     onSubmit(submitData);
   };
 
@@ -107,9 +124,12 @@ const ResponsibleForm = ({ editingResponsible, onSubmit, onCancel }: Responsible
         <Label htmlFor="nome">Nome *</Label>
         <Input
           id="nome"
-          {...register('nome', { required: true })}
+          {...register('nome')}
           placeholder="Nome completo do responsável"
         />
+        {errors.nome && (
+          <p className="text-sm text-red-600 mt-1">Nome é obrigatório</p>
+        )}
       </div>
 
       <div>

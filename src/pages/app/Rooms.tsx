@@ -104,15 +104,6 @@ const Rooms = () => {
   };
 
   const deleteRoom = async (id: string) => {
-    if (!isOwner() && !hasPermission('gerenciarSalas')) {
-      toast({
-        title: "Acesso Negado",
-        description: "Você não tem permissão para realizar esta ação. Entre em contato com o administrador.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (!confirm('Tem certeza que deseja excluir esta sala?')) return;
 
     try {

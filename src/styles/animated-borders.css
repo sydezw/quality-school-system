@@ -1,0 +1,166 @@
+/* Animação de borda vermelha e branca para caixas de seleção ativas */
+@keyframes redWhiteBorderPulse {
+  0% {
+    border-color: #dc2626; /* red-600 */
+    box-shadow: 0 0 0 0.5px #dc2626, 0 0 5px rgba(220, 38, 38, 0.2);
+  }
+  25% {
+    border-color: #ef4444; /* red-500 */
+    box-shadow: 0 0 0 0.5px #ef4444, 0 0 5px rgba(239, 68, 68, 0.2);
+  }
+  50% {
+    border-color: #f87171; /* red-400 */
+    box-shadow: 0 0 0 0.5px #f87171, 0 0 5px rgba(248, 113, 113, 0.2);
+  }
+  75% {
+    border-color: #e5e7eb; /* gray-200 (branco suave) */
+    box-shadow: 0 0 0 0.5px #e5e7eb, 0 0 5px rgba(229, 231, 235, 0.3);
+  }
+  100% {
+    border-color: #dc2626; /* red-600 */
+    box-shadow: 0 0 0 0.5px #dc2626, 0 0 5px rgba(220, 38, 38, 0.2);
+  }
+}
+
+/* Aplicar animação apenas quando os componentes estão abertos/ativos */
+
+/* Popover trigger quando aberto */
+[data-radix-popover-trigger][data-state="open"] {
+  border: 2px solid #dc2626 !important;
+  border-radius: 8px 8px 0 0 !important;
+  animation: redWhiteBorderPulse 2s infinite !important;
+}
+
+/* Popover content quando aberto */
+[data-radix-popover-content] {
+  border: 2px solid #dc2626 !important;
+  border-top: none !important;
+  border-radius: 0 0 8px 8px !important;
+  animation: redWhiteBorderPulse 2s infinite !important;
+  margin-top: -2px !important;
+}
+
+/* Wrapper div para combobox */
+.combobox-wrapper {
+  border: 1px solid #d1d5db !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+
+.combobox-wrapper[data-open="true"] {
+  border: 2px solid #dc2626 !important;
+  border-radius: 8px !important;
+  animation: redWhiteBorderPulse 2s infinite !important;
+}
+
+
+
+/* REMOVER TODAS AS BORDAS INTERNAS */
+[data-radix-popover-content] *,
+[data-radix-popover-content] *::before,
+[data-radix-popover-content] *::after {
+  border: none !important;
+  border-top: none !important;
+  border-bottom: none !important;
+  border-left: none !important;
+  border-right: none !important;
+  box-shadow: none !important;
+}
+
+/* Transições suaves */
+[data-radix-select-trigger],
+button[role="combobox"],
+div[role="combobox"] {
+  transition: all 0.3s ease-in-out;
+  border: 1px solid #d1d5db; /* gray-300 padrão */
+}
+
+/* Hover effects - sutil quando não está ativo */
+[data-radix-select-trigger]:hover:not([data-state="open"]),
+button[role="combobox"]:hover:not([aria-expanded="true"]),
+div[role="combobox"]:hover:not([aria-expanded="true"]) {
+  border-color: #6b7280; /* gray-500 */
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* ===== CAMPOS DE ENTRADA DE TEXTO ===== */
+
+/* Input fields - animação quando focado */
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="number"],
+input[type="password"],
+input[type="search"],
+input:not([type]),
+.input-field,
+[data-input] {
+  transition: all 0.3s ease-in-out;
+  border: 1px solid #d1d5db; /* gray-300 padrão */
+}
+
+/* Input focus - animação vermelha e branca - DESABILITADO */
+
+/* Textarea - animação quando focado */
+textarea,
+.textarea-field,
+[data-textarea] {
+  transition: all 0.3s ease-in-out;
+  border: 1px solid #d1d5db; /* gray-300 padrão */
+}
+
+/* textarea:focus - DESABILITADO */
+
+/* Command Input - animação quando focado */
+[cmdk-input],
+.command-input,
+[data-cmdk-input] {
+  transition: all 0.3s ease-in-out;
+  border: 1px solid #d1d5db; /* gray-300 padrão */
+}
+
+/* command input focus - DESABILITADO */
+
+/* Hover effects para campos de texto - sutil quando não focado */
+input[type="text"]:hover:not(:focus),
+input[type="email"]:hover:not(:focus),
+input[type="tel"]:hover:not(:focus),
+input[type="number"]:hover:not(:focus),
+input[type="password"]:hover:not(:focus),
+input[type="search"]:hover:not(:focus),
+input:not([type]):hover:not(:focus),
+textarea:hover:not(:focus),
+[cmdk-input]:hover:not(:focus),
+.input-field:hover:not(:focus),
+.textarea-field:hover:not(:focus),
+.command-input:hover:not(:focus) {
+  border-color: #6b7280; /* gray-500 */
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Garantir que os estilos se apliquem aos componentes UI específicos */
+.ui-input,
+.ui-textarea,
+.ui-command-input {
+  transition: all 0.3s ease-in-out;
+  border: 1px solid #d1d5db;
+}
+
+/* ui components focus - DESABILITADO */
+
+.ui-input:hover:not(:focus),
+.ui-textarea:hover:not(:focus),
+.ui-command-input:hover:not(:focus) {
+  border-color: #6b7280;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Efeito especial para elementos ativos */
+[data-radix-select-trigger][data-state="open"]:hover,
+[role="combobox"][aria-expanded="true"]:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
+}

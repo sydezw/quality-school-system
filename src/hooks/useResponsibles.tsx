@@ -40,23 +40,33 @@ export const useResponsibles = () => {
 
   const saveResponsible = async (data: any, editingResponsible: Responsible | null) => {
     try {
+      console.log('Salvando responsável:', { data, editingResponsible });
+      
       if (editingResponsible) {
         const { error } = await supabase
           .from('responsaveis')
           .update(data)
           .eq('id', editingResponsible.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Erro no update:', error);
+          throw error;
+        }
         toast({
           title: "Sucesso",
           description: "Responsável atualizado com sucesso!",
         });
       } else {
-        const { error } = await supabase
+        const { data: result, error } = await supabase
           .from('responsaveis')
-          .insert([data]);
+          .insert([data])
+          .select();
 
-        if (error) throw error;
+        if (error) {
+          console.error('Erro no insert:', error);
+          throw error;
+        }
+        console.log('Responsável criado:', result);
         toast({
           title: "Sucesso",
           description: "Responsável criado com sucesso!",
@@ -69,7 +79,7 @@ export const useResponsibles = () => {
       console.error('Erro ao salvar responsável:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível salvar o responsável.",
+        description: `Não foi possível salvar o responsável. ${error.message || ''}`,
         variant: "destructive",
       });
       return false;

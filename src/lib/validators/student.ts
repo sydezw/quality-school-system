@@ -32,24 +32,6 @@ export const studentFormSchema = z.object({
   data_nascimento: z.date({
     required_error: "Data de nascimento é obrigatória."
   }).nullable().refine(val => !!val, { message: "Data de nascimento é obrigatória." }),
-}).superRefine((data, ctx) => {
-  // Validar responsável se menor
-  const { data_nascimento, responsavel_id } = data as any;
-  let menorDeIdade = false;
-
-  if (data_nascimento instanceof Date) {
-    menorDeIdade = isMenorIdade(data_nascimento);
-  }
-
-  if (menorDeIdade) {
-    if (!responsavel_id || responsavel_id === "none") {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["responsavel_id"],
-        message: "Informe um responsável para alunos menores de idade.",
-      });
-    }
-  }
 });
 
 export type StudentFormValues = z.infer<typeof studentFormSchema>;

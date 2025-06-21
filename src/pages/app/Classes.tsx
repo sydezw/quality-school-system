@@ -161,15 +161,6 @@ const Classes = () => {
   };
 
   const deleteClass = async (id: string) => {
-    if (!isOwner() && !hasPermission('gerenciarTurmas')) {
-      toast({
-        title: "Acesso Negado",
-        description: "Você não tem permissão para realizar esta ação. Entre em contato com o administrador.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (!confirm('Tem certeza que deseja excluir esta turma?')) return;
 
     try {

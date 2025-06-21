@@ -1,11 +1,36 @@
-import { useState, useMemo, useRef } from "react";
-import { FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import StudentSelectField from "./StudentSelectField";
+import React, { useState, useMemo } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Check, ChevronsUpDown, Plus, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import ResponsibleDialog from "./ResponsibleDialog";
 import { Control } from "react-hook-form";
 import { StudentFormValues } from "@/lib/validators/student";
-import { Search, Trash2 } from "lucide-react";
 import { useResponsibles } from "@/hooks/useResponsibles";
 
 interface Responsible {
@@ -23,100 +48,16 @@ interface ResponsibleFieldProps {
   saveResponsible: (data: any, editingResponsible: any) => Promise<boolean>;
 }
 
-function normalizeSearch(text: string) {
-  if (!text) return "";
-  return text
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/\D/g, "");
-}
-
-function highlightMatch(text: string, query: string) {
-  if (!query) return text;
-  const normalizedText = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  const idx = normalizedText.indexOf(query.toLowerCase());
-  if (idx === -1) return text;
-  return (
-    <>
-      {text.slice(0, idx)}
-      <span className="font-bold bg-yellow-200 rounded">{text.slice(idx, idx + query.length)}</span>
-      {text.slice(idx + query.length)}
-    </>
-  );
-}
-
-const SuggestionDropdown = ({
-  suggestions,
-  searchQuery,
-  onSelect,
-  onDelete,
-  visible,
-  selectedResponsibleId,
-  deletingId,
-}: {
-  suggestions: Responsible[];
-  searchQuery: string;
-  onSelect: (r: Responsible) => void;
-  onDelete: (id: string) => void;
-  visible: boolean;
-  selectedResponsibleId?: string | null;
-  deletingId?: string | null;
-}) => {
-  if (!visible || !suggestions.length || !searchQuery.trim()) return null;
-  return (
-    <ul className="absolute left-0 right-0 mt-1 z-50 bg-white border border-gray-200 rounded shadow max-h-56 overflow-auto">
-      {suggestions.map(responsible => (
-        <li key={responsible.id}>
-          <div className={`flex items-center w-full ${selectedResponsibleId === responsible.id ? "bg-gray-50" : ""}`}>
-            <button
-              type="button"
-              className={`flex-1 text-left px-3 py-2 hover:bg-gray-100 flex flex-col`}
-              onClick={() => onSelect(responsible)}
-            >
-              <span>
-                {highlightMatch(responsible.nome, searchQuery)}
-                {responsible.cpf && (
-                  <span className="ml-2 text-xs text-gray-500">CPF: {highlightMatch(responsible.cpf, searchQuery.replace(/\D/g, ""))}</span>
-                )}
-              </span>
-              {responsible.telefone && (
-                <span className="text-xs text-gray-500">Telefone: {highlightMatch(responsible.telefone, searchQuery.replace(/\D/g, ""))}</span>
-              )}
-            </button>
-            <button
-              type="button"
-              className="px-2 py-2 text-red-500 hover:bg-red-50 rounded-tr-md rounded-br-md"
-              onClick={() => onDelete(responsible.id)}
-              title="Excluir responsável"
-              disabled={deletingId === responsible.id}
-            >
-              {deletingId === responsible.id ? (
-                <span className="w-4 h-4 flex items-center justify-center animate-spin border-2 border-gray-300 border-t-red-500 rounded-full"></span>
-              ) : (
-                <Trash2 className="w-4 h-4" />
-              )}
-            </button>
-          </div>
-        </li>
-      ))}
-    </ul>
-  );
-};
-
-const ResponsibleField = ({ control, responsibles, saveResponsible }: ResponsibleFieldProps) => {
+const ResponsibleFieldComponent = ({ control, responsibles, saveResponsible }: ResponsibleFieldProps) => {
   const [isResponsibleDialogOpen, setIsResponsibleDialogOpen] = useState(false);
   const [editingResponsible, setEditingResponsible] = useState<Responsible | null>(null);
+  const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const { deleteResponsible } = useResponsibles();
 
   const filteredResponsibles = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return responsibles;
-    }
+    if (!searchQuery.trim()) return responsibles;
     const queryNorm = searchQuery.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const queryNumbers = searchQuery.replace(/\D/g, "");
 
@@ -125,18 +66,22 @@ const ResponsibleField = ({ control, responsibles, saveResponsible }: Responsibl
       const cpfNorm = responsible.cpf ? responsible.cpf.replace(/\D/g, "") : "";
       const telNorm = responsible.telefone ? responsible.telefone.replace(/\D/g, "") : "";
 
-      return (
+      // Busca inteligente: início do nome completo, início de qualquer palavra, ou sobrenomes
+      const nomeWords = nomeNorm.split(' ').filter(word => word.length > 0);
+      const queryMatches = (
+        // Começa com a query
         nomeNorm.startsWith(queryNorm) ||
-        nomeNorm.includes(queryNorm) ||
-        (cpfNorm && cpfNorm.startsWith(queryNumbers)) ||
+        // Qualquer palavra começa com a query
+        nomeWords.some(word => word.startsWith(queryNorm)) ||
+        // CPF contém os números
         (cpfNorm && cpfNorm.includes(queryNumbers)) ||
-        (telNorm && telNorm.startsWith(queryNumbers)) ||
+        // Telefone contém os números
         (telNorm && telNorm.includes(queryNumbers))
       );
+
+      return queryMatches;
     });
   }, [responsibles, searchQuery]);
-
-  const suggestions = useMemo(() => filteredResponsibles.slice(0, 7), [filteredResponsibles]);
 
   const handleResponsibleSubmit = async (data: any) => {
     const success = await saveResponsible(data, editingResponsible);
@@ -152,88 +97,159 @@ const ResponsibleField = ({ control, responsibles, saveResponsible }: Responsibl
   };
 
   const handleDeleteResponsible = async (id: string) => {
-    setShowSuggestions(false);
-    setTimeout(async () => {
-      const confirmed = window.confirm('Tem certeza que deseja excluir este responsável?');
-      if (!confirmed) return;
-      setDeletingId(id);
-      await deleteResponsible(id);
-      setDeletingId(null);
-      setSearchQuery("");
-      if (inputRef.current) inputRef.current.blur();
-    }, 80);
+    const confirmed = window.confirm('Tem certeza que deseja excluir este responsável?');
+    if (!confirmed) return;
+    setDeletingId(id);
+    await deleteResponsible(id);
+    setDeletingId(null);
   };
 
   return (
     <FormField
       control={control}
       name="responsavel_id"
-      render={({ field }) => (
-        <FormItem>
-          <div className="flex items-center justify-between mb-2">
-            <FormLabel>Responsável</FormLabel>
-            <ResponsibleDialog
-              isOpen={isResponsibleDialogOpen}
-              editingResponsible={editingResponsible}
-              onOpenChange={setIsResponsibleDialogOpen}
-              onSubmit={handleResponsibleSubmit}
-              onOpenCreate={handleCreateResponsible}
-            />
-          </div>
-          <div className="relative mb-2">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-            <Input
-              ref={inputRef}
-              type="text"
-              placeholder="Pesquisar responsável por nome, CPF ou telefone..."
-              value={searchQuery}
-              onChange={e => {
-                setSearchQuery(e.target.value);
-                setShowSuggestions(true);
-              }}
-              onFocus={() => setShowSuggestions(true)}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 120)}
-              className="pl-10"
-              autoComplete="off"
-            />
-            <SuggestionDropdown
-              suggestions={suggestions}
-              searchQuery={searchQuery}
-              onSelect={responsible => {
-                field.onChange(responsible.id);
-                setSearchQuery(responsible.nome);
-                setShowSuggestions(false);
-                if (inputRef.current) inputRef.current.blur();
-              }}
-              onDelete={handleDeleteResponsible}
-              visible={showSuggestions}
-              selectedResponsibleId={field.value}
-              deletingId={deletingId}
-            />
-          </div>
-          <StudentSelectField
-            value={field.value || 'none'}
-            label={""}
-            options={[
-              { value: "none", label: "Sem responsável" },
-              ...filteredResponsibles.map((r) => ({
-                value: r.id,
-                label: r.nome
-              }))
-            ]}
-            onChange={field.onChange}
-            formMessage={<FormMessage />}
-          />
-          {searchQuery && (
-            <p className="text-sm text-gray-500 mt-1">
-              {filteredResponsibles.length > 0
-                ? `${filteredResponsibles.length} responsável(is) encontrado(s)`
-                : "Nenhum responsável encontrado"
-              }
-            </p>
-          )}
-        </FormItem>
-      )}
+      render={({ field }) => {
+        const selectedResponsible = responsibles.find(r => r.id === field.value);
+        return (
+          <FormItem>
+            <div className="flex items-center justify-between mb-2">
+              <FormLabel>Responsável</FormLabel>
+              <ResponsibleDialog
+                isOpen={isResponsibleDialogOpen}
+                editingResponsible={editingResponsible}
+                onOpenChange={setIsResponsibleDialogOpen}
+                onSubmit={handleResponsibleSubmit}
+                onOpenCreate={handleCreateResponsible}
+              />
+            </div>
+            <div className={`combobox-wrapper ${open ? 'border-red-600' : 'border-gray-300'}`} data-open={open}>
+               <Popover open={open} onOpenChange={setOpen}>
+                 <PopoverTrigger asChild>
+                        <Button
+                           variant="ghost"
+                           role="combobox"
+                           aria-expanded={open}
+                           className="w-full justify-between rounded-none border-0 focus:ring-0 focus:ring-offset-0 hover:bg-transparent"
+                           style={{ border: 'none', boxShadow: 'none', borderRadius: '0', outline: 'none' }}
+                         >
+                    {selectedResponsible ? selectedResponsible.nome : "Selecionar responsável..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent 
+                       className="p-0" 
+                       style={{ 
+                         width: 'var(--radix-popover-trigger-width)', 
+                         minWidth: '400px', 
+                         maxHeight: '300px'
+                       }}
+                     >
+                  <Command style={{ border: 'none' }}>
+                    <CommandInput
+                         placeholder="Buscar responsável..."
+                         value={searchQuery}
+                         onValueChange={setSearchQuery}
+                         style={{ border: 'none' }}
+                       />
+                    <CommandList style={{ border: 'none' }}>
+                    <CommandEmpty>
+                      <div className="text-center py-6 px-4">
+                        <div className="text-sm text-gray-500 mb-3">
+                          {searchQuery.trim() ? 
+                            `Nenhum responsável encontrado para "${searchQuery}"` : 
+                            'Nenhum responsável encontrado'
+                          }
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => {
+                            setOpen(false);
+                            handleCreateResponsible();
+                          }}
+                          className="bg-red-600 hover:bg-red-700 text-white"
+                        >
+                          <Plus className="w-4 h-4 mr-1" />
+                          Criar novo responsável
+                        </Button>
+                      </div>
+                    </CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="none"
+                        onSelect={() => {
+                          field.onChange(null);
+                          setOpen(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            !field.value ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        Sem responsável
+                      </CommandItem>
+                      {filteredResponsibles.map(responsible => (
+                        <CommandItem
+                          key={responsible.id}
+                          value={responsible.nome}
+                          onSelect={() => {
+                            field.onChange(responsible.id);
+                            setOpen(false);
+                          }}
+                        >
+                          <div className="flex items-center w-full">
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                field.value === responsible.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <div className="flex-1">
+                              <div className="font-medium">{responsible.nome}</div>
+                              {responsible.cpf && (
+                                <div className="text-sm text-gray-500">CPF: {responsible.cpf}</div>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteResponsible(responsible.id);
+                              }}
+                              className="ml-2 p-1 text-red-500 hover:bg-red-50 rounded"
+                              disabled={deletingId === responsible.id}
+                            >
+                              {deletingId === responsible.id ? (
+                                <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <X className="w-4 h-4" />
+                              )}
+                            </button>
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+                 </Popover>
+            </div>
+            <FormMessage />
+          </FormItem>
+        );
+      }}
+    />
+  );
+};
+
+const ResponsibleField = ({ control, responsibles, saveResponsible }: ResponsibleFieldProps) => {
+  return (
+    <ResponsibleFieldComponent 
+      control={control} 
+      responsibles={responsibles} 
+      saveResponsible={saveResponsible} 
     />
   );
 };
