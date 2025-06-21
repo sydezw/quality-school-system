@@ -197,16 +197,22 @@ export default function ApproveLogins() {
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="pending" className="flex items-center gap-2">
+              <TabsTrigger 
+                value="pending" 
+                className="flex items-center gap-2 data-[state=active]:bg-red-600 data-[state=active]:text-white hover:bg-red-50 hover:text-red-700 transition-colors"
+              >
                 <Clock className="h-4 w-4" />
                 Aprovações Pendentes
                 {pendingUsers.length > 0 && (
-                  <Badge variant="secondary" className="ml-1">
+                  <Badge variant="secondary" className="ml-1 bg-white text-red-600">
                     {pendingUsers.length}
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="permissions" className="flex items-center gap-2">
+              <TabsTrigger 
+                value="permissions" 
+                className="flex items-center gap-2 data-[state=active]:bg-red-600 data-[state=active]:text-white hover:bg-red-50 hover:text-red-700 transition-colors"
+              >
                 <Settings className="h-4 w-4" />
                 Gerenciar Permissões
               </TabsTrigger>
@@ -247,7 +253,7 @@ export default function ApproveLogins() {
                             <Button
                               onClick={() => handleUserAction(user.id, 'approve')}
                               size="sm"
-                              className="bg-green-600 hover:bg-green-700"
+                              className="bg-green-600 hover:bg-green-700 text-white font-medium shadow-md hover:shadow-lg transition-all"
                             >
                               <CheckCircle className="h-4 w-4 mr-1" />
                               Aprovar
@@ -255,7 +261,7 @@ export default function ApproveLogins() {
                             <Button
                               onClick={() => handleUserAction(user.id, 'reject')}
                               size="sm"
-                              variant="destructive"
+                              className="bg-red-600 hover:bg-red-700 text-white font-medium shadow-md hover:shadow-lg transition-all"
                             >
                               <XCircle className="h-4 w-4 mr-1" />
                               Rejeitar

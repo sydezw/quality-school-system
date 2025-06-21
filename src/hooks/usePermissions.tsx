@@ -37,7 +37,6 @@ export interface UserPermissions {
   // Presenças
   gerenciarPresencas: boolean;
   
-  // Administração
   gerenciarUsuarios: boolean;
   
   // Professores
@@ -55,6 +54,10 @@ export interface UserPermissions {
   // Gerador de Contratos
   visualizarGeradorContratos: boolean;
   gerenciarGeradorContratos: boolean;
+  
+  // Documentos
+  visualizarDocumentos: boolean;
+  gerenciarDocumentos: boolean;
 }
 
 export const usePermissions = () => {
@@ -108,9 +111,9 @@ export const usePermissions = () => {
          visualizarAgenda: false,
          gerenciarAgenda: false,
          visualizarContratos: false,
-      gerenciarContratos: false,
+        gerenciarContratos: false,
          visualizarFinanceiro: false,
-        gerenciarFinanceiro: false,
+         gerenciarFinanceiro: false,
          gerenciarPresencas: false,
          gerenciarUsuarios: false,
          visualizarProfessores: false,
@@ -121,6 +124,8 @@ export const usePermissions = () => {
          gerenciarMateriais: false,
          visualizarGeradorContratos: false,
          gerenciarGeradorContratos: false,
+         visualizarDocumentos: false,
+         gerenciarDocumentos: false,
        };
      }
 
@@ -138,7 +143,7 @@ export const usePermissions = () => {
         visualizarAgenda: true,
         gerenciarAgenda: true,
         visualizarContratos: true,
-      gerenciarContratos: true,
+        gerenciarContratos: true,
         visualizarFinanceiro: true,
         gerenciarFinanceiro: true,
         gerenciarPresencas: true,
@@ -151,6 +156,8 @@ export const usePermissions = () => {
         gerenciarMateriais: true,
         visualizarGeradorContratos: true,
         gerenciarGeradorContratos: true,
+        visualizarDocumentos: true,
+        gerenciarDocumentos: true,
       };
     }
 
@@ -167,21 +174,22 @@ export const usePermissions = () => {
       visualizarAgenda: usuario.perm_visualizar_agenda ?? false,
       gerenciarAgenda: usuario.perm_gerenciar_agenda ?? false,
       visualizarContratos: usuario.perm_visualizar_contratos ?? false,
-      gerenciarContratos: usuario.perm_gerenciar_contratos ?? false,
-
+        gerenciarContratos: usuario.perm_gerenciar_contratos ?? false,
       visualizarFinanceiro: usuario.perm_visualizar_financeiro ?? false,
-        gerenciarFinanceiro: usuario.perm_gerenciar_financeiro ?? false,
+      gerenciarFinanceiro: usuario.perm_gerenciar_financeiro ?? false,
       gerenciarPresencas: usuario.perm_gerenciar_presencas ?? false,
       gerenciarUsuarios: usuario.perm_gerenciar_usuarios ?? false,
       visualizarProfessores: usuario.perm_visualizar_professores ?? false,
       gerenciarProfessores: usuario.perm_gerenciar_professores ?? false,
       visualizarSalas: usuario.perm_visualizar_salas ?? false,
-      gerenciarSalas: usuario.perm_gerenciar_salas ?? false,
-      visualizarMateriais: usuario.perm_visualizar_materiais ?? false,
-      gerenciarMateriais: usuario.perm_gerenciar_materiais ?? false,
-      visualizarGeradorContratos: usuario.perm_visualizar_gerador_contratos ?? false,
-      gerenciarGeradorContratos: usuario.perm_gerenciar_gerador_contratos ?? false,
-    };
+      gerenciarSalas: usuario.perm_gerenciar_salas || false,
+        visualizarMateriais: usuario.perm_visualizar_materiais || false,
+        gerenciarMateriais: usuario.perm_gerenciar_materiais || false,
+        visualizarGeradorContratos: usuario.perm_visualizar_gerador_contratos ?? false,
+        gerenciarGeradorContratos: usuario.perm_gerenciar_gerador_contratos ?? false,
+        visualizarDocumentos: usuario.perm_visualizar_documentos ?? false,
+        gerenciarDocumentos: usuario.perm_gerenciar_documentos ?? false,
+      };
   };
 
   const permissions = getPermissions(user);

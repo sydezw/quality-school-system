@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import { usePermissions, UserPermissions } from '@/hooks/usePermissions';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 interface PermissionButtonProps {
   children: ReactNode;
@@ -26,6 +27,7 @@ export const PermissionButton = ({
   ...props
 }: PermissionButtonProps) => {
   const { hasPermission, isOwner, loading } = usePermissions();
+  const { toast } = useToast();
 
   // Se está carregando, desabilita o botão
   if (loading) {
@@ -80,13 +82,25 @@ export const PermissionButton = ({
   // Verifica se tem a permissão específica
   const hasRequiredPermission = hasPermission(permission);
   
+  const handleClick = () => {
+    if (hasRequiredPermission) {
+      onClick?.();
+    } else {
+      toast({
+        title: "Acesso Negado",
+        description: "Você não tem permissão para realizar esta ação.",
+        variant: "destructive",
+      });
+    }
+  };
+  
   return (
     <Button
-      onClick={hasRequiredPermission ? onClick : undefined}
-      disabled={disabled || !hasRequiredPermission}
+      onClick={handleClick}
+      disabled={disabled}
       className={cn(
         className,
-        !hasRequiredPermission && 'opacity-50 cursor-not-allowed'
+        !hasRequiredPermission && 'opacity-50'
       )}
       variant={variant}
       size={size}

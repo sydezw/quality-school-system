@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Printer, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { usePermissions } from '@/hooks/usePermissions';
 import { PermissionGuard } from '@/components/guards/PermissionGuard';
 import { PermissionButton } from '@/components/guards/PermissionButton';
 
@@ -30,6 +31,7 @@ const ContractGenerator = () => {
   const [selectedLanguage, setSelectedLanguage] = useState<string>('Inglês');
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { hasPermission, isOwner } = usePermissions();
 
   const fetchStudents = async () => {
     try {
@@ -195,24 +197,26 @@ const ContractGenerator = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">
-                Escolha um aluno para gerar o contrato:
-              </label>
-              <Select onValueChange={handleStudentSelect}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecione um aluno..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {students.map((student) => (
-                    <SelectItem key={student.id} value={student.id}>
-                      {student.nome} - {student.idioma}
-                      {student.turmas?.nome && ` (${student.turmas.nome})`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <PermissionGuard permission="gerenciarGeradorContratos">
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  Escolha um aluno para gerar o contrato:
+                </label>
+                <Select onValueChange={handleStudentSelect}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecione um aluno..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {students.map((student) => (
+                      <SelectItem key={student.id} value={student.id}>
+                        {student.nome} - {student.idioma}
+                        {student.turmas?.nome && ` (${student.turmas.nome})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </PermissionGuard>
             
             {selectedStudent && (
               <div className="p-4 bg-blue-50 rounded-lg">

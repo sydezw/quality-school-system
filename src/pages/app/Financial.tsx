@@ -203,6 +203,15 @@ const Financial = () => {
   };
 
   const deleteBoleto = async (id: string) => {
+    if (!isOwner() && !hasPermission('gerenciarFinanceiro')) {
+      toast({
+        title: "Acesso Negado",
+        description: "Você não tem permissão para realizar esta ação. Entre em contato com o administrador.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!confirm('Tem certeza que deseja excluir este boleto?')) return;
 
     try {
@@ -229,6 +238,15 @@ const Financial = () => {
   };
 
   const deleteDespesa = async (id: string) => {
+    if (!isOwner() && !hasPermission('gerenciarFinanceiro')) {
+      toast({
+        title: "Acesso Negado",
+        description: "Você não tem permissão para realizar esta ação. Entre em contato com o administrador.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!confirm('Tem certeza que deseja excluir esta despesa?')) return;
 
     try {
@@ -304,6 +322,7 @@ const Financial = () => {
       </PermissionGuard>
     );
   }
+
   return (
     <PermissionGuard permission="visualizarFinanceiro">
       <div className="space-y-6">

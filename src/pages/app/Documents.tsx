@@ -12,6 +12,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, FileText, Download, Eye } from 'lucide-react';
 import { useForm } from 'react-hook-form';
+import { usePermissions } from '@/hooks/usePermissions';
+import { PermissionGuard } from '@/components/guards/PermissionGuard';
+import { PermissionButton } from '@/components/guards/PermissionButton';
+
 
 interface Document {
   id: string;
@@ -35,6 +39,7 @@ const Documents = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
   const { register, handleSubmit, reset, setValue } = useForm();
+  const { hasPermission, isOwner } = usePermissions();
 
   useEffect(() => {
     fetchDocuments();
@@ -110,6 +115,15 @@ const Documents = () => {
   };
 
   const updateDocumentStatus = async (id: string, status: 'gerado' | 'assinado' | 'cancelado') => {
+    if (!isOwner() && !hasPermission('gerenciarDocumentos')) {
+      toast({
+        title: "Acesso Negado",
+        description: "Você não tem permissão para realizar esta ação. Entre em contato com o administrador.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('documentos')
@@ -158,6 +172,8 @@ const Documents = () => {
     return labels[tipo] || tipo;
   };
 
+
+
   const formatDate = (dateStr: string) => {
     return new Date(dateStr + 'T00:00:00').toLocaleDateString('pt-BR');
   };
@@ -174,16 +190,21 @@ const Documents = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Documentos</h1>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={openCreateDialog} className="bg-brand-red hover:bg-brand-red/90">
-              <Plus className="h-4 w-4 mr-2" />
-              Gerar Documento
-            </Button>
-          </DialogTrigger>
+    <PermissionGuard permission="visualizarDocumentos">
+      <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold">Documentos</h1>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <PermissionButton 
+                  permission="gerenciarDocumentos"
+                  onClick={openCreateDialog} 
+                className="bg-brand-red hover:bg-brand-red/90"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Gerar Documento
+              </PermissionButton>
+            </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Gerar Novo Documento</DialogTitle>
@@ -275,19 +296,25 @@ const Documents = () => {
                     <TableCell>{getTipoLabel(doc.tipo)}</TableCell>
                     <TableCell>{formatDate(doc.data)}</TableCell>
                     <TableCell>
-                      <Select
-                        value={doc.status}
-                        onValueChange={(value) => updateDocumentStatus(doc.id, value as 'gerado' | 'assinado' | 'cancelado')}
-                      >
-                        <SelectTrigger className="w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="gerado">Gerado</SelectItem>
-                          <SelectItem value="assinado">Assinado</SelectItem>
-                          <SelectItem value="cancelado">Cancelado</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <PermissionGuard permission="gerenciarDocumentos" fallback={
+                        <Badge variant={doc.status === 'gerado' ? 'default' : doc.status === 'assinado' ? 'secondary' : 'destructive'}>
+                          {doc.status === 'gerado' ? 'Gerado' : doc.status === 'assinado' ? 'Assinado' : 'Cancelado'}
+                        </Badge>
+                      }>
+                        <Select
+                          value={doc.status}
+                          onValueChange={(value) => updateDocumentStatus(doc.id, value as 'gerado' | 'assinado' | 'cancelado')}
+                        >
+                          <SelectTrigger className="w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="gerado">Gerado</SelectItem>
+                            <SelectItem value="assinado">Assinado</SelectItem>
+                            <SelectItem value="cancelado">Cancelado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </PermissionGuard>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
@@ -323,7 +350,8 @@ const Documents = () => {
           )}
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </PermissionGuard>
   );
 };
 

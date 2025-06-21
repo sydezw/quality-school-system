@@ -1097,8 +1097,14 @@ export type Database = {
           perm_gerenciar_salas: boolean | null
           perm_gerenciar_presencas: boolean | null
           perm_gerenciar_usuarios: boolean | null
+          perm_visualizar_agenda: boolean | null
+          perm_gerenciar_agenda: boolean | null
+          perm_visualizar_materiais: boolean | null
+          perm_gerenciar_materiais: boolean | null
           perm_visualizar_gerador_contratos: boolean | null
           perm_gerenciar_gerador_contratos: boolean | null
+          perm_visualizar_documentos: boolean | null
+          perm_gerenciar_documentos: boolean | null
           senha: string
           updated_at: string
         }
@@ -1128,8 +1134,14 @@ export type Database = {
           perm_gerenciar_salas?: boolean | null
           perm_gerenciar_presencas?: boolean | null
           perm_gerenciar_usuarios?: boolean | null
+          perm_visualizar_agenda?: boolean | null
+          perm_gerenciar_agenda?: boolean | null
+          perm_visualizar_materiais?: boolean | null
+          perm_gerenciar_materiais?: boolean | null
           perm_visualizar_gerador_contratos?: boolean | null
           perm_gerenciar_gerador_contratos?: boolean | null
+          perm_visualizar_documentos?: boolean | null
+          perm_gerenciar_documentos?: boolean | null
           senha: string
           updated_at?: string
         }
@@ -1159,8 +1171,14 @@ export type Database = {
           perm_gerenciar_salas?: boolean | null
           perm_gerenciar_presencas?: boolean | null
           perm_gerenciar_usuarios?: boolean | null
+          perm_visualizar_agenda?: boolean | null
+          perm_gerenciar_agenda?: boolean | null
+          perm_visualizar_materiais?: boolean | null
+          perm_gerenciar_materiais?: boolean | null
           perm_visualizar_gerador_contratos?: boolean | null
           perm_gerenciar_gerador_contratos?: boolean | null
+          perm_visualizar_documentos?: boolean | null
+          perm_gerenciar_documentos?: boolean | null
           senha?: string
           updated_at?: string
         }
@@ -1192,8 +1210,14 @@ export type Database = {
           perm_gerenciar_salas: boolean | null
           perm_gerenciar_presencas: boolean | null
           perm_gerenciar_usuarios: boolean | null
+          perm_visualizar_agenda: boolean | null
+          perm_gerenciar_agenda: boolean | null
+          perm_visualizar_materiais: boolean | null
+          perm_gerenciar_materiais: boolean | null
           perm_visualizar_gerador_contratos: boolean | null
           perm_gerenciar_gerador_contratos: boolean | null
+          perm_visualizar_documentos: boolean | null
+          perm_gerenciar_documentos: boolean | null
           senha: string
           status: string
           updated_at: string
@@ -1223,8 +1247,14 @@ export type Database = {
           perm_gerenciar_salas?: boolean | null
           perm_gerenciar_presencas?: boolean | null
           perm_gerenciar_usuarios?: boolean | null
+          perm_visualizar_agenda?: boolean | null
+          perm_gerenciar_agenda?: boolean | null
+          perm_visualizar_materiais?: boolean | null
+          perm_gerenciar_materiais?: boolean | null
           perm_visualizar_gerador_contratos?: boolean | null
           perm_gerenciar_gerador_contratos?: boolean | null
+          perm_visualizar_documentos?: boolean | null
+          perm_gerenciar_documentos?: boolean | null
           senha: string
           status?: string
           updated_at?: string
@@ -1254,8 +1284,14 @@ export type Database = {
           perm_gerenciar_salas?: boolean | null
           perm_gerenciar_presencas?: boolean | null
           perm_gerenciar_usuarios?: boolean | null
+          perm_visualizar_agenda?: boolean | null
+          perm_gerenciar_agenda?: boolean | null
+          perm_visualizar_materiais?: boolean | null
+          perm_gerenciar_materiais?: boolean | null
           perm_visualizar_gerador_contratos?: boolean | null
           perm_gerenciar_gerador_contratos?: boolean | null
+          perm_visualizar_documentos?: boolean | null
+          perm_gerenciar_documentos?: boolean | null
           senha?: string
           status?: string
           updated_at?: string

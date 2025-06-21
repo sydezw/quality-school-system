@@ -23,17 +23,17 @@ import {
 // Define os itens do menu com suas respectivas permissões
 const menuItems = [
   { icon: Home, label: 'Dashboard', path: '/app/dashboard', permission: null }, // Dashboard sempre visível
-  { icon: Users, label: 'Alunos', path: '/app/students', permission: null },
-  { icon: GraduationCap, label: 'Professores', path: '/app/teachers', permission: null },
-  { icon: BookCopy, label: 'Turmas', path: '/app/classes', permission: null },
-  { icon: Building2, label: 'Salas', path: '/app/rooms', permission: null },
-  { icon: FileText, label: 'Contratos', path: '/app/contracts', permission: null },
+  { icon: Users, label: 'Alunos', path: '/app/students', permission: 'visualizarAlunos' as keyof UserPermissions },
+  { icon: GraduationCap, label: 'Professores', path: '/app/teachers', permission: 'visualizarProfessores' as keyof UserPermissions },
+  { icon: BookCopy, label: 'Turmas', path: '/app/classes', permission: 'visualizarTurmas' as keyof UserPermissions },
+  { icon: Building2, label: 'Salas', path: '/app/rooms', permission: 'visualizarSalas' as keyof UserPermissions },
+  { icon: FileText, label: 'Contratos', path: '/app/contracts', permission: 'visualizarContratos' as keyof UserPermissions },
   { icon: FileSignature, label: 'Gerador de Contratos', path: '/app/contract-generator', permission: 'visualizarGeradorContratos' as keyof UserPermissions },
-  { icon: DollarSign, label: 'Financeiro', path: '/app/financial', permission: null },
+  { icon: DollarSign, label: 'Financeiro', path: '/app/financial', permission: 'visualizarFinanceiro' as keyof UserPermissions },
+  { icon: Calendar, label: 'Agenda', path: '/app/agenda', permission: 'visualizarAgenda' as keyof UserPermissions },
+  { icon: Package, label: 'Materiais', path: '/app/materials', permission: 'visualizarMateriais' as keyof UserPermissions },
   { icon: BarChart3, label: 'Relatórios', path: '/app/reports', permission: null },
-  { icon: Calendar, label: 'Agenda', path: '/app/agenda', permission: null },
-  { icon: Package, label: 'Materiais', path: '/app/materials', permission: null },
-  { icon: FileText, label: 'Documentos', path: '/app/documents', permission: 'gerenciarAvaliacoes' as keyof UserPermissions },
+  { icon: FileText, label: 'Documentos', path: '/app/documents', permission: 'visualizarDocumentos' },
   { icon: Calendar, label: 'Aniversariantes do Mês', path: '/app/birthdays', permission: null }, // Sempre visível
   { icon: UserCheck, label: 'Aprovar Logins', path: '/app/approve-logins', permission: 'gerenciarUsuarios' as keyof UserPermissions },
 ];

@@ -19,23 +19,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
+    // Verificar se há uma sessão salva no localStorage
+    const savedSession = localStorage.getItem('auth_session');
+    const savedUser = localStorage.getItem('auth_user');
+    
+    if (savedSession && savedUser) {
+      try {
+        const parsedSession = JSON.parse(savedSession);
+        const parsedUser = JSON.parse(savedUser);
+        
+        // Verificar se a sessão não expirou
+        if (parsedSession.expires_at > Math.floor(Date.now() / 1000)) {
+          setSession(parsedSession);
+          setUser(parsedUser);
+        } else {
+          // Sessão expirada, limpar localStorage
+          localStorage.removeItem('auth_session');
+          localStorage.removeItem('auth_user');
+        }
+      } catch (error) {
+        // Erro ao parsear, limpar localStorage
+        localStorage.removeItem('auth_session');
+        localStorage.removeItem('auth_user');
       }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    }
+    
+    setLoading(false);
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -81,6 +90,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         user: mockUser
       };
 
+      // Salvar no localStorage
+      localStorage.setItem('auth_session', JSON.stringify(mockSession));
+      localStorage.setItem('auth_user', JSON.stringify(mockUser));
+      
       // Atualizar o estado manualmente
       setUser(mockUser);
       setSession(mockSession);
@@ -93,7 +106,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => {
     try {
-      // Limpar o estado local primeiro
+      // Limpar localStorage
+      localStorage.removeItem('auth_session');
+      localStorage.removeItem('auth_user');
+      
+      // Limpar o estado local
       setUser(null);
       setSession(null);
       
@@ -103,8 +120,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Ignorar erros do signOut já que estamos usando autenticação customizada
       console.log('SignOut completed');
     } finally {
-      // Redirecionar para login
-      window.location.href = '/login';
+      // Redirecionar para auth
+      window.location.href = '/auth';
     }
   };
 

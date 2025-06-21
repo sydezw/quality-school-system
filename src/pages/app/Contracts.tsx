@@ -10,6 +10,7 @@ import { NewContractDialog } from '@/components/contracts/NewContractDialog';
 import { EditContractDialog } from '@/components/contracts/EditContractDialog';
 import { PermissionGuard } from '@/components/guards/PermissionGuard';
 import { PermissionButton } from '@/components/shared/PermissionButton';
+import { usePermissions } from '@/hooks/usePermissions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,6 +41,7 @@ const Contracts = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'expiring' | 'expired' | 'active'>('all');
   const { toast } = useToast();
+  const { hasPermission, isOwner } = usePermissions();
 
   const fetchContracts = async () => {
     try {
@@ -71,6 +73,15 @@ const Contracts = () => {
   }, []);
 
   const handleDeleteContract = async (contractId: string) => {
+    if (!isOwner() && !hasPermission('gerenciarContratos')) {
+      toast({
+        title: "Acesso Negado",
+        description: "Você não tem permissão para realizar esta ação. Entre em contato com o administrador.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('contratos')
