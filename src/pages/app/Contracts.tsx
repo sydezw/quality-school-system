@@ -8,6 +8,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { NewContractDialog } from '@/components/contracts/NewContractDialog';
 import { EditContractDialog } from '@/components/contracts/EditContractDialog';
+import { PermissionGuard } from '@/components/guards/PermissionGuard';
+import { PermissionButton } from '@/components/shared/PermissionButton';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -226,11 +228,12 @@ const Contracts = () => {
   const contractsExpired = contracts.filter(c => c.situacao === 'vencido').length;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Gestão de Contratos</h1>
-        <NewContractDialog onContractCreated={fetchContracts} />
-      </div>
+    <PermissionGuard permission="visualizarContratos">
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Gestão de Contratos</h1>
+          <NewContractDialog onContractCreated={fetchContracts} />
+        </div>
 
       {/* Resumo dos Contratos */}
       <div className="grid gap-4 md:grid-cols-4">
@@ -365,13 +368,14 @@ const Contracts = () => {
                       
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button 
+                          <PermissionButton 
+                            permission="gerenciarContratos"
                             size="sm" 
                             variant="destructive"
                           >
                             <Trash2 className="h-4 w-4 mr-1" />
                             Excluir
-                          </Button>
+                          </PermissionButton>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
@@ -394,49 +398,54 @@ const Contracts = () => {
 
                       {contract.situacao === 'vencido' && (
                         <>
-                          <Button 
+                          <PermissionButton 
+                            permission="gerenciarContratos"
                             size="sm" 
                             variant="destructive"
                             onClick={() => handleTerminateContract(contract.id, contract.aluno_id)}
                           >
                             <AlertTriangle className="h-4 w-4 mr-1" />
                             Encerrar
-                          </Button>
-                          <Button 
+                          </PermissionButton>
+                          <PermissionButton 
+                            permission="gerenciarContratos"
                             size="sm" 
                             variant="outline"
                             onClick={() => handleRenewContract(contract)}
                           >
                             Renovar
-                          </Button>
+                          </PermissionButton>
                         </>
                       )}
                       {contract.situacao === 'vencendo' && (
                         <>
-                          <Button 
+                          <PermissionButton 
+                            permission="gerenciarContratos"
                             size="sm" 
                             variant="outline"
                             onClick={() => handleTerminateContract(contract.id, contract.aluno_id)}
                           >
                             Encerrar
-                          </Button>
-                          <Button 
+                          </PermissionButton>
+                          <PermissionButton 
+                            permission="gerenciarContratos"
                             size="sm" 
                             variant="default"
                             onClick={() => handleRenewContract(contract)}
                           >
                             Renovar
-                          </Button>
+                          </PermissionButton>
                         </>
                       )}
                       {contract.situacao === 'ativo' && (
-                        <Button 
+                        <PermissionButton 
+                          permission="gerenciarContratos"
                           size="sm" 
                           variant="outline"
                           onClick={() => handleRenewContract(contract)}
                         >
                           Renovar
-                        </Button>
+                        </PermissionButton>
                       )}
                     </div>
                   </TableCell>
@@ -454,6 +463,7 @@ const Contracts = () => {
         </CardContent>
       </Card>
     </div>
+    </PermissionGuard>
   );
 };
 

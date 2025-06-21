@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { Plus, Edit, Trash2, Users } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { usePermissions } from '@/hooks/usePermissions';
 import { PermissionButton } from '@/components/shared/PermissionButton';
+import { PermissionGuard } from '@/components/guards/PermissionGuard';
 
 interface Teacher {
   id: string;
@@ -167,20 +168,21 @@ const Teachers = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Professores</h1>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <PermissionButton 
-              permission="gerenciarUsuarios"
-              className="bg-brand-red hover:bg-brand-red/90"
-              onClick={openCreateDialog}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Professor
-            </PermissionButton>
-          </DialogTrigger>
+    <PermissionGuard permission="visualizarProfessores">
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold">Professores</h1>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <PermissionButton 
+                permission="gerenciarProfessores"
+                className="bg-brand-red hover:bg-brand-red/90"
+                onClick={openCreateDialog}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Novo Professor
+              </PermissionButton>
+            </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>
@@ -333,7 +335,7 @@ const Teachers = () => {
                     <TableCell>
                       <div className="flex gap-2">
                         <PermissionButton
-                          permission="gerenciarUsuarios"
+                          permission="gerenciarProfessores"
                           variant="outline"
                           size="sm"
                           onClick={() => openEditDialog(teacher)}
@@ -342,7 +344,7 @@ const Teachers = () => {
                           <Edit className="h-4 w-4" />
                         </PermissionButton>
                         <PermissionButton
-                          permission="gerenciarUsuarios"
+                          permission="gerenciarProfessores"
                           variant="outline"
                           size="sm"
                           onClick={() => deleteTeacher(teacher.id)}
@@ -360,7 +362,8 @@ const Teachers = () => {
           )}
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </PermissionGuard>
   );
 };
 

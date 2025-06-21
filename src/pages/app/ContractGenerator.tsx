@@ -5,6 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Printer, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { PermissionGuard } from '@/components/guards/PermissionGuard';
+import { PermissionButton } from '@/components/guards/PermissionButton';
 
 interface Student {
   id: string;
@@ -168,18 +170,20 @@ const ContractGenerator = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Gerador de Contratos</h1>
-        <Button 
-          onClick={handlePrint}
-          disabled={!selectedStudent}
-          className="flex items-center gap-2"
-        >
-          <Printer className="h-4 w-4" />
-          Imprimir
-        </Button>
-      </div>
+    <PermissionGuard permission="visualizarGeradorContratos">
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Gerador de Contratos</h1>
+          <PermissionButton 
+            permission="gerenciarGeradorContratos"
+            onClick={handlePrint}
+            disabled={!selectedStudent}
+            className="flex items-center gap-2"
+          >
+            <Printer className="h-4 w-4" />
+            Imprimir
+          </PermissionButton>
+        </div>
 
       {/* Seleção de Aluno */}
       <Card>
@@ -238,20 +242,22 @@ const ContractGenerator = () => {
             <div id="contract-content" className="space-y-6 p-6 bg-white border rounded-lg">
               <div className="contract-header text-center">
                 <div className="mb-4 flex justify-center gap-2">
-                  <Button
+                  <PermissionButton
+                    permission="gerenciarGeradorContratos"
                     variant={selectedLanguage === 'Inglês' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setSelectedLanguage('Inglês')}
                   >
                     Inglês
-                  </Button>
-                  <Button
+                  </PermissionButton>
+                  <PermissionButton
+                    permission="gerenciarGeradorContratos"
                     variant={selectedLanguage === 'Japonês' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setSelectedLanguage('Japonês')}
                   >
                     Japonês
-                  </Button>
+                  </PermissionButton>
                 </div>
                 <h1 className="contract-title text-xl font-bold mb-4">
                   {getContractTitle()}
@@ -336,7 +342,8 @@ const ContractGenerator = () => {
           </CardContent>
         </Card>
       )}
-    </div>
+      </div>
+    </PermissionGuard>
   );
 };
 

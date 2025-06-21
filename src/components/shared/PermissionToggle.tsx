@@ -27,60 +27,74 @@ interface PermissionGroup {
 
 const permissionGroups: PermissionGroup[] = [
   {
-    title: 'Gestão de Alunos',
-    permissions: [
-      { key: 'criarAlunos', dbKey: 'perm_criar_alunos', label: 'Criar Alunos', description: 'Permite cadastrar novos alunos' },
-      { key: 'editarAlunos', dbKey: 'perm_editar_alunos', label: 'Editar Alunos', description: 'Permite editar dados dos alunos' },
-      { key: 'removerAlunos', dbKey: 'perm_remover_alunos', label: 'Remover Alunos', description: 'Permite excluir alunos do sistema' },
-    ],
-  },
+      title: 'Gestão de Alunos',
+      permissions: [
+        { key: 'visualizarAlunos', dbKey: 'perm_visualizar_alunos', label: 'Visualizar Alunos', description: 'Permite visualizar informações dos alunos' },
+        { key: 'gerenciarAlunos', dbKey: 'perm_gerenciar_alunos', label: 'Gerenciar Alunos', description: 'Permite criar, editar e excluir alunos' },
+      ],
+    },
   {
-    title: 'Gestão de Turmas',
-    permissions: [
-      { key: 'criarTurmas', dbKey: 'perm_criar_turmas', label: 'Criar Turmas', description: 'Permite criar novas turmas' },
-      { key: 'editarTurmas', dbKey: 'perm_editar_turmas', label: 'Editar Turmas', description: 'Permite editar informações das turmas' },
-      { key: 'removerTurmas', dbKey: 'perm_remover_turmas', label: 'Remover Turmas', description: 'Permite excluir turmas' },
-    ],
-  },
+      title: 'Gestão de Turmas',
+      permissions: [
+        { key: 'visualizarTurmas', dbKey: 'perm_visualizar_turmas', label: 'Visualizar Turmas', description: 'Permite visualizar informações das turmas' },
+        { key: 'gerenciarTurmas', dbKey: 'perm_gerenciar_turmas', label: 'Gerenciar Turmas', description: 'Permite criar, editar e excluir turmas' },
+      ],
+    },
   {
-    title: 'Gestão de Aulas',
-    permissions: [
-      { key: 'criarAulas', dbKey: 'perm_criar_aulas', label: 'Criar Aulas', description: 'Permite criar novas aulas' },
-      { key: 'editarAulas', dbKey: 'perm_editar_aulas', label: 'Editar Aulas', description: 'Permite editar aulas existentes' },
-      { key: 'removerAulas', dbKey: 'perm_remover_aulas', label: 'Remover Aulas', description: 'Permite excluir aulas' },
-    ],
-  },
+      title: 'Gestão de Aulas',
+      permissions: [
+        { key: 'visualizarAulas', dbKey: 'perm_visualizar_aulas', label: 'Visualizar Aulas', description: 'Permite visualizar informações das aulas' },
+        { key: 'gerenciarAulas', dbKey: 'perm_gerenciar_aulas', label: 'Gerenciar Aulas', description: 'Permite criar, editar e excluir aulas' },
+      ],
+    },
   {
-    title: 'Gestão de Avaliações',
-    permissions: [
-      { key: 'criarAvaliacoes', dbKey: 'perm_criar_avaliacoes', label: 'Criar Avaliações', description: 'Permite criar avaliações' },
-      { key: 'editarAvaliacoes', dbKey: 'perm_editar_avaliacoes', label: 'Editar Avaliações', description: 'Permite editar avaliações' },
-      { key: 'removerAvaliacoes', dbKey: 'perm_remover_avaliacoes', label: 'Remover Avaliações', description: 'Permite excluir avaliações' },
-    ],
-  },
+      title: 'Gestão de Avaliações',
+      permissions: [
+        { key: 'visualizarAvaliacoes', dbKey: 'perm_visualizar_avaliacoes', label: 'Visualizar Avaliações', description: 'Permite visualizar avaliações' },
+        { key: 'gerenciarAvaliacoes', dbKey: 'perm_gerenciar_avaliacoes', label: 'Gerenciar Avaliações', description: 'Permite criar, editar e excluir avaliações' },
+      ],
+    },
   {
     title: 'Gestão de Contratos',
     permissions: [
-      { key: 'criarContratos', dbKey: 'perm_criar_contratos', label: 'Criar Contratos', description: 'Permite criar contratos' },
-      { key: 'editarContratos', dbKey: 'perm_editar_contratos', label: 'Editar Contratos', description: 'Permite editar contratos' },
-      { key: 'removerContratos', dbKey: 'perm_remover_contratos', label: 'Remover Contratos', description: 'Permite excluir contratos' },
-      { key: 'aprovarContratos', dbKey: 'perm_aprovar_contratos', label: 'Aprovar Contratos', description: 'Permite aprovar contratos' },
+      { key: 'visualizarContratos', dbKey: 'perm_visualizar_contratos', label: 'Visualizar Contratos', description: 'Permite visualizar contratos' },
+      { key: 'gerenciarContratos', dbKey: 'perm_gerenciar_contratos', label: 'Gerenciar Contratos', description: 'Permite criar, editar e excluir contratos' },
     ],
   },
   {
-    title: 'Gestão Financeira',
+    title: 'Gerador de Contratos',
     permissions: [
-      { key: 'gerenciarBoletos', dbKey: 'perm_gerenciar_boletos', label: 'Gerenciar Boletos', description: 'Permite gerenciar boletos' },
-      { key: 'gerenciarDespesas', dbKey: 'perm_gerenciar_despesas', label: 'Gerenciar Despesas', description: 'Permite gerenciar despesas' },
-      { key: 'gerenciarFolha', dbKey: 'perm_gerenciar_folha', label: 'Gerenciar Folha', description: 'Permite gerenciar folha de pagamento' },
+      { key: 'visualizarGeradorContratos', dbKey: 'perm_visualizar_gerador_contratos', label: 'Visualizar Gerador de Contratos', description: 'Permite acessar o gerador de contratos' },
+      { key: 'gerenciarGeradorContratos', dbKey: 'perm_gerenciar_gerador_contratos', label: 'Gerenciar Gerador de Contratos', description: 'Permite gerar e imprimir contratos' },
     ],
   },
   {
-    title: 'Gestão de Presenças',
-    permissions: [
-      { key: 'gerenciarPresencas', dbKey: 'perm_gerenciar_presencas', label: 'Gerenciar Presenças', description: 'Permite gerenciar presenças' },
-    ],
-  },
+      title: 'Gestão Financeira',
+      permissions: [
+        { key: 'visualizarFinanceiro', dbKey: 'perm_visualizar_financeiro', label: 'Visualizar Financeiro', description: 'Permite visualizar informações financeiras' },
+        { key: 'gerenciarFinanceiro', dbKey: 'perm_gerenciar_financeiro', label: 'Gerenciar Financeiro', description: 'Permite criar, editar e excluir registros financeiros' },
+      ],
+    },
+    {
+      title: 'Gestão de Professores',
+      permissions: [
+        { key: 'visualizarProfessores', dbKey: 'perm_visualizar_professores', label: 'Visualizar Professores', description: 'Permite visualizar informações dos professores' },
+        { key: 'gerenciarProfessores', dbKey: 'perm_gerenciar_professores', label: 'Gerenciar Professores', description: 'Permite criar, editar e excluir professores' },
+      ],
+    },
+    {
+      title: 'Gestão de Salas',
+      permissions: [
+        { key: 'visualizarSalas', dbKey: 'perm_visualizar_salas', label: 'Visualizar Salas', description: 'Permite visualizar informações das salas' },
+        { key: 'gerenciarSalas', dbKey: 'perm_gerenciar_salas', label: 'Gerenciar Salas', description: 'Permite criar, editar e excluir salas' },
+      ],
+    },
+    {
+      title: 'Gestão de Presenças',
+      permissions: [
+        { key: 'gerenciarPresencas', dbKey: 'perm_gerenciar_presencas', label: 'Gerenciar Presenças', description: 'Permite gerenciar presenças' },
+      ],
+    },
   {
     title: 'Administração',
     permissions: [

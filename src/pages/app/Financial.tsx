@@ -294,7 +294,7 @@ const Financial = () => {
 
   if (loading) {
     return (
-      <PermissionGuard permission="gerenciarBoletos">
+      <PermissionGuard permission="visualizarFinanceiro">
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-red border-t-transparent mx-auto"></div>
@@ -304,9 +304,8 @@ const Financial = () => {
       </PermissionGuard>
     );
   }
-
   return (
-    <PermissionGuard permission="gerenciarBoletos">
+    <PermissionGuard permission="visualizarFinanceiro">
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">Financeiro</h1>
@@ -361,7 +360,7 @@ const Financial = () => {
             <Dialog open={isBoletoDialogOpen} onOpenChange={setIsBoletoDialogOpen}>
               <DialogTrigger asChild>
                 <PermissionButton
-                  permission="gerenciarBoletos"
+                  permission="gerenciarFinanceiro"
                   onClick={() => { setEditingBoleto(null); resetBoleto(); setIsBoletoDialogOpen(true); }}
                   className="bg-brand-red hover:bg-brand-red/90"
                 >
@@ -495,7 +494,7 @@ const Financial = () => {
                         <TableCell>
                           <div className="flex gap-2">
                             <PermissionButton
-                              permission="editarFinanceiro"
+                              permission="gerenciarFinanceiro"
                               size="sm"
                               variant="outline"
                               onClick={() => openEditBoletoDialog(boleto)}
@@ -503,7 +502,7 @@ const Financial = () => {
                               <Edit className="h-4 w-4" />
                             </PermissionButton>
                             <PermissionButton
-                              permission="removerFinanceiro"
+                              permission="gerenciarFinanceiro"
                               size="sm"
                               variant="outline"
                               onClick={() => deleteBoleto(boleto.id)}
@@ -527,7 +526,7 @@ const Financial = () => {
             <Dialog open={isDespesaDialogOpen} onOpenChange={setIsDespesaDialogOpen}>
               <DialogTrigger asChild>
                 <PermissionButton
-                  permission="gerenciarDespesas"
+                  permission="gerenciarFinanceiro"
                   onClick={() => { setEditingDespesa(null); resetDespesa(); setIsDespesaDialogOpen(true); }}
                   className="bg-brand-red hover:bg-brand-red/90"
                 >
@@ -652,7 +651,7 @@ const Financial = () => {
                         <TableCell>
                           <div className="flex gap-2">
                             <PermissionButton
-                              permission="editarFinanceiro"
+                              permission="gerenciarFinanceiro"
                               size="sm"
                               variant="outline"
                               onClick={() => openEditDespesaDialog(despesa)}
@@ -660,7 +659,7 @@ const Financial = () => {
                               <Edit className="h-4 w-4" />
                             </PermissionButton>
                             <PermissionButton
-                              permission="removerFinanceiro"
+                              permission="gerenciarFinanceiro"
                               size="sm"
                               variant="outline"
                               onClick={() => deleteDespesa(despesa.id)}

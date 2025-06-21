@@ -84,7 +84,7 @@ const StudentTable = ({ students, onEdit, onDelete }: StudentTableProps) => {
             <TableCell>
               <div className="flex space-x-2">
                 <PermissionButton
-                  permission="editarAlunos"
+                  permission="gerenciarAlunos"
                   variant="outline"
                   size="sm"
                   onClick={() => onEdit(student)}
@@ -93,7 +93,7 @@ const StudentTable = ({ students, onEdit, onDelete }: StudentTableProps) => {
                   <Edit className="h-4 w-4" />
                 </PermissionButton>
                 <PermissionButton
-                  permission="removerAlunos"
+                  permission="gerenciarAlunos"
                   variant="outline"
                   size="sm"
                   onClick={() => onDelete(student.id)}

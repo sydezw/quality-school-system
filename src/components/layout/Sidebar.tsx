@@ -28,12 +28,12 @@ const menuItems = [
   { icon: BookCopy, label: 'Turmas', path: '/app/classes', permission: null },
   { icon: Building2, label: 'Salas', path: '/app/rooms', permission: null },
   { icon: FileText, label: 'Contratos', path: '/app/contracts', permission: null },
-  { icon: FileSignature, label: 'Gerador de Contratos', path: '/app/contract-generator', permission: null },
+  { icon: FileSignature, label: 'Gerador de Contratos', path: '/app/contract-generator', permission: 'visualizarGeradorContratos' as keyof UserPermissions },
   { icon: DollarSign, label: 'Financeiro', path: '/app/financial', permission: null },
   { icon: BarChart3, label: 'Relatórios', path: '/app/reports', permission: null },
   { icon: Calendar, label: 'Agenda', path: '/app/agenda', permission: null },
   { icon: Package, label: 'Materiais', path: '/app/materials', permission: null },
-  { icon: FileText, label: 'Documentos', path: '/app/documents', permission: 'criarAvaliacoes' as keyof UserPermissions },
+  { icon: FileText, label: 'Documentos', path: '/app/documents', permission: 'gerenciarAvaliacoes' as keyof UserPermissions },
   { icon: Calendar, label: 'Aniversariantes do Mês', path: '/app/birthdays', permission: null }, // Sempre visível
   { icon: UserCheck, label: 'Aprovar Logins', path: '/app/approve-logins', permission: 'gerenciarUsuarios' as keyof UserPermissions },
 ];
