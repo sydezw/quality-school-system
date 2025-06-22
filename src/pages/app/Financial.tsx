@@ -495,7 +495,7 @@ const Financial = () => {
                         <TableCell>
                           <div className="flex gap-2">
                             <PermissionButton
-                              permission="editarFinanceiro"
+                              permission="gerenciarBoletos"
                               size="sm"
                               variant="outline"
                               onClick={() => openEditBoletoDialog(boleto)}
@@ -503,10 +503,11 @@ const Financial = () => {
                               <Edit className="h-4 w-4" />
                             </PermissionButton>
                             <PermissionButton
-                              permission="removerFinanceiro"
+                              permission="gerenciarBoletos"
                               size="sm"
                               variant="outline"
                               onClick={() => deleteBoleto(boleto.id)}
+                              className="text-red-600 hover:text-red-700"
                             >
                               <Trash2 className="h-4 w-4" />
                             </PermissionButton>
@@ -652,7 +653,7 @@ const Financial = () => {
                         <TableCell>
                           <div className="flex gap-2">
                             <PermissionButton
-                              permission="editarFinanceiro"
+                              permission="gerenciarDespesas"
                               size="sm"
                               variant="outline"
                               onClick={() => openEditDespesaDialog(despesa)}
@@ -660,10 +661,11 @@ const Financial = () => {
                               <Edit className="h-4 w-4" />
                             </PermissionButton>
                             <PermissionButton
-                              permission="removerFinanceiro"
+                              permission="gerenciarDespesas"
                               size="sm"
                               variant="outline"
                               onClick={() => deleteDespesa(despesa.id)}
+                              className="text-red-600 hover:text-red-700"
                             >
                               <Trash2 className="h-4 w-4" />
                             </PermissionButton>

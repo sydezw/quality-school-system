@@ -31,18 +31,19 @@ const AcademicFields = ({ control, classes, selectedIdioma }: AcademicFieldsProp
   };
 
   // Filtrar turmas baseado no idioma selecionado
+  // Se há idioma selecionado, filtrar por idioma; senão, mostrar todas
   const filteredClasses = selectedIdioma
     ? classes.filter(turma => {
         const turmaIdioma = normalizeString(turma.idioma || '');
         const selectedIdiomaLower = normalizeString(selectedIdioma);
         return turmaIdioma === selectedIdiomaLower;
       })
-    : classes; // Se não há idioma selecionado, mostrar todas as turmas
+    : classes; // Mostrar todas as turmas quando não há idioma selecionado
   
   console.log('AcademicFields - filteredClasses:', filteredClasses);
 
-  // Determinar estado do select de turma
-  const turmaDisabled = !selectedIdioma;
+  // Campo turma sempre habilitado, mas filtrado por idioma quando selecionado
+  const turmaDisabled = false;
 
   return (
     <>
@@ -70,8 +71,8 @@ const AcademicFields = ({ control, classes, selectedIdioma }: AcademicFieldsProp
           <div>
             <StudentSelectField
               value={field.value || 'none'}
-              label="Turma"
-              placeholder="Selecione a turma"
+              label="Turma (Opcional)"
+              placeholder="Selecione a turma ou deixe sem turma"
               options={[
                 { value: "none", label: "Sem turma" },
                 ...filteredClasses.map((cls) => ({
@@ -81,13 +82,18 @@ const AcademicFields = ({ control, classes, selectedIdioma }: AcademicFieldsProp
               ]}
               onChange={field.onChange}
               formMessage={<FormMessage />}
-              // Campo desabilitado até selecionar idioma
               disabled={turmaDisabled}
             />
-            {/* Mensagem explicativa se usuário tentou selecionar, mas não há turmas */}
+            {/* Mensagem explicativa se usuário selecionou idioma mas não há turmas */}
             {selectedIdioma && filteredClasses.length === 0 && (
-              <div className="text-xs text-red-600 mt-1">
-                Nenhuma turma disponível para o idioma selecionado.
+              <div className="text-xs text-amber-600 mt-1">
+                Nenhuma turma disponível para o idioma selecionado. O aluno pode ficar sem turma.
+              </div>
+            )}
+            {/* Mensagem informativa sobre a opcionalidade */}
+            {!selectedIdioma && (
+              <div className="text-xs text-gray-500 mt-1">
+                Selecione um idioma para filtrar as turmas ou deixe o aluno sem turma.
               </div>
             )}
           </div>

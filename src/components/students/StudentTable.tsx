@@ -1,34 +1,55 @@
 
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import React, { useState } from 'react';
+import { Student } from '@/integrations/supabase/types';
 import { Edit, Trash2 } from 'lucide-react';
-import { usePermissions } from '@/hooks/usePermissions';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { PermissionButton } from '@/components/shared/PermissionButton';
-
-interface Student {
-  id: string;
-  nome: string;
-  cpf: string | null;
-  telefone: string | null;
-  email: string | null;
-  endereco: string | null;
-  status: string;
-  idioma: string;
-  turma_id: string | null;
-  responsavel_id: string | null;
-  turmas?: { nome: string };
-  responsaveis?: { nome: string };
-}
+import { formatPhoneNumber } from '@/utils/formatters';
+import { DeleteStudentDialog } from './DeleteStudentDialog';
+import { Badge } from '@/components/ui/badge';
 
 interface StudentTableProps {
   students: Student[];
   onEdit: (student: Student) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => Promise<boolean>;
+  deletingStudentId?: string | null;
 }
 
-const StudentTable = ({ students, onEdit, onDelete }: StudentTableProps) => {
-  const { hasPermission, isOwner } = usePermissions();
+const StudentTable = ({ students, onEdit, onDelete, deletingStudentId }: StudentTableProps) => {
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteClick = (student: Student) => {
+    setStudentToDelete(student);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!studentToDelete) return;
+    
+    setIsDeleting(true);
+    const success = await onDelete(studentToDelete.id);
+    
+    if (success) {
+      setDeleteDialogOpen(false);
+      setStudentToDelete(null);
+    }
+    
+    setIsDeleting(false);
+  };
+
+  const handleDeleteCancel = () => {
+     setDeleteDialogOpen(false);
+     setStudentToDelete(null);
+   };
   
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -49,6 +70,7 @@ const StudentTable = ({ students, onEdit, onDelete }: StudentTableProps) => {
   }
 
   return (
+    <>
     <Table>
       <TableHeader>
         <TableRow>
@@ -96,11 +118,16 @@ const StudentTable = ({ students, onEdit, onDelete }: StudentTableProps) => {
                   permission="gerenciarAlunos"
                   variant="outline"
                   size="sm"
-                  onClick={() => onDelete(student.id)}
+                  onClick={() => handleDeleteClick(student)}
                   className="text-red-600 hover:text-red-700"
                   showLockIcon={false}
+                  disabled={deletingStudentId === student.id}
                 >
-                  <Trash2 className="h-4 w-4" />
+                  {deletingStudentId === student.id ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
                 </PermissionButton>
               </div>
             </TableCell>
@@ -108,7 +135,15 @@ const StudentTable = ({ students, onEdit, onDelete }: StudentTableProps) => {
         ))}
       </TableBody>
     </Table>
-  );
+    
+    <DeleteStudentDialog
+      isOpen={deleteDialogOpen}
+      student={studentToDelete}
+      onOpenChange={setDeleteDialogOpen}
+      onConfirm={handleDeleteConfirm}
+      isDeleting={isDeleting}
+    />
+  </>);
 };
 
 export default StudentTable;

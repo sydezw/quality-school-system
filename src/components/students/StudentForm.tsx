@@ -1,3 +1,4 @@
+import React from 'react';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,21 +13,7 @@ import AcademicFields from './AcademicFields';
 import ResponsibleField from './ResponsibleField';
 import FormActions from './FormActions';
 import { useToast } from "@/hooks/use-toast"; // para feedback de erro no submit
-
-interface Student {
-  id: string;
-  nome: string;
-  cpf: string | null;
-  telefone: string | null;
-  email: string | null;
-  endereco: string | null;
-  numero_endereco: string | null;
-  status: string;
-  idioma: string;
-  turma_id: string | null;
-  responsavel_id: string | null;
-  data_nascimento: Date | null;
-}
+import { Student } from '@/integrations/supabase/types';
 
 interface Class {
   id: string;

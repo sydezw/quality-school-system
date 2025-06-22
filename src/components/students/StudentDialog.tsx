@@ -1,4 +1,5 @@
 
+import React from 'react';
 import {
   Sheet,
   SheetContent,
@@ -9,21 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import StudentForm from './StudentForm';
-
-interface Student {
-  id: string;
-  nome: string;
-  cpf: string | null;
-  telefone: string | null;
-  email: string | null;
-  endereco: string | null;
-  numero_endereco: string | null;
-  status: string;
-  idioma: string;
-  turma_id: string | null;
-  responsavel_id: string | null;
-  data_nascimento: Date | null;
-}
+import { Student } from '@/integrations/supabase/types';
 
 interface Class {
   id: string;

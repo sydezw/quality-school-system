@@ -6,27 +6,11 @@ import { useStudents } from '@/hooks/useStudents';
 import { usePermissions } from '@/hooks/usePermissions';
 import { PermissionButton } from '@/components/shared/PermissionButton';
 import { PermissionGuard } from '@/components/guards/PermissionGuard';
+import { Student } from '@/integrations/supabase/types';
 import { Plus } from 'lucide-react';
 
-interface Student {
-  id: string;
-  nome: string;
-  cpf: string | null;
-  telefone: string | null;
-  email: string | null;
-  endereco: string | null;
-  numero_endereco: string | null;
-  status: string;
-  idioma: string;
-  turma_id: string | null;
-  responsavel_id: string | null;
-  turmas?: { nome: string };
-  responsaveis?: { nome: string };
-  data_nascimento: Date | null; // Garante a existência da propriedade
-}
-
 const Students = () => {
-  const { students, classes, loading, saveStudent, deleteStudent } = useStudents();
+  const { students, classes, loading, saveStudent, deleteStudent, deletingStudentId } = useStudents();
   const { hasPermission, isOwner } = usePermissions();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
@@ -112,6 +96,7 @@ const Students = () => {
               students={filteredStudents}
               onEdit={handleEdit}
               onDelete={deleteStudent}
+              deletingStudentId={deletingStudentId}
             />
           </CardContent>
         </Card>

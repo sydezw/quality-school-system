@@ -26,8 +26,8 @@ export const studentFormSchema = z.object({
   endereco: z.string().min(3, { message: "Endereço é obrigatório." }),
   numero_endereco: z.string().min(1, { message: "Número do endereço é obrigatório." }),
   idioma: z.string().min(1, { message: "Idioma é obrigatório." }),
-  turma_id: z.string().refine(val => val && val !== "none", { message: "Selecione uma turma antes de salvar." }),
-  responsavel_id: z.string().optional().nullable(),
+  turma_id: z.string().optional().nullable().or(z.literal('none')),
+  responsavel_id: z.string().optional().nullable().or(z.literal('none')),
   status: z.string().min(1, { message: "Status é obrigatório." }),
   data_nascimento: z.date({
     required_error: "Data de nascimento é obrigatória."

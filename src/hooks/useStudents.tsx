@@ -1,24 +1,9 @@
 
+import React from 'react';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-
-interface Student {
-  id: string;
-  nome: string;
-  cpf: string | null;
-  telefone: string | null;
-  email: string | null;
-  endereco: string | null;
-  numero_endereco: string | null;
-  status: string;
-  idioma: string;
-  turma_id: string | null;
-  responsavel_id: string | null;
-  data_nascimento: Date | null;
-  turmas?: { nome: string };
-  responsaveis?: { nome: string };
-}
+import { Student } from '@/integrations/supabase/types';
 
 interface Class {
   id: string;
@@ -87,7 +72,12 @@ export const useStudents = () => {
 
   const saveStudent = async (data: any, editingStudent: Student | null) => {
     try {
-      const submitData = data;
+      // Processar dados antes de enviar
+      const submitData = {
+        ...data,
+        turma_id: data.turma_id === 'none' ? null : data.turma_id,
+        responsavel_id: data.responsavel_id === 'none' ? null : data.responsavel_id
+      };
 
       if (editingStudent) {
         const { error } = await supabase
@@ -125,29 +115,65 @@ export const useStudents = () => {
     }
   };
 
-  const deleteStudent = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este aluno?')) return;
+  const [deletingStudentId, setDeletingStudentId] = useState<string | null>(null);
 
+  const deleteStudent = async (id: string): Promise<boolean> => {
+    setDeletingStudentId(id);
+    
     try {
-      const { error } = await supabase
+      // Primeiro, verificar se o aluno existe
+      const { data: studentExists, error: checkError } = await supabase
+        .from('alunos')
+        .select('id, nome')
+        .eq('id', id)
+        .single();
+
+      if (checkError || !studentExists) {
+        throw new Error('Aluno não encontrado.');
+      }
+
+      // Executar a exclusão
+      const { error: deleteError } = await supabase
         .from('alunos')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (deleteError) {
+        // Tratar diferentes tipos de erro
+        if (deleteError.code === 'PGRST116') {
+          throw new Error('Aluno não encontrado.');
+        } else if (deleteError.code === '23503') {
+          throw new Error('Não é possível excluir este aluno pois existem registros relacionados.');
+        } else {
+          throw new Error(`Erro no banco de dados: ${deleteError.message}`);
+        }
+      }
       
       toast({
         title: "Sucesso",
-        description: "Aluno excluído com sucesso!",
+        description: `Aluno "${studentExists.nome}" excluído com sucesso!`,
+        duration: 5000,
       });
-      fetchStudents();
-    } catch (error) {
+      
+      // Atualizar a lista de alunos
+      await fetchStudents();
+      
+      return true;
+    } catch (error: any) {
       console.error('Erro ao excluir aluno:', error);
+      
+      const errorMessage = error.message || 'Não foi possível excluir o aluno. Tente novamente.';
+      
       toast({
-        title: "Erro",
-        description: "Não foi possível excluir o aluno.",
+        title: "Erro na Exclusão",
+        description: errorMessage,
         variant: "destructive",
+        duration: 7000,
       });
+      
+      return false;
+    } finally {
+      setDeletingStudentId(null);
     }
   };
 
@@ -162,6 +188,7 @@ export const useStudents = () => {
     loading,
     saveStudent,
     deleteStudent,
+    deletingStudentId,
     refetch: fetchStudents
   };
 };

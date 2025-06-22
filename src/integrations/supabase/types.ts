@@ -1510,3 +1510,9 @@ export const Constants = {
     },
   },
 } as const
+
+// Export helper types
+export type Student = Database['public']['Tables']['alunos']['Row'] & {
+  turmas?: { nome: string } | null;
+  responsaveis?: { nome: string } | null;
+};

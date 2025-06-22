@@ -1,21 +1,8 @@
 
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Save } from 'lucide-react';
-
-interface Student {
-  id: string;
-  nome: string;
-  cpf: string | null;
-  telefone: string | null;
-  email: string | null;
-  endereco: string | null;
-  numero_endereco: string | null;
-  status: string;
-  idioma: string;
-  turma_id: string | null;
-  responsavel_id: string | null;
-  data_nascimento: Date | null;
-}
+import { Student } from '@/integrations/supabase/types';
 
 interface FormActionsProps {
   editingStudent: Student | null;

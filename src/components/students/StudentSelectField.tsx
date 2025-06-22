@@ -19,6 +19,7 @@ type StudentSelectFieldProps = {
   formMessage?: React.ReactNode;
   onDelete?: (value: string) => void;
   deletingId?: string | null;
+  disabled?: boolean;
 };
 
 const StudentSelectField = ({
@@ -30,6 +31,7 @@ const StudentSelectField = ({
   formMessage,
   onDelete,
   deletingId,
+  disabled = false,
 }: StudentSelectFieldProps) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -44,7 +46,7 @@ const StudentSelectField = ({
   return (
     <FormItem>
       <FormLabel>{label}</FormLabel>
-      <Select onValueChange={onChange} value={value || ""} open={isOpen} onOpenChange={setIsOpen}>
+      <Select onValueChange={onChange} value={value || ""} open={isOpen} onOpenChange={setIsOpen} disabled={disabled}>
         <FormControl>
           <SelectTrigger>
             <SelectValue placeholder={placeholder || "Selecione"} />

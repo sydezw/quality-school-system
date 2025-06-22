@@ -37,3 +37,6 @@ export const formatPhone = (value: string) => {
     return `(${cleanValue.slice(0, 2)}) ${cleanValue.slice(2, 7)}-${cleanValue.slice(7, 11)}`;
   }
 };
+
+// Alias para compatibilidade
+export const formatPhoneNumber = formatPhone;

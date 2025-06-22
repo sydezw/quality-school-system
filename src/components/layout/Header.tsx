@@ -17,7 +17,7 @@ const Header = () => {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-sm">
             <User className="h-4 w-4" />
-            <span>{user?.email}</span>
+            <span>Olá {user?.email}</span>
           </div>
           <Button 
             variant="outline" 

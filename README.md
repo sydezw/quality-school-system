@@ -1,73 +1,162 @@
-# Welcome to your Lovable project
+# Sistema Escolar TS School
 
-## Project info
+Um sistema completo de gestão escolar desenvolvido com tecnologias modernas para facilitar a administração de instituições de ensino.
 
-**URL**: https://lovable.dev/projects/44fda055-befd-4525-81ac-ed75d3b7b154
+## 📋 Sobre o Projeto
 
-## How can I edit this code?
+O TS School é uma plataforma web robusta e intuitiva que oferece ferramentas essenciais para a gestão completa de escolas e cursos de idiomas. O sistema foi desenvolvido com foco na experiência do usuário e na eficiência operacional.
 
-There are several ways of editing your application.
+## ✨ Funcionalidades Principais
 
-**Use Lovable**
+### 👥 Gestão de Pessoas
+- **Alunos**: Cadastro completo com informações pessoais, responsáveis e histórico acadêmico
+- **Professores**: Gerenciamento de docentes e suas especialidades
+- **Usuários**: Sistema de permissões granulares e controle de acesso
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/44fda055-befd-4525-81ac-ed75d3b7b154) and start prompting.
+### 📚 Gestão Acadêmica
+- **Turmas**: Criação e organização de classes por níveis e idiomas
+- **Materiais**: Biblioteca digital de recursos didáticos
+- **Agenda**: Calendário integrado para eventos e atividades
+- **Aniversariantes**: Painel especial para celebrações mensais
 
-Changes made via Lovable will be committed automatically to this repo.
+### 💰 Gestão Financeira
+- **Boletos**: Geração e controle de cobranças
+- **Receitas e Despesas**: Controle financeiro completo
+- **Relatórios**: Dashboards e análises financeiras
 
-**Use your preferred IDE**
+### 📊 Relatórios e Analytics
+- **Dashboard**: Visão geral com métricas importantes
+- **Relatórios Personalizados**: Análises detalhadas por período
+- **Gráficos Interativos**: Visualização de dados em tempo real
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### 🏢 Gestão Administrativa
+- **Salas**: Controle de ocupação e disponibilidade
+- **Contratos**: Geração automática de documentos
+- **Documentos**: Biblioteca de arquivos institucionais
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## 🚀 Tecnologias Utilizadas
 
-Follow these steps:
+- **Frontend**: React 18 + TypeScript
+- **Styling**: Tailwind CSS + shadcn/ui
+- **Build Tool**: Vite
+- **Backend**: Supabase (PostgreSQL + Auth + Storage)
+- **Roteamento**: React Router DOM
+- **Formulários**: React Hook Form
+- **Notificações**: Sonner + React Hot Toast
+- **Ícones**: Lucide React
+- **Animações**: CSS3 + Tailwind Animations
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## 📦 Instalação e Configuração
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### Pré-requisitos
+- Node.js (versão 18 ou superior)
+- npm ou yarn
+- Conta no Supabase
 
-# Step 3: Install the necessary dependencies.
-npm i
+### Passos para instalação
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+1. **Clone o repositório**
+```bash
+git clone <URL_DO_REPOSITORIO>
+cd quality-school-system
+```
+
+2. **Instale as dependências**
+```bash
+npm install
+```
+
+3. **Configure as variáveis de ambiente**
+```bash
+cp .env.example .env.local
+```
+Edite o arquivo `.env.local` com suas credenciais do Supabase:
+```
+VITE_SUPABASE_URL=sua_url_do_supabase
+VITE_SUPABASE_ANON_KEY=sua_chave_anonima
+```
+
+4. **Execute as migrações do banco de dados**
+```bash
+npx supabase db reset
+```
+
+5. **Inicie o servidor de desenvolvimento**
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+O sistema estará disponível em `http://localhost:5173`
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## 🔧 Scripts Disponíveis
 
-**Use GitHub Codespaces**
+- `npm run dev` - Inicia o servidor de desenvolvimento
+- `npm run build` - Gera a build de produção
+- `npm run preview` - Visualiza a build de produção
+- `npm run lint` - Executa o linter
+- `npm run type-check` - Verifica os tipos TypeScript
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 🗄️ Estrutura do Banco de Dados
 
-## What technologies are used for this project?
+O sistema utiliza PostgreSQL via Supabase com as seguintes tabelas principais:
 
-This project is built with:
+- `usuarios` - Dados dos usuários do sistema
+- `alunos` - Informações dos estudantes
+- `responsaveis` - Dados dos responsáveis pelos alunos
+- `professores` - Cadastro de docentes
+- `turmas` - Classes e grupos de estudo
+- `financeiro` - Transações financeiras
+- `agenda` - Eventos e compromissos
+- `materiais` - Recursos didáticos
+- `salas` - Espaços físicos da instituição
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 🔐 Sistema de Permissões
 
-## How can I deploy this project?
+O TS School implementa um sistema granular de permissões:
 
-Simply open [Lovable](https://lovable.dev/projects/44fda055-befd-4525-81ac-ed75d3b7b154) and click on Share -> Publish.
+- **Proprietário**: Acesso total ao sistema
+- **Administrador**: Gestão completa exceto configurações críticas
+- **Professor**: Acesso a turmas e materiais
+- **Secretário**: Gestão administrativa e financeira
+- **Visualizador**: Apenas consulta de dados
 
-## Can I connect a custom domain to my Lovable project?
+## 🎨 Design System
 
-Yes, you can!
+O sistema segue um design consistente baseado em:
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+- **Cores Primárias**: Vermelho da marca (#D72638) e tons neutros
+- **Tipografia**: Inter (sistema) com hierarquia clara
+- **Componentes**: Biblioteca shadcn/ui customizada
+- **Responsividade**: Mobile-first approach
+- **Acessibilidade**: Conformidade com WCAG 2.1
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+## 📱 Responsividade
+
+O sistema é totalmente responsivo e otimizado para:
+- 📱 Dispositivos móveis (320px+)
+- 📱 Tablets (768px+)
+- 💻 Desktops (1024px+)
+- 🖥️ Telas grandes (1440px+)
+
+## 🤝 Contribuição
+
+Para contribuir com o projeto:
+
+1. Faça um fork do repositório
+2. Crie uma branch para sua feature (`git checkout -b feature/nova-funcionalidade`)
+3. Commit suas mudanças (`git commit -m 'Adiciona nova funcionalidade'`)
+4. Push para a branch (`git push origin feature/nova-funcionalidade`)
+5. Abra um Pull Request
+
+## 📄 Licença
+
+Todos os direitos reservados para Sistema Escolar TS School  
+©Flution 2025
+
+## 📞 Suporte
+
+Para suporte técnico ou dúvidas sobre o sistema, entre em contato através dos canais oficiais da Flution.
+
+---
+
+**Desenvolvido com ❤️ pela equipe Flution**
