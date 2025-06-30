@@ -86,29 +86,69 @@ export const useResponsibles = () => {
     }
   };
 
-  const deleteResponsible = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este responsável?')) return;
-
+  const deleteResponsible = async (id: string): Promise<boolean> => {
     try {
-      const { error } = await supabase
+      // Primeiro, verificar se o responsável existe
+      const { data: responsibleExists, error: checkError } = await supabase
+        .from('responsaveis')
+        .select('id, nome')
+        .eq('id', id)
+        .single();
+
+      if (checkError || !responsibleExists) {
+        toast({
+          title: "Responsável não encontrado",
+          description: "O responsável que você está tentando excluir não existe mais.",
+          variant: "destructive",
+        });
+        await fetchResponsibles();
+        return false;
+      }
+
+      // Executar a exclusão
+      const { error: deleteError } = await supabase
         .from('responsaveis')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (deleteError) {
+        // Tratar diferentes tipos de erro
+        if (deleteError.code === 'PGRST116') {
+          toast({
+            title: "Responsável não encontrado",
+            description: "O responsável que você está tentando excluir não existe mais.",
+            variant: "destructive",
+          });
+          await fetchResponsibles();
+          return false;
+        } else if (deleteError.code === '23503') {
+          toast({
+            title: "Não é possível excluir este responsável",
+            description: "Este responsável está vinculado a alunos ou outros registros. Remova essas vinculações antes de excluir.",
+            variant: "destructive",
+          });
+          return false;
+        } else {
+          throw deleteError;
+        }
+      }
       
       toast({
-        title: "Sucesso",
-        description: "Responsável excluído com sucesso!",
+        title: "Responsável excluído com sucesso!",
+        description: `O responsável "${responsibleExists.nome}" foi removido do sistema.`,
       });
-      fetchResponsibles();
+      
+      // Atualizar a lista de responsáveis
+      await fetchResponsibles();
+      return true;
     } catch (error) {
       console.error('Erro ao excluir responsável:', error);
       toast({
-        title: "Erro",
-        description: "Não foi possível excluir o responsável.",
+        title: "Erro ao excluir responsável",
+        description: "Ocorreu um erro inesperado. Tente novamente.",
         variant: "destructive",
       });
+      return false;
     }
   };
 

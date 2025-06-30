@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { PermissionButton } from '@/components/shared/PermissionButton';
+
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -115,10 +115,10 @@ export const NewContractDialog = ({ onContractCreated }: NewContractDialogProps)
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <PermissionButton permission="gerenciarContratos" className="bg-brand-red hover:bg-red-700">
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Contrato
-        </PermissionButton>
+        <Button className="bg-brand-red hover:bg-red-700">
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Contrato
+            </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>

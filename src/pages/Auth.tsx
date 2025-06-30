@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { School } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -24,23 +24,26 @@ const Auth = () => {
   const [registerCargo, setRegisterCargo] = useState('Secretária');
   const [registerLoading, setRegisterLoading] = useState(false);
   
-  const { signIn } = useAuth();
+  const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
+    // Validate fields before sending
+    if (!email || !password) {
+      toast.error('Email e senha são obrigatórios.');
+      setLoading(false);
+      return;
+    }
+    
     try {
-      const { error } = await signIn(email, password);
-      if (error) {
-        toast.error('Erro ao fazer login: ' + error.message);
-      } else {
-        toast.success('Login realizado com sucesso!');
-        navigate('/app/dashboard');
-      }
+      await signIn({ email, password });
+      toast.success('Login realizado com sucesso!');
+      navigate('/dashboard');
     } catch (error) {
-      toast.error('Erro inesperado ao fazer login');
+      toast.error(error instanceof Error ? error.message : 'Erro inesperado ao fazer login');
     } finally {
       setLoading(false);
     }
@@ -51,22 +54,12 @@ const Auth = () => {
     setRegisterLoading(true);
     
     try {
-      // Inserir o usuário na tabela usuarios_pendentes
-      const { error } = await supabase
-        .from('usuarios_pendentes')
-        .insert([{
-          nome: registerName,
-          email: registerEmail,
-          senha: registerPassword,
-          cargo: registerCargo as any,
-          status: 'pendente'
-        }]);
-
-      if (error) {
-        console.error('Erro ao cadastrar usuário:', error);
-        toast.error('Erro ao cadastrar usuário. Tente novamente.');
-        return;
-      }
+      await signUp({
+        nome: registerName,
+        email: registerEmail,
+        cargo_desejado: registerCargo,
+        motivo: 'Solicitação via sistema'
+      });
       
       toast.success('Cadastro realizado com sucesso! Aguarde a aprovação do administrador.');
       
@@ -77,8 +70,7 @@ const Auth = () => {
       setRegisterCargo('Secretária');
       
     } catch (error) {
-      console.error('Erro inesperado ao cadastrar usuário:', error);
-      toast.error('Erro inesperado ao cadastrar usuário');
+      toast.error(error instanceof Error ? error.message : 'Erro inesperado ao cadastrar usuário');
     } finally {
       setRegisterLoading(false);
     }

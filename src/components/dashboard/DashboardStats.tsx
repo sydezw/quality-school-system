@@ -23,7 +23,7 @@ const DashboardStats = ({ data }: DashboardStatsProps) => {
       {/* Total de Alunos */}
       <div
         className="cursor-pointer"
-        onClick={() => navigate('/app/students')}
+        onClick={() => navigate('/students')}
         tabIndex={0}
         title="Ir para Alunos"
       >
@@ -38,7 +38,7 @@ const DashboardStats = ({ data }: DashboardStatsProps) => {
       {/* Total de Turmas */}
       <div
         className="cursor-pointer"
-        onClick={() => navigate('/app/classes')}
+        onClick={() => navigate('/classes')}
         tabIndex={0}
         title="Ir para Turmas"
       >
@@ -52,7 +52,7 @@ const DashboardStats = ({ data }: DashboardStatsProps) => {
       {/* Contratos Ativos */}
       <div
         className="cursor-pointer"
-        onClick={() => navigate('/app/contracts')}
+        onClick={() => navigate('/contracts')}
         tabIndex={0}
         title="Ir para Contratos"
       >
@@ -66,7 +66,7 @@ const DashboardStats = ({ data }: DashboardStatsProps) => {
       {/* Faturamento do Mês */}
       <div
         className="cursor-pointer"
-        onClick={() => navigate('/app/financial')}
+        onClick={() => navigate('/financial')}
         tabIndex={0}
         title="Ir para Financeiro"
       >
@@ -81,7 +81,7 @@ const DashboardStats = ({ data }: DashboardStatsProps) => {
       {/* Inadimplentes */}
       <div
         className="cursor-pointer"
-        onClick={() => navigate('/app/financial?status=inadimplente')}
+        onClick={() => navigate('/financial?status=inadimplente')}
         tabIndex={0}
         title="Ver apenas inadimplentes"
       >
@@ -96,7 +96,7 @@ const DashboardStats = ({ data }: DashboardStatsProps) => {
       {/* Professores Ativos */}
       <div
         className="cursor-pointer"
-        onClick={() => navigate('/app/teachers')}
+        onClick={() => navigate('/teachers')}
         tabIndex={0}
         title="Ir para Professores"
       >

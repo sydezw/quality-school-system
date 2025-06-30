@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 export const SIDEBAR_LINKS = [
-  { title: 'Dashboard', icon: LayoutDashboard, href: '/app/dashboard' },
+  { title: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
   { title: 'Alunos', icon: Users, href: '#' },
   { title: 'Professores', icon: User, href: '#' },
   { title: 'Turmas', icon: BookCopy, href: '#' },

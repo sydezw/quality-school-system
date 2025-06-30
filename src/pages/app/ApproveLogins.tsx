@@ -7,9 +7,8 @@ import { CheckCircle, XCircle, Clock, Users, FileText, UserCheck, Settings } fro
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database, Tables } from "@/integrations/supabase/types";
-import { PermissionToggle } from "@/components/shared/PermissionToggle";
-import { usePermissions, UserPermissions } from "@/hooks/usePermissions";
-import { PermissionGuard } from "@/components/guards/PermissionGuard";
+
+
 
 interface PendingUser {
   id: string;
@@ -31,7 +30,7 @@ export default function ApproveLogins() {
   const [approvedLoading, setApprovedLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('pending');
   const { toast } = useToast();
-  const { isOwner } = usePermissions();
+
 
   useEffect(() => {
     fetchPendingUsers();
@@ -185,7 +184,7 @@ export default function ApproveLogins() {
   };
 
   return (
-    <PermissionGuard permission="gerenciarUsuarios">
+    <div>
       <div className="container mx-auto p-6">
         <Card>
         <CardHeader>
@@ -276,13 +275,7 @@ export default function ApproveLogins() {
             </TabsContent>
 
             <TabsContent value="permissions" className="mt-6">
-              {!isOwner ? (
-                <div className="text-center py-8">
-                  <Settings className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">Acesso Restrito</h3>
-                  <p className="text-muted-foreground">Apenas administradores podem gerenciar permissões de usuários.</p>
-                </div>
-              ) : approvedLoading ? (
+              {approvedLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
@@ -308,10 +301,9 @@ export default function ApproveLogins() {
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <PermissionToggle 
-                          user={user} 
-                          onPermissionChange={fetchApprovedUsers}
-                        />
+                        <div className="space-y-2">
+                          <p className="text-sm text-muted-foreground">Permissões do usuário</p>
+                        </div>
                       </CardContent>
                     </Card>
                   ))}
@@ -322,6 +314,6 @@ export default function ApproveLogins() {
         </CardContent>
         </Card>
        </div>
-     </PermissionGuard>
+     </div>
    );
 }

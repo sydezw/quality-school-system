@@ -79,7 +79,7 @@ const ContractAlerts = () => {
       {/* Contratos Vencendo */}
       <Card
         className={contractsExpiring.length > 0 ? "border-orange-300 bg-orange-50 cursor-pointer" : "cursor-pointer"}
-        onClick={() => navigate('/app/contracts?alerta=vencendo')}
+        onClick={() => navigate('/contracts?alerta=vencendo')}
         tabIndex={0}
         title="Clique para ver contratos vencendo"
       >
@@ -114,7 +114,7 @@ const ContractAlerts = () => {
       {/* Contratos Vencidos */}
       <Card
         className={contractsExpired.length > 0 ? "border-red-300 bg-red-50 cursor-pointer" : "cursor-pointer"}
-        onClick={() => navigate('/app/contracts?alerta=vencido')}
+        onClick={() => navigate('/contracts?alerta=vencido')}
         tabIndex={0}
         title="Clique para ver contratos vencidos"
       >

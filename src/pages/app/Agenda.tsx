@@ -12,9 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, Calendar, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { useForm } from 'react-hook-form';
-import { usePermissions } from '@/hooks/usePermissions';
-import { PermissionButton } from '@/components/shared/PermissionButton';
-import { PermissionGuard } from '@/components/guards/PermissionGuard';
+
 
 interface AgendaItem {
   id: string;
@@ -37,7 +35,7 @@ const Agenda = () => {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const { toast } = useToast();
   const { register, handleSubmit, reset, setValue } = useForm();
-  const { hasPermission, isOwner } = usePermissions();
+
 
   useEffect(() => {
     fetchCurrentUser();
@@ -166,23 +164,47 @@ const Agenda = () => {
     if (!confirm('Tem certeza que deseja excluir este evento?')) return;
 
     try {
-      const { error } = await supabase
+      // Primeiro, verificar se o evento existe
+      const { data: eventExists, error: checkError } = await supabase
+        .from('agenda')
+        .select('id, titulo')
+        .eq('id', id)
+        .single();
+
+      if (checkError || !eventExists) {
+        throw new Error('Evento não encontrado.');
+      }
+
+      // Executar a exclusão
+      const { error: deleteError } = await supabase
         .from('agenda')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (deleteError) {
+        // Tratar diferentes tipos de erro
+        if (deleteError.code === 'PGRST116') {
+          throw new Error('Evento não encontrado.');
+        } else if (deleteError.code === '23503') {
+          throw new Error('Não é possível excluir este evento pois existem registros relacionados. Para resolver este problema, execute as migrações do banco de dados ou entre em contato com o administrador do sistema.');
+        } else {
+          throw new Error(`Erro no banco de dados: ${deleteError.message}`);
+        }
+      }
       
       toast({
         title: "Sucesso",
-        description: "Evento excluído com sucesso!",
+        description: `Evento "${eventExists.titulo}" excluído com sucesso!`,
+        duration: 5000,
       });
-      fetchAgendaItems();
+      
+      // Atualizar a lista de eventos
+      await fetchAgendaItems();
     } catch (error) {
       console.error('Erro ao excluir evento:', error);
       toast({
-        title: "Erro",
-        description: "Não foi possível excluir o evento.",
+        title: "Erro na Exclusão",
+        description: error instanceof Error ? error.message : "Não foi possível excluir o evento.",
         variant: "destructive",
       });
     }
@@ -338,17 +360,16 @@ const Agenda = () => {
   }
 
   return (
-    <PermissionGuard permission="visualizarAgenda">
+    <div>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">📅 Agenda Escolar</h1>
-          <PermissionButton
-            permission="gerenciarAgenda"
+          <Button
             onClick={() => openCreateDialog()}
           >
             <Plus className="h-4 w-4 mr-2" />
             Adicionar Evento
-          </PermissionButton>
+          </Button>
         </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -538,8 +559,7 @@ const Agenda = () => {
                 Cancelar
               </Button>
               {editingItem && (
-                <PermissionButton
-                  permission="gerenciarAgenda"
+                <Button
                   type="button"
                   variant="destructive"
                   onClick={() => {
@@ -549,14 +569,14 @@ const Agenda = () => {
                   }}
                 >
                   <Trash2 className="h-4 w-4" />
-                </PermissionButton>
+                </Button>
               )}
             </div>
           </form>
         </DialogContent>
         </Dialog>
       </div>
-    </PermissionGuard>
+    </div>
   );
 };
 

@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { PermissionButton } from '@/components/shared/PermissionButton';
+
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -129,10 +129,10 @@ export const EditContractDialog = ({ contract, onContractUpdated }: EditContract
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <PermissionButton permission="gerenciarContratos" size="sm" variant="outline">
-          <Edit className="h-4 w-4 mr-1" />
-          Editar
-        </PermissionButton>
+        <Button size="sm" variant="outline">
+                <Edit className="h-4 w-4" />
+                Editar
+              </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>

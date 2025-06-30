@@ -12,9 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, FileText, Download, Eye } from 'lucide-react';
 import { useForm } from 'react-hook-form';
-import { usePermissions } from '@/hooks/usePermissions';
-import { PermissionGuard } from '@/components/guards/PermissionGuard';
-import { PermissionButton } from '@/components/guards/PermissionButton';
+
 
 
 interface Document {
@@ -23,8 +21,10 @@ interface Document {
   data: string;
   arquivo_link: string | null;
   status: 'gerado' | 'assinado' | 'cancelado';
-  aluno_id: string;
+  aluno_id: string | null;
+  professor_id: string | null;
   alunos?: { nome: string };
+  professores?: { nome: string };
 }
 
 interface Student {
@@ -32,18 +32,31 @@ interface Student {
   nome: string;
 }
 
+interface Teacher {
+  id: string;
+  nome: string;
+}
+
 const Documents = () => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [documentType, setDocumentType] = useState<'aluno' | 'professor'>('aluno');
   const { toast } = useToast();
-  const { register, handleSubmit, reset, setValue } = useForm();
-  const { hasPermission, isOwner } = usePermissions();
+  interface FormData {
+    pessoa_id: string;
+    tipo: string;
+    arquivo_link?: string;
+  }
+
+  const { register, handleSubmit, reset, setValue } = useForm<FormData>();
 
   useEffect(() => {
     fetchDocuments();
     fetchStudents();
+    fetchTeachers();
   }, []);
 
   const fetchDocuments = async () => {
@@ -52,7 +65,8 @@ const Documents = () => {
         .from('documentos')
         .select(`
           *,
-          alunos (nome)
+          alunos (nome),
+          professores (nome)
         `)
         .order('data', { ascending: false });
 
@@ -85,14 +99,41 @@ const Documents = () => {
     }
   };
 
+  const fetchTeachers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('professores')
+        .select('id, nome')
+        .order('nome');
+
+      if (error) throw error;
+      setTeachers(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar professores:', error);
+    }
+  };
+
   const onSubmit = async (data: any) => {
     try {
+      // Criar dados para inserção baseado no tipo de documento
+      const insertData: any = {
+        tipo: data.tipo,
+        data: new Date().toISOString().split('T')[0],
+        arquivo_link: data.arquivo_link || null,
+        status: 'gerado'
+      };
+
+      if (documentType === 'aluno') {
+        insertData.aluno_id = data.pessoa_id;
+        insertData.professor_id = null;
+      } else {
+        insertData.professor_id = data.pessoa_id;
+        insertData.aluno_id = null;
+      }
+
       const { error } = await supabase
         .from('documentos')
-        .insert([{
-          ...data,
-          data: new Date().toISOString().split('T')[0] // Data atual
-        }]);
+        .insert([insertData]);
 
       if (error) throw error;
       
@@ -115,15 +156,6 @@ const Documents = () => {
   };
 
   const updateDocumentStatus = async (id: string, status: 'gerado' | 'assinado' | 'cancelado') => {
-    if (!isOwner() && !hasPermission('gerenciarDocumentos')) {
-      toast({
-        title: "Acesso Negado",
-        description: "Você não tem permissão para realizar esta ação. Entre em contato com o administrador.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
       const { error } = await supabase
         .from('documentos')
@@ -150,7 +182,9 @@ const Documents = () => {
 
   const openCreateDialog = () => {
     reset();
+    setDocumentType('aluno');
     setIsDialogOpen(true);
+    fetchTeachers();
   };
 
   const getStatusColor = (status: string) => {
@@ -167,9 +201,31 @@ const Documents = () => {
       'contrato': 'Contrato',
       'declaracao_matricula': 'Declaração de Matrícula',
       'declaracao_frequencia': 'Declaração de Frequência',
-      'declaracao_conclusao': 'Declaração de Conclusão'
+      'declaracao_conclusao': 'Declaração de Conclusão',
+      'certificado_professor': 'Certificado do Professor',
+      'diploma_professor': 'Diploma do Professor',
+      'comprovante_experiencia': 'Comprovante de Experiência',
+      'documento_pessoal': 'Documento Pessoal'
     };
     return labels[tipo] || tipo;
+  };
+
+  const getDocumentTypeOptions = () => {
+    if (documentType === 'aluno') {
+      return [
+        { value: 'contrato', label: 'Contrato' },
+        { value: 'declaracao_matricula', label: 'Declaração de Matrícula' },
+        { value: 'declaracao_frequencia', label: 'Declaração de Frequência' },
+        { value: 'declaracao_conclusao', label: 'Declaração de Conclusão' }
+      ];
+    } else {
+      return [
+        { value: 'certificado_professor', label: 'Certificado do Professor' },
+        { value: 'diploma_professor', label: 'Diploma do Professor' },
+        { value: 'comprovante_experiencia', label: 'Comprovante de Experiência' },
+        { value: 'documento_pessoal', label: 'Documento Pessoal' }
+      ];
+    }
   };
 
 
@@ -190,20 +246,19 @@ const Documents = () => {
   }
 
   return (
-    <PermissionGuard permission="visualizarDocumentos">
+    <div>
       <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold">Documentos</h1>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <PermissionButton 
-                  permission="gerenciarDocumentos"
-                  onClick={openCreateDialog} 
+                <Button 
+                onClick={openCreateDialog} 
                 className="bg-brand-red hover:bg-brand-red/90"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Gerar Documento
-              </PermissionButton>
+              </Button>
             </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
@@ -211,35 +266,57 @@ const Documents = () => {
             </DialogHeader>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
-                <Label htmlFor="aluno_id">Aluno *</Label>
-                <Select onValueChange={(value) => setValue('aluno_id', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o aluno" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {students.map((student) => (
-                      <SelectItem key={student.id} value={student.id}>
-                        {student.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="tipo">Tipo de Documento *</Label>
-                <Select onValueChange={(value) => setValue('tipo', value)}>
+                <Label htmlFor="documentType">Tipo de Pessoa *</Label>
+                <Select onValueChange={(value) => {
+                  setDocumentType(value as 'aluno' | 'professor');
+                  setValue('pessoa_id', '');
+                  setValue('tipo', '');
+                }}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o tipo" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="contrato">Contrato</SelectItem>
-                    <SelectItem value="declaracao_matricula">Declaração de Matrícula</SelectItem>
-                    <SelectItem value="declaracao_frequencia">Declaração de Frequência</SelectItem>
-                    <SelectItem value="declaracao_conclusao">Declaração de Conclusão</SelectItem>
+                    <SelectItem value="aluno">Aluno</SelectItem>
+                    <SelectItem value="professor">Professor</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
+              {documentType && (
+                <div>
+                  <Label htmlFor="pessoa_id">{documentType === 'aluno' ? 'Aluno' : 'Professor'} *</Label>
+                  <Select onValueChange={(value) => setValue('pessoa_id', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={`Selecione o ${documentType === 'aluno' ? 'aluno' : 'professor'}`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(documentType === 'aluno' ? students : teachers).map((person) => (
+                        <SelectItem key={person.id} value={person.id}>
+                          {person.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {documentType && (
+                <div>
+                  <Label htmlFor="tipo">Tipo de Documento *</Label>
+                  <Select onValueChange={(value) => setValue('tipo', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getDocumentTypeOptions().map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div>
                 <Label htmlFor="arquivo_link">Link do Arquivo</Label>
@@ -280,7 +357,7 @@ const Documents = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Aluno</TableHead>
+                  <TableHead>Pessoa</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Data</TableHead>
                   <TableHead>Status</TableHead>
@@ -291,16 +368,11 @@ const Documents = () => {
                 {documents.map((doc) => (
                   <TableRow key={doc.id}>
                     <TableCell className="font-medium">
-                      {doc.alunos?.nome}
+                      {doc.alunos?.nome || doc.professores?.nome}
                     </TableCell>
                     <TableCell>{getTipoLabel(doc.tipo)}</TableCell>
                     <TableCell>{formatDate(doc.data)}</TableCell>
                     <TableCell>
-                      <PermissionGuard permission="gerenciarDocumentos" fallback={
-                        <Badge variant={doc.status === 'gerado' ? 'default' : doc.status === 'assinado' ? 'secondary' : 'destructive'}>
-                          {doc.status === 'gerado' ? 'Gerado' : doc.status === 'assinado' ? 'Assinado' : 'Cancelado'}
-                        </Badge>
-                      }>
                         <Select
                           value={doc.status}
                           onValueChange={(value) => updateDocumentStatus(doc.id, value as 'gerado' | 'assinado' | 'cancelado')}
@@ -314,7 +386,6 @@ const Documents = () => {
                             <SelectItem value="cancelado">Cancelado</SelectItem>
                           </SelectContent>
                         </Select>
-                      </PermissionGuard>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
@@ -351,7 +422,7 @@ const Documents = () => {
         </CardContent>
       </Card>
       </div>
-    </PermissionGuard>
+    </div>
   );
 };
 

@@ -14,24 +14,20 @@ import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, Building2, BarChart3 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import RoomOccupancyReport from '@/components/rooms/RoomOccupancyReport';
-import { usePermissions } from '@/hooks/usePermissions';
-import { PermissionButton } from '@/components/shared/PermissionButton';
-import { PermissionGuard } from '@/components/guards/PermissionGuard';
 
-interface Room {
-  id: string;
-  nome: string;
-  capacidade: number;
-  tipo: string;
-}
+import { DeleteRoomDialog } from '@/components/rooms/DeleteRoomDialog';
+import { Room } from '@/integrations/supabase/types';
 
 const Rooms = () => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [roomToDelete, setRoomToDelete] = useState<Room | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
-  const { hasPermission, isOwner } = usePermissions();
+
   const { register, handleSubmit, reset, setValue } = useForm();
 
   useEffect(() => {
@@ -46,7 +42,9 @@ const Rooms = () => {
         .order('nome');
 
       if (error) throw error;
-      setRooms(data || []);
+      // Filtra apenas salas com nome, capacidade e tipo válidos
+      const validRooms = (data || []).filter(room => room.nome && room.capacidade && room.tipo);
+      setRooms(validRooms);
     } catch (error) {
       console.error('Erro ao buscar salas:', error);
       toast({
@@ -103,46 +101,108 @@ const Rooms = () => {
     }
   };
 
-  const deleteRoom = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta sala?')) return;
+  const handleDeleteClick = (room: Room) => {
+    setRoomToDelete(room);
+    setDeleteDialogOpen(true);
+  };
 
+  const handleDeleteConfirm = async () => {
+    if (!roomToDelete) return;
+    
+    setIsDeleting(true);
+    const success = await deleteRoom(roomToDelete.id);
+    
+    if (success) {
+      setDeleteDialogOpen(false);
+      setRoomToDelete(null);
+    }
+    
+    setIsDeleting(false);
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setRoomToDelete(null);
+  };
+
+  const deleteRoom = async (id: string): Promise<boolean> => {
     try {
-      // Verificar se a sala tem turmas associadas
-      const { data: classes, error: classError } = await supabase
+      // Primeiro, verificar se a sala existe
+      const { data: roomExists, error: checkError } = await supabase
+        .from('salas')
+        .select('id, nome')
+        .eq('id', id)
+        .single();
+
+      if (checkError || !roomExists) {
+        toast({
+          title: "Sala não encontrada",
+          description: "A sala que você está tentando excluir não existe mais.",
+          variant: "destructive",
+        });
+        await fetchRooms();
+        return false;
+      }
+
+      // Verificar se há turmas associadas
+      const { data: classes } = await supabase
         .from('turmas')
         .select('id')
         .eq('sala_id', id);
 
-      if (classError) throw classError;
-
       if (classes && classes.length > 0) {
         toast({
-          title: "Erro",
-          description: "Esta sala não pode ser excluída pois tem um professor anexado nela - desanexe o professor dessa sala na aba turmas.",
+          title: "Não é possível excluir esta sala",
+          description: "Esta sala possui turmas associadas. Remova essas vinculações antes de excluir.",
           variant: "destructive",
         });
-        return;
+        return false;
       }
 
-      const { error } = await supabase
+      // Executar a exclusão
+      const { error: deleteError } = await supabase
         .from('salas')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (deleteError) {
+        // Tratar diferentes tipos de erro
+        if (deleteError.code === 'PGRST116') {
+          toast({
+            title: "Sala não encontrada",
+            description: "A sala que você está tentando excluir não existe mais.",
+            variant: "destructive",
+          });
+          await fetchRooms();
+          return false;
+        } else if (deleteError.code === '23503') {
+          toast({
+            title: "Não é possível excluir esta sala",
+            description: "Esta sala está vinculada a turmas ou outros registros. Remova essas vinculações antes de excluir.",
+            variant: "destructive",
+          });
+          return false;
+        } else {
+          throw deleteError;
+        }
+      }
       
       toast({
-        title: "Sucesso",
-        description: "Sala excluída com sucesso!",
+        title: "Sala excluída com sucesso!",
+        description: `A sala "${roomExists.nome}" foi removida do sistema.`,
       });
-      fetchRooms();
+      
+      // Atualizar a lista de salas
+      await fetchRooms();
+      return true;
     } catch (error) {
       console.error('Erro ao excluir sala:', error);
       toast({
-        title: "Erro",
-        description: "Não foi possível excluir a sala.",
+        title: "Erro ao excluir sala",
+        description: "Ocorreu um erro inesperado. Tente novamente.",
         variant: "destructive",
       });
+      return false;
     }
   };
 
@@ -176,20 +236,19 @@ const Rooms = () => {
   }
 
   return (
-    <PermissionGuard permission="visualizarSalas">
+    <div>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">Salas</h1>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <PermissionButton 
-                permission="gerenciarSalas"
+              <Button 
                 className="bg-brand-red hover:bg-brand-red/90"
                 onClick={openCreateDialog}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Nova Sala
-              </PermissionButton>
+              </Button>
             </DialogTrigger>
             <DialogContent className="max-w-md">
             <DialogHeader>
@@ -292,25 +351,26 @@ const Rooms = () => {
                         <TableCell>{room.capacidade} alunos</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            <PermissionButton
-                              permission="gerenciarSalas"
+                            <Button
                               variant="outline"
                               size="sm"
                               onClick={() => openEditDialog(room)}
-                              showLockIcon={false}
                             >
                               <Edit className="h-4 w-4" />
-                            </PermissionButton>
-                            <PermissionButton
-                              permission="gerenciarSalas"
+                            </Button>
+                            <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => deleteRoom(room.id)}
+                              onClick={() => handleDeleteClick(room)}
                               className="text-red-600 hover:text-red-700"
-                              showLockIcon={false}
+                              disabled={isDeleting && roomToDelete?.id === room.id}
                             >
-                              <Trash2 className="h-4 w-4" />
-                            </PermissionButton>
+                              {isDeleting && roomToDelete?.id === room.id ? (
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -326,8 +386,16 @@ const Rooms = () => {
           <RoomOccupancyReport />
         </TabsContent>
       </Tabs>
+
+      <DeleteRoomDialog
+         isOpen={deleteDialogOpen}
+         room={roomToDelete}
+         onOpenChange={setDeleteDialogOpen}
+         onConfirm={handleDeleteConfirm}
+         isDeleting={isDeleting}
+       />
     </div>
-    </PermissionGuard>
+    </div>
   );
 };
 

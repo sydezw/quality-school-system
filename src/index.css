@@ -1,9 +1,9 @@
 
+@import './styles/birthdays-animations.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import './styles/birthdays-animations.css';
 
 @layer base {
   :root {

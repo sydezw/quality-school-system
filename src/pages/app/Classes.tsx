@@ -12,9 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, BookCopy } from 'lucide-react';
 import { useForm } from 'react-hook-form';
-import { usePermissions } from '@/hooks/usePermissions';
-import { PermissionGuard } from '@/components/guards/PermissionGuard';
-import { PermissionButton } from '@/components/shared/PermissionButton';
+
 
 interface Class {
   id: string;
@@ -50,7 +48,7 @@ const Classes = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
   const { toast } = useToast();
-  const { hasPermission, isOwner } = usePermissions();
+
   const { register, handleSubmit, reset, setValue, watch } = useForm();
 
   const selectedIdioma = watch('idioma');
@@ -164,23 +162,47 @@ const Classes = () => {
     if (!confirm('Tem certeza que deseja excluir esta turma?')) return;
 
     try {
-      const { error } = await supabase
+      // Primeiro, verificar se a turma existe
+      const { data: classExists, error: checkError } = await supabase
+        .from('turmas')
+        .select('id, nome')
+        .eq('id', id)
+        .single();
+
+      if (checkError || !classExists) {
+        throw new Error('Turma não encontrada.');
+      }
+
+      // Executar a exclusão
+      const { error: deleteError } = await supabase
         .from('turmas')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (deleteError) {
+        // Tratar diferentes tipos de erro
+        if (deleteError.code === 'PGRST116') {
+          throw new Error('Turma não encontrada.');
+        } else if (deleteError.code === '23503') {
+          throw new Error('Não é possível excluir esta turma pois existem registros relacionados. Para resolver este problema, execute as migrações do banco de dados ou entre em contato com o administrador do sistema.');
+        } else {
+          throw new Error(`Erro no banco de dados: ${deleteError.message}`);
+        }
+      }
       
       toast({
         title: "Sucesso",
-        description: "Turma excluída com sucesso!",
+        description: `Turma "${classExists.nome}" excluída com sucesso!`,
+        duration: 5000,
       });
-      fetchClasses();
+      
+      // Atualizar a lista de turmas
+      await fetchClasses();
     } catch (error) {
       console.error('Erro ao excluir turma:', error);
       toast({
-        title: "Erro",
-        description: "Não foi possível excluir a turma.",
+        title: "Erro na Exclusão",
+        description: error instanceof Error ? error.message : "Não foi possível excluir a turma.",
         variant: "destructive",
       });
     }
@@ -228,20 +250,19 @@ const Classes = () => {
   }
 
   return (
-    <PermissionGuard permission="visualizarTurmas">
+    <div>
       <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold">Turmas</h1>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <PermissionButton 
-                    permission="gerenciarTurmas"
+                <Button 
                   className="bg-brand-red hover:bg-brand-red/90"
                   onClick={openCreateDialog}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Nova Turma
-                </PermissionButton>
+                </Button>
               </DialogTrigger>
                <DialogContent className="max-w-md">
             <DialogHeader>
@@ -413,25 +434,21 @@ const Classes = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <PermissionButton
-                          permission="gerenciarTurmas"
+                        <Button
                           variant="outline"
                           size="sm"
                           onClick={() => openEditDialog(classItem)}
-                          showLockIcon={false}
                         >
                           <Edit className="h-4 w-4" />
-                        </PermissionButton>
-                        <PermissionButton
-                          permission="gerenciarTurmas"
+                        </Button>
+                        <Button
                           variant="outline"
                           size="sm"
                           onClick={() => deleteClass(classItem.id)}
                           className="text-red-600 hover:text-red-700"
-                          showLockIcon={false}
                         >
                           <Trash2 className="h-4 w-4" />
-                        </PermissionButton>
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -442,7 +459,7 @@ const Classes = () => {
         </CardContent>
       </Card>
       </div>
-    </PermissionGuard>
+    </div>
   );
 };
 

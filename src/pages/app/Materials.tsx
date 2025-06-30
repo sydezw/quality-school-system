@@ -13,9 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, BookOpen, Package } from 'lucide-react';
 import { useForm } from 'react-hook-form';
-import { usePermissions } from '@/hooks/usePermissions';
-import { PermissionButton } from '@/components/shared/PermissionButton';
-import { PermissionGuard } from '@/components/guards/PermissionGuard';
+
 
 interface Material {
   id: string;
@@ -33,7 +31,7 @@ const Materials = () => {
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
   const { toast } = useToast();
   const { register, handleSubmit, reset, setValue } = useForm();
-  const { hasPermission, isOwner } = usePermissions();
+
 
   useEffect(() => {
     fetchMaterials();
@@ -103,23 +101,47 @@ const Materials = () => {
     if (!confirm('Tem certeza que deseja excluir este material?')) return;
 
     try {
-      const { error } = await supabase
+      // Primeiro, verificar se o material existe
+      const { data: materialExists, error: checkError } = await supabase
+        .from('materiais')
+        .select('id, nome')
+        .eq('id', id)
+        .single();
+
+      if (checkError || !materialExists) {
+        throw new Error('Material não encontrado.');
+      }
+
+      // Executar a exclusão
+      const { error: deleteError } = await supabase
         .from('materiais')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (deleteError) {
+        // Tratar diferentes tipos de erro
+        if (deleteError.code === 'PGRST116') {
+          throw new Error('Material não encontrado.');
+        } else if (deleteError.code === '23503') {
+          throw new Error('Não é possível excluir este material pois existem registros relacionados. Para resolver este problema, execute as migrações do banco de dados ou entre em contato com o administrador do sistema.');
+        } else {
+          throw new Error(`Erro no banco de dados: ${deleteError.message}`);
+        }
+      }
       
       toast({
         title: "Sucesso",
-        description: "Material excluído com sucesso!",
+        description: `Material "${materialExists.nome}" excluído com sucesso!`,
+        duration: 5000,
       });
-      fetchMaterials();
+      
+      // Atualizar a lista de materiais
+      await fetchMaterials();
     } catch (error) {
       console.error('Erro ao excluir material:', error);
       toast({
-        title: "Erro",
-        description: "Não foi possível excluir o material.",
+        title: "Erro na Exclusão",
+        description: error instanceof Error ? error.message : "Não foi possível excluir o material.",
         variant: "destructive",
       });
     }
@@ -169,20 +191,19 @@ const Materials = () => {
   }
 
   return (
-    <PermissionGuard permission="visualizarMateriais">
+    <div>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">Materiais Didáticos</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <PermissionButton
-              permission="gerenciarMateriais"
+            <Button
               onClick={openCreateDialog}
               className="bg-brand-red hover:bg-brand-red/90"
             >
               <Plus className="h-4 w-4 mr-2" />
               Novo Material
-            </PermissionButton>
+            </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
@@ -312,22 +333,20 @@ const Materials = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <PermissionButton
-                          permission="gerenciarMateriais"
+                        <Button
                           size="sm"
                           variant="outline"
                           onClick={() => openEditDialog(material)}
                         >
                           <Edit className="h-4 w-4" />
-                        </PermissionButton>
-                        <PermissionButton
-                          permission="gerenciarMateriais"
+                        </Button>
+                        <Button
                           size="sm"
                           variant="outline"
                           onClick={() => deleteMaterial(material.id)}
                         >
                           <Trash2 className="h-4 w-4" />
-                        </PermissionButton>
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -338,7 +357,7 @@ const Materials = () => {
         </CardContent>
         </Card>
       </div>
-    </PermissionGuard>
+    </div>
   );
 };
 

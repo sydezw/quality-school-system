@@ -9,32 +9,44 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Users } from 'lucide-react';
+import { Plus, Edit, Users, Trash2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
-import { usePermissions } from '@/hooks/usePermissions';
-import { PermissionButton } from '@/components/shared/PermissionButton';
-import { PermissionGuard } from '@/components/guards/PermissionGuard';
+import { zodResolver } from '@hookform/resolvers/zod';
 
-interface Teacher {
-  id: string;
-  nome: string;
-  cpf: string | null;
-  telefone: string | null;
-  email: string | null;
-  idiomas: string;
-  salario: number | null;
-}
-
+import { Teacher } from '@/integrations/supabase/types';
+import { teacherFormSchema, type TeacherFormData } from '@/lib/validators/teacher';
 import { formatCPF, formatPhone } from '@/utils/formatters';
+import { AdvancedDeleteDialog, DeletionPlan } from '@/components/shared/AdvancedDeleteDialog';
 
 const Teachers = () => {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
   const { toast } = useToast();
-  const { hasPermission, isOwner } = usePermissions();
-  const { register, handleSubmit, reset, setValue, watch } = useForm();
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    reset,
+    formState: { errors }
+  } = useForm<TeacherFormData>({
+    resolver: zodResolver(teacherFormSchema),
+    defaultValues: {
+      nome: '',
+      cpf: '',
+      telefone: '',
+      email: '',
+      idiomas: '',
+      salario: '',
+      status: 'ativo'
+    }
+  });
   const cpfValue = watch('cpf');
 
   useEffect(() => {
@@ -67,22 +79,27 @@ const Teachers = () => {
     setValue('cpf', formattedCPF);
   };
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: TeacherFormData) => {
+
+
     try {
-      // Converter salário para número se fornecido e remover formatação do CPF
-      const formData = {
-        ...data,
-        salario: data.salario ? parseFloat(data.salario) : null,
-        cpf: data.cpf ? data.cpf.replace(/\D/g, '') : null
+      const teacherData = {
+        nome: data.nome,
+        cpf: data.cpf?.replace(/\D/g, '') || null,
+        telefone: data.telefone || null,
+        email: data.email || null,
+        idiomas: data.idiomas || '',
+        salario: data.salario && data.salario !== '0,00' ? parseFloat(data.salario.replace(/\./g, '').replace(',', '.')) : null,
       };
 
       if (editingTeacher) {
         const { error } = await supabase
           .from('professores')
-          .update(formData)
+          .update(teacherData)
           .eq('id', editingTeacher.id);
 
         if (error) throw error;
+
         toast({
           title: "Sucesso",
           description: "Professor atualizado com sucesso!",
@@ -90,9 +107,10 @@ const Teachers = () => {
       } else {
         const { error } = await supabase
           .from('professores')
-          .insert([formData]);
+          .insert([teacherData]);
 
         if (error) throw error;
+
         toast({
           title: "Sucesso",
           description: "Professor criado com sucesso!",
@@ -100,7 +118,6 @@ const Teachers = () => {
       }
 
       setIsDialogOpen(false);
-      setEditingTeacher(null);
       reset();
       fetchTeachers();
     } catch (error) {
@@ -113,49 +130,22 @@ const Teachers = () => {
     }
   };
 
-  const deleteTeacher = async (id: string) => {
-    if (!isOwner() && !hasPermission('gerenciarProfessores')) {
-      toast({
-        title: "Acesso Negado",
-        description: "Você não tem permissão para realizar esta ação. Entre em contato com o administrador.",
-        variant: "destructive",
-      });
-      return;
-    }
 
-    if (!confirm('Tem certeza que deseja excluir este professor?')) return;
-
-    try {
-      const { error } = await supabase
-        .from('professores')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      
-      toast({
-        title: "Sucesso",
-        description: "Professor excluído com sucesso!",
-      });
-      fetchTeachers();
-    } catch (error) {
-      console.error('Erro ao excluir professor:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível excluir o professor.",
-        variant: "destructive",
-      });
-    }
-  };
 
   const openEditDialog = (teacher: Teacher) => {
     setEditingTeacher(teacher);
-    setValue('nome', teacher.nome);
-    setValue('cpf', teacher.cpf ? formatCPF(teacher.cpf) : '');
-    setValue('telefone', teacher.telefone || '');
-    setValue('email', teacher.email || '');
-    setValue('idiomas', teacher.idiomas);
-    setValue('salario', teacher.salario ? teacher.salario.toFixed(2) : '');
+    reset({
+      nome: teacher.nome,
+      cpf: teacher.cpf ? formatCPF(teacher.cpf) : '',
+      telefone: teacher.telefone || '',
+      email: teacher.email || '',
+      idiomas: teacher.idiomas,
+      salario: teacher.salario ? teacher.salario.toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }) : '0,00',
+      status: teacher.status || 'ativo'
+    });
     setIsDialogOpen(true);
   };
 
@@ -163,6 +153,57 @@ const Teachers = () => {
     setEditingTeacher(null);
     reset();
     setIsDialogOpen(true);
+  };
+
+  const handleDeleteClick = (teacher: Teacher) => {
+    setTeacherToDelete(teacher);
+    setDeleteDialogOpen(true);
+  };
+
+  const deleteTeacherWithPlan = async (teacher: Teacher, plan: DeletionPlan) => {
+    setIsDeleting(true);
+    try {
+      // A exclusão do professor vai respeitar as constraints do banco
+      const { error } = await supabase
+        .from('professores')
+        .delete()
+        .eq('id', teacher.id);
+
+      if (error) {
+        // Se houver erro de constraint, explicar ao usuário
+        if (error.code === '23503') {
+          toast({
+            title: "Erro de Dependência",
+            description: "Não foi possível excluir o professor devido a registros relacionados. Verifique se existem dados que impedem a exclusão.",
+            variant: "destructive",
+          });
+        } else {
+          throw error;
+        }
+        return false;
+      }
+
+      toast({
+        title: "Sucesso",
+        description: `Professor ${teacher.nome} foi excluído com sucesso!`,
+      });
+      
+      // Atualizar a lista de professores
+      await fetchTeachers();
+      setDeleteDialogOpen(false);
+      setTeacherToDelete(null);
+      return true;
+    } catch (error) {
+      console.error('Erro ao excluir professor:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir o professor. Tente novamente.",
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   if (loading) {
@@ -177,20 +218,19 @@ const Teachers = () => {
   }
 
   return (
-    <PermissionGuard permission="visualizarProfessores">
+    <div>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">Professores</h1>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <PermissionButton 
-                permission="gerenciarProfessores"
+              <Button 
                 className="bg-brand-red hover:bg-brand-red/90"
                 onClick={openCreateDialog}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Novo Professor
-              </PermissionButton>
+              </Button>
             </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
@@ -203,9 +243,13 @@ const Teachers = () => {
                 <Label htmlFor="nome">Nome *</Label>
                 <Input
                   id="nome"
-                  {...register('nome', { required: true })}
+                  {...register('nome')}
                   placeholder="Nome completo"
+                  className={errors.nome ? "border-red-500" : ""}
                 />
+                {errors.nome && (
+                  <p className="text-sm text-red-500 mt-1">{errors.nome.message}</p>
+                )}
               </div>
 
               <div>
@@ -216,7 +260,11 @@ const Teachers = () => {
                   onChange={handleCPFChange}
                   placeholder="000.000.000-00"
                   maxLength={14}
+                  className={errors.cpf ? "border-red-500" : ""}
                 />
+                {errors.cpf && (
+                  <p className="text-sm text-red-500 mt-1">{errors.cpf.message}</p>
+                )}
               </div>
 
               <div>
@@ -230,23 +278,30 @@ const Teachers = () => {
                     setValue('telefone', formatted);
                   }}
                   maxLength={15}
+                  className={errors.telefone ? "border-red-500" : ""}
                 />
+                {errors.telefone && (
+                  <p className="text-sm text-red-500 mt-1">{errors.telefone.message}</p>
+                )}
               </div>
 
               <div>
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
-                  type="email"
                   {...register('email')}
                   placeholder="email@exemplo.com"
+                  className={errors.email ? "border-red-500" : ""}
                 />
+                {errors.email && (
+                  <p className="text-sm text-red-500 mt-1">{errors.email.message}</p>
+                )}
               </div>
 
               <div>
-                <Label htmlFor="idiomas">Idiomas *</Label>
-                <Select onValueChange={(value) => setValue('idiomas', value)} defaultValue={editingTeacher?.idiomas}>
-                  <SelectTrigger>
+                <Label htmlFor="idiomas">Idiomas</Label>
+                <Select onValueChange={(value) => setValue('idiomas', value)} value={watch('idiomas')}>
+                  <SelectTrigger className={errors.idiomas ? "border-red-500" : ""}>
                     <SelectValue placeholder="Selecione o idioma" />
                   </SelectTrigger>
                   <SelectContent>
@@ -254,24 +309,62 @@ const Teachers = () => {
                     <SelectItem value="Japonês">Japonês</SelectItem>
                   </SelectContent>
                 </Select>
+                {errors.idiomas && (
+                  <p className="text-sm text-red-500 mt-1">{errors.idiomas.message}</p>
+                )}
               </div>
 
               <div>
                 <Label htmlFor="salario">Salário</Label>
                 <Input
                   id="salario"
-                  type="number"
-                  step="0.01"
                   {...register('salario')}
                   placeholder="0,00"
+                  value={watch('salario') || '0,00'}
                   onChange={(e) => {
                     let value = e.target.value;
-                    if (value && !value.includes('.') && !value.includes(',')) {
-                      value = value + ',00';
+                    // Remove tudo que não é número
+                    value = value.replace(/\D/g, '');
+                    
+                    // Se vazio, define como 0
+                    if (value === '') {
+                      setValue('salario', '0,00');
+                      return;
                     }
-                    setValue('salario', value);
+                    
+                    // Converte para número e formata
+                    const numValue = parseInt(value);
+                    
+                    // Formata como moeda brasileira
+                    const formatted = (numValue / 100).toLocaleString('pt-BR', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    });
+                    
+                    setValue('salario', formatted);
                   }}
+                  className={errors.salario ? "border-red-500" : ""}
                 />
+                {errors.salario && (
+                  <p className="text-sm text-red-500 mt-1">{errors.salario.message}</p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="status">Status *</Label>
+                <Select onValueChange={(value) => setValue('status', value)} value={watch('status')}>
+                  <SelectTrigger className={errors.status ? "border-red-500" : ""}>
+                    <SelectValue placeholder="Selecione o status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ativo">Ativo</SelectItem>
+                    <SelectItem value="inativo">Inativo</SelectItem>
+                    <SelectItem value="demitido">Demitido</SelectItem>
+                  </SelectContent>
+                </Select>
+                {errors.status && (
+                  <p className="text-sm text-red-500 mt-1">{errors.status.message}</p>
+                )}
               </div>
 
               <div className="flex gap-2 pt-4">
@@ -309,6 +402,7 @@ const Teachers = () => {
                   <TableHead>Idiomas</TableHead>
                   <TableHead>Contato</TableHead>
                   <TableHead>Salário</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -342,26 +436,37 @@ const Teachers = () => {
                       )}
                     </TableCell>
                     <TableCell>
-                      <div className="flex gap-2">
-                        <PermissionButton
-                          permission="gerenciarProfessores"
+                      <Badge 
+                        variant={teacher.status === 'ativo' ? 'default' : 'secondary'}
+                        className={`text-xs ${
+                          teacher.status === 'ativo' 
+                            ? 'bg-green-100 text-green-800 hover:bg-green-100' 
+                            : teacher.status === 'inativo'
+                            ? 'bg-gray-100 text-gray-800 hover:bg-gray-100'
+                            : 'bg-red-100 text-red-800 hover:bg-red-100'
+                        }`}
+                      >
+                        {teacher.status === 'ativo' ? 'Ativo' : 
+                         teacher.status === 'inativo' ? 'Inativo' : 'Demitido'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button
                           variant="outline"
                           size="sm"
                           onClick={() => openEditDialog(teacher)}
-                          showLockIcon={false}
                         >
                           <Edit className="h-4 w-4" />
-                        </PermissionButton>
-                        <PermissionButton
-                          permission="gerenciarProfessores"
+                        </Button>
+                        <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => deleteTeacher(teacher.id)}
-                          className="text-red-600 hover:text-red-700"
-                          showLockIcon={false}
+                          onClick={() => handleDeleteClick(teacher)}
+                          disabled={isDeleting}
                         >
                           <Trash2 className="h-4 w-4" />
-                        </PermissionButton>
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -372,7 +477,17 @@ const Teachers = () => {
         </CardContent>
       </Card>
       </div>
-    </PermissionGuard>
+      
+      <AdvancedDeleteDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        entityType="teacher"
+        entityName={teacherToDelete?.nome || ''}
+        onConfirm={(plan) => deleteTeacherWithPlan(teacherToDelete!, plan)}
+        isLoading={isDeleting}
+      />
+
+    </div>
   );
 };
 

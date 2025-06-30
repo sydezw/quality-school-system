@@ -10,49 +10,36 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { PermissionButton } from '@/components/shared/PermissionButton';
-import { formatPhoneNumber } from '@/utils/formatters';
-import { DeleteStudentDialog } from './DeleteStudentDialog';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { AdvancedDeleteDialog, DeletionPlan } from '@/components/shared/AdvancedDeleteDialog';
 
 interface StudentTableProps {
   students: Student[];
   onEdit: (student: Student) => void;
-  onDelete: (id: string) => Promise<boolean>;
-  deletingStudentId?: string | null;
+  onDelete?: (student: Student, plan: DeletionPlan) => void;
+  isDeleting?: boolean;
 }
 
-const StudentTable = ({ students, onEdit, onDelete, deletingStudentId }: StudentTableProps) => {
+const StudentTable = ({ students, onEdit, onDelete, isDeleting = false }: StudentTableProps) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDeleteClick = (student: Student) => {
     setStudentToDelete(student);
     setDeleteDialogOpen(true);
   };
 
-  const handleDeleteConfirm = async () => {
-    if (!studentToDelete) return;
-    
-    setIsDeleting(true);
-    const success = await onDelete(studentToDelete.id);
-    
-    if (success) {
+  const handleDeleteConfirm = (plan: DeletionPlan) => {
+    if (studentToDelete && onDelete) {
+      onDelete(studentToDelete, plan);
       setDeleteDialogOpen(false);
       setStudentToDelete(null);
     }
-    
-    setIsDeleting(false);
   };
-
-  const handleDeleteCancel = () => {
-     setDeleteDialogOpen(false);
-     setStudentToDelete(null);
-   };
   
-  const getStatusColor = (status: string) => {
-    switch (status) {
+  const getStatusColor = (student: Student) => {
+    switch (student.status) {
       case 'Ativo': return 'bg-green-100 text-green-800';
       case 'Trancado': return 'bg-yellow-100 text-yellow-800';
       case 'Cancelado': return 'bg-red-100 text-red-800';
@@ -93,7 +80,7 @@ const StudentTable = ({ students, onEdit, onDelete, deletingStudentId }: Student
             <TableCell>{student.turmas?.nome || 'Sem turma'}</TableCell>
             <TableCell>{student.responsaveis?.nome || 'Sem responsável'}</TableCell>
             <TableCell>
-              <Badge className={getStatusColor(student.status)}>
+              <Badge className={getStatusColor(student)}>
                 {student.status}
               </Badge>
             </TableCell>
@@ -104,31 +91,24 @@ const StudentTable = ({ students, onEdit, onDelete, deletingStudentId }: Student
               </div>
             </TableCell>
             <TableCell>
-              <div className="flex space-x-2">
-                <PermissionButton
-                  permission="gerenciarAlunos"
+              <div className="flex items-center gap-2">
+                <Button
                   variant="outline"
                   size="sm"
                   onClick={() => onEdit(student)}
-                  showLockIcon={false}
                 >
                   <Edit className="h-4 w-4" />
-                </PermissionButton>
-                <PermissionButton
-                  permission="gerenciarAlunos"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDeleteClick(student)}
-                  className="text-red-600 hover:text-red-700"
-                  showLockIcon={false}
-                  disabled={deletingStudentId === student.id}
-                >
-                  {deletingStudentId === student.id ? (
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  ) : (
+                </Button>
+                {onDelete && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDeleteClick(student)}
+                    disabled={isDeleting}
+                  >
                     <Trash2 className="h-4 w-4" />
-                  )}
-                </PermissionButton>
+                  </Button>
+                )}
               </div>
             </TableCell>
           </TableRow>
@@ -136,12 +116,13 @@ const StudentTable = ({ students, onEdit, onDelete, deletingStudentId }: Student
       </TableBody>
     </Table>
     
-    <DeleteStudentDialog
-      isOpen={deleteDialogOpen}
-      student={studentToDelete}
+    <AdvancedDeleteDialog
+      open={deleteDialogOpen}
       onOpenChange={setDeleteDialogOpen}
+      entityType="student"
+      entityName={studentToDelete?.nome || ''}
       onConfirm={handleDeleteConfirm}
-      isDeleting={isDeleting}
+      isLoading={isDeleting}
     />
   </>);
 };

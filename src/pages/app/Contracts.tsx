@@ -8,9 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { NewContractDialog } from '@/components/contracts/NewContractDialog';
 import { EditContractDialog } from '@/components/contracts/EditContractDialog';
-import { PermissionGuard } from '@/components/guards/PermissionGuard';
-import { PermissionButton } from '@/components/shared/PermissionButton';
-import { usePermissions } from '@/hooks/usePermissions';
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,7 +39,7 @@ const Contracts = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'expiring' | 'expired' | 'active'>('all');
   const { toast } = useToast();
-  const { hasPermission, isOwner } = usePermissions();
+
 
   const fetchContracts = async () => {
     try {
@@ -73,36 +71,51 @@ const Contracts = () => {
   }, []);
 
   const handleDeleteContract = async (contractId: string) => {
-    if (!isOwner() && !hasPermission('gerenciarContratos')) {
-      toast({
-        title: "Acesso Negado",
-        description: "Você não tem permissão para realizar esta ação. Entre em contato com o administrador.",
-        variant: "destructive",
-      });
-      return;
-    }
+
 
     try {
-      const { error } = await supabase
+      // Primeiro, verificar se o contrato existe
+      const { data: contractExists, error: checkError } = await supabase
+        .from('contratos')
+        .select('id, numero_contrato')
+        .eq('id', contractId)
+        .single();
+
+      if (checkError || !contractExists) {
+        throw new Error('Contrato não encontrado.');
+      }
+
+      // Executar a exclusão
+      const { error: deleteError } = await supabase
         .from('contratos')
         .delete()
         .eq('id', contractId);
 
-      if (error) throw error;
+      if (deleteError) {
+        // Tratar diferentes tipos de erro
+        if (deleteError.code === 'PGRST116') {
+          throw new Error('Contrato não encontrado.');
+        } else if (deleteError.code === '23503') {
+          throw new Error('Não é possível excluir este contrato pois existem registros relacionados. Para resolver este problema, execute as migrações do banco de dados ou entre em contato com o administrador do sistema.');
+        } else {
+          throw new Error(`Erro no banco de dados: ${deleteError.message}`);
+        }
+      }
 
       toast({
         title: "Sucesso",
-        description: "Contrato excluído com sucesso.",
+        description: `Contrato excluído com sucesso!`,
+        duration: 5000,
       });
 
       // Recarregar dados
-      fetchContracts();
+      await fetchContracts();
 
     } catch (error) {
       console.error('Erro ao excluir contrato:', error);
       toast({
-        title: "Erro",
-        description: "Não foi possível excluir o contrato.",
+        title: "Erro na Exclusão",
+        description: error instanceof Error ? error.message : "Não foi possível excluir o contrato.",
         variant: "destructive",
       });
     }
@@ -239,7 +252,7 @@ const Contracts = () => {
   const contractsExpired = contracts.filter(c => c.situacao === 'vencido').length;
 
   return (
-    <PermissionGuard permission="visualizarContratos">
+    <div>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Gestão de Contratos</h1>
@@ -379,14 +392,13 @@ const Contracts = () => {
                       
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <PermissionButton 
-                            permission="gerenciarContratos"
+                          <Button 
                             size="sm" 
                             variant="destructive"
                           >
                             <Trash2 className="h-4 w-4 mr-1" />
                             Excluir
-                          </PermissionButton>
+                          </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
@@ -409,54 +421,49 @@ const Contracts = () => {
 
                       {contract.situacao === 'vencido' && (
                         <>
-                          <PermissionButton 
-                            permission="gerenciarContratos"
+                          <Button 
                             size="sm" 
                             variant="destructive"
                             onClick={() => handleTerminateContract(contract.id, contract.aluno_id)}
                           >
                             <AlertTriangle className="h-4 w-4 mr-1" />
                             Encerrar
-                          </PermissionButton>
-                          <PermissionButton 
-                            permission="gerenciarContratos"
+                          </Button>
+                          <Button 
                             size="sm" 
                             variant="outline"
                             onClick={() => handleRenewContract(contract)}
                           >
                             Renovar
-                          </PermissionButton>
+                          </Button>
                         </>
                       )}
                       {contract.situacao === 'vencendo' && (
                         <>
-                          <PermissionButton 
-                            permission="gerenciarContratos"
+                          <Button 
                             size="sm" 
                             variant="outline"
                             onClick={() => handleTerminateContract(contract.id, contract.aluno_id)}
                           >
                             Encerrar
-                          </PermissionButton>
-                          <PermissionButton 
-                            permission="gerenciarContratos"
+                          </Button>
+                          <Button 
                             size="sm" 
                             variant="default"
                             onClick={() => handleRenewContract(contract)}
                           >
                             Renovar
-                          </PermissionButton>
+                          </Button>
                         </>
                       )}
                       {contract.situacao === 'ativo' && (
-                        <PermissionButton 
-                          permission="gerenciarContratos"
+                        <Button 
                           size="sm" 
                           variant="outline"
                           onClick={() => handleRenewContract(contract)}
                         >
                           Renovar
-                        </PermissionButton>
+                        </Button>
                       )}
                     </div>
                   </TableCell>
@@ -474,7 +481,7 @@ const Contracts = () => {
         </CardContent>
       </Card>
     </div>
-    </PermissionGuard>
+    </div>
   );
 };
 

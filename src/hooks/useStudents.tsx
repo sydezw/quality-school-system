@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Student } from '@/integrations/supabase/types';
+import { DeletionPlan } from '@/components/shared/AdvancedDeleteDialog';
 
 interface Class {
   id: string;
@@ -16,6 +17,7 @@ export const useStudents = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
 
   const fetchStudents = async () => {
@@ -115,65 +117,54 @@ export const useStudents = () => {
     }
   };
 
-  const [deletingStudentId, setDeletingStudentId] = useState<string | null>(null);
-
-  const deleteStudent = async (id: string): Promise<boolean> => {
-    setDeletingStudentId(id);
-    
+  const deleteStudentWithPlan = async (student: Student, plan: DeletionPlan) => {
+    setIsDeleting(true);
     try {
-      // Primeiro, verificar se o aluno existe
-      const { data: studentExists, error: checkError } = await supabase
-        .from('alunos')
-        .select('id, nome')
-        .eq('id', id)
-        .single();
-
-      if (checkError || !studentExists) {
-        throw new Error('Aluno não encontrado.');
-      }
-
-      // Executar a exclusão
-      const { error: deleteError } = await supabase
+      // Primeiro, aplicar as regras do plano de exclusão
+      // Para dados que devem ser mantidos (SET NULL), não fazemos nada especial
+      // pois as constraints do banco já estão configuradas
+      
+      // Para dados que devem ser excluídos (CASCADE), também não precisamos
+      // fazer nada especial pois as constraints estão configuradas
+      
+      // A exclusão do aluno vai respeitar as constraints do banco
+      const { error } = await supabase
         .from('alunos')
         .delete()
-        .eq('id', id);
+        .eq('id', student.id);
 
-      if (deleteError) {
-        // Tratar diferentes tipos de erro
-        if (deleteError.code === 'PGRST116') {
-          throw new Error('Aluno não encontrado.');
-        } else if (deleteError.code === '23503') {
-          throw new Error('Não é possível excluir este aluno pois existem registros relacionados.');
+      if (error) {
+        // Se houver erro de constraint, explicar ao usuário
+        if (error.code === '23503') {
+          toast({
+            title: "Erro de Dependência",
+            description: "Não foi possível excluir o aluno devido a registros relacionados. Verifique se existem dados que impedem a exclusão.",
+            variant: "destructive",
+          });
         } else {
-          throw new Error(`Erro no banco de dados: ${deleteError.message}`);
+          throw error;
         }
+        return false;
       }
-      
+
       toast({
         title: "Sucesso",
-        description: `Aluno "${studentExists.nome}" excluído com sucesso!`,
-        duration: 5000,
+        description: `Aluno ${student.nome} foi excluído com sucesso!`,
       });
       
       // Atualizar a lista de alunos
       await fetchStudents();
-      
       return true;
-    } catch (error: any) {
+    } catch (error) {
       console.error('Erro ao excluir aluno:', error);
-      
-      const errorMessage = error.message || 'Não foi possível excluir o aluno. Tente novamente.';
-      
       toast({
-        title: "Erro na Exclusão",
-        description: errorMessage,
+        title: "Erro",
+        description: "Não foi possível excluir o aluno. Tente novamente.",
         variant: "destructive",
-        duration: 7000,
       });
-      
       return false;
     } finally {
-      setDeletingStudentId(null);
+      setIsDeleting(false);
     }
   };
 
@@ -186,9 +177,10 @@ export const useStudents = () => {
     students,
     classes,
     loading,
+    isDeleting,
     saveStudent,
-    deleteStudent,
-    deletingStudentId,
-    refetch: fetchStudents
+    deleteStudentWithPlan,
+    refetch: fetchStudents,
+    fetchStudents
   };
 };

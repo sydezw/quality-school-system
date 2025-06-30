@@ -1,17 +1,15 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import StudentDialog from '@/components/students/StudentDialog';
 import StudentTable from '@/components/students/StudentTable';
 import { useStudents } from '@/hooks/useStudents';
-import { usePermissions } from '@/hooks/usePermissions';
-import { PermissionButton } from '@/components/shared/PermissionButton';
-import { PermissionGuard } from '@/components/guards/PermissionGuard';
+
 import { Student } from '@/integrations/supabase/types';
 import { Plus } from 'lucide-react';
 
 const Students = () => {
-  const { students, classes, loading, saveStudent, deleteStudent, deletingStudentId } = useStudents();
-  const { hasPermission, isOwner } = usePermissions();
+  const { students, classes, loading, isDeleting, saveStudent, deleteStudentWithPlan } = useStudents();
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [query, setQuery] = useState('');
@@ -34,6 +32,12 @@ const Students = () => {
     setIsDialogOpen(true);
   };
 
+  const handleDelete = async (student: Student, plan: any) => {
+    await deleteStudentWithPlan(student, plan);
+  };
+
+
+
   // Filtra alunos pelo nome (insensitive)
   const filteredStudents = useMemo(() => {
     if (!query) return students;
@@ -54,7 +58,7 @@ const Students = () => {
   }
 
   return (
-    <PermissionGuard permission="visualizarAlunos">
+    <div>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold tracking-tight">Alunos</h1>
@@ -66,14 +70,13 @@ const Students = () => {
               onChange={(e) => setQuery(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-transparent"
             />
-            <PermissionButton 
-              permission="gerenciarAlunos"
+            <button 
               className="bg-brand-red text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors flex items-center gap-2"
               onClick={handleCreate}
             >
               <Plus size={16} />
               Novo Aluno
-            </PermissionButton>
+            </button>
           </div>
         </div>
 
@@ -89,19 +92,21 @@ const Students = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Lista de Alunos ({filteredStudents.length})</CardTitle>
+            <CardTitle>
+              Lista de Alunos ({filteredStudents.length})
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <StudentTable
               students={filteredStudents}
               onEdit={handleEdit}
-              onDelete={deleteStudent}
-              deletingStudentId={deletingStudentId}
+              onDelete={handleDelete}
+              isDeleting={isDeleting}
             />
           </CardContent>
         </Card>
       </div>
-    </PermissionGuard>
+    </div>
   );
 };
 

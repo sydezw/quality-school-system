@@ -32,15 +32,8 @@ import ResponsibleDialog from "./ResponsibleDialog";
 import { Control } from "react-hook-form";
 import { StudentFormValues } from "@/lib/validators/student";
 import { useResponsibles } from "@/hooks/useResponsibles";
-
-interface Responsible {
-  id: string;
-  nome: string;
-  cpf: string | null;
-  endereco: string | null;
-  numero_endereco: string | null;
-  telefone: string | null;
-}
+import { DeleteResponsibleDialog } from "@/components/responsibles/DeleteResponsibleDialog";
+import { Responsible } from "@/integrations/supabase/types";
 
 interface ResponsibleFieldProps {
   control: Control<StudentFormValues>;
@@ -54,6 +47,9 @@ const ResponsibleFieldComponent = ({ control, responsibles, saveResponsible }: R
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [responsibleToDelete, setResponsibleToDelete] = useState<Responsible | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { deleteResponsible } = useResponsibles();
 
   const filteredResponsibles = useMemo(() => {
@@ -96,15 +92,34 @@ const ResponsibleFieldComponent = ({ control, responsibles, saveResponsible }: R
     setIsResponsibleDialogOpen(true);
   };
 
-  const handleDeleteResponsible = async (id: string) => {
-    const confirmed = window.confirm('Tem certeza que deseja excluir este responsável?');
-    if (!confirmed) return;
-    setDeletingId(id);
-    await deleteResponsible(id);
+  const handleDeleteClick = (responsible: Responsible) => {
+    setResponsibleToDelete(responsible);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!responsibleToDelete) return;
+    
+    setIsDeleting(true);
+    setDeletingId(responsibleToDelete.id);
+    const success = await deleteResponsible(responsibleToDelete.id);
+    
+    if (success) {
+      setDeleteDialogOpen(false);
+      setResponsibleToDelete(null);
+    }
+    
+    setIsDeleting(false);
     setDeletingId(null);
   };
 
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setResponsibleToDelete(null);
+  };
+
   return (
+    <>
     <FormField
       control={control}
       name="responsavel_id"
@@ -216,7 +231,7 @@ const ResponsibleFieldComponent = ({ control, responsibles, saveResponsible }: R
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleDeleteResponsible(responsible.id);
+                                handleDeleteClick(responsible);
                               }}
                               className="ml-2 p-1 text-red-500 hover:bg-red-50 rounded"
                               disabled={deletingId === responsible.id}
@@ -241,6 +256,15 @@ const ResponsibleFieldComponent = ({ control, responsibles, saveResponsible }: R
         );
       }}
     />
+    
+    <DeleteResponsibleDialog
+      isOpen={deleteDialogOpen}
+      responsible={responsibleToDelete}
+      onOpenChange={setDeleteDialogOpen}
+      onConfirm={handleDeleteConfirm}
+      isDeleting={isDeleting}
+    />
+    </>
   );
 };
 

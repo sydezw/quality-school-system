@@ -1,147 +1,136 @@
 
-import { useState, useEffect, createContext, useContext } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useEffect } from 'react';
+import { supabase } from '../integrations/supabase/client';
+import type { User, AuthState, LoginCredentials, SignUpData } from '../types/auth';
 
-interface AuthContextType {
-  user: User | null;
-  session: Session | null;
-  loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signOut: () => Promise<void>;
-}
+export function useAuth() {
+  const [state, setState] = useState<AuthState>({
+    user: null,
+    loading: true,
+    error: null
+  });
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
-
+  // Verificar sessão ao carregar
   useEffect(() => {
-    // Verificar se há uma sessão salva no localStorage
-    const savedSession = localStorage.getItem('auth_session');
-    const savedUser = localStorage.getItem('auth_user');
-    
-    if (savedSession && savedUser) {
-      try {
-        const parsedSession = JSON.parse(savedSession);
-        const parsedUser = JSON.parse(savedUser);
-        
-        // Verificar se a sessão não expirou
-        if (parsedSession.expires_at > Math.floor(Date.now() / 1000)) {
-          setSession(parsedSession);
-          setUser(parsedUser);
-        } else {
-          // Sessão expirada, limpar localStorage
-          localStorage.removeItem('auth_session');
-          localStorage.removeItem('auth_user');
-        }
-      } catch (error) {
-        // Erro ao parsear, limpar localStorage
-        localStorage.removeItem('auth_session');
-        localStorage.removeItem('auth_user');
-      }
-    }
-    
-    setLoading(false);
+    checkSession();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const checkSession = async () => {
     try {
-      // Verificar se o usuário existe na tabela usuarios
-      const { data: usuario, error: userError } = await supabase
+      const sessionData = localStorage.getItem('ts_school_session');
+      if (sessionData) {
+        const { userId } = JSON.parse(sessionData);
+        await loadUser(userId);
+      }
+    } catch (error) {
+      console.error('Erro ao verificar sessão:', error);
+      localStorage.removeItem('ts_school_session');
+    } finally {
+      setState(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const loadUser = async (userId: string) => {
+    try {
+      const { data: user, error } = await supabase
         .from('usuarios')
-        .select('*')
+        .select('id, nome, email, cargo, created_at, updated_at')
+        .eq('id', userId)
+        .single();
+
+      if (error) throw error;
+
+      setState(prev => ({
+        ...prev,
+        user: {
+          id: user.id,
+          nome: user.nome,
+          email: user.email,
+          cargo: user.cargo,
+          created_at: user.created_at,
+          updated_at: user.updated_at
+        },
+        error: null
+      }));
+    } catch (error) {
+      console.error('Erro ao carregar usuário:', error);
+      localStorage.removeItem('ts_school_session');
+      setState(prev => ({ ...prev, error: 'Erro ao carregar usuário', user: null }));
+    }
+  };
+
+  const signIn = async ({ email, password }: LoginCredentials) => {
+    setState(prev => ({ ...prev, loading: true, error: null }));
+    
+    try {
+      const { data: user, error } = await supabase
+        .from('usuarios')
+        .select('id, nome, email, cargo, created_at, updated_at')
         .eq('email', email)
         .eq('senha', password)
         .single();
 
-      if (userError || !usuario) {
-        return { error: { message: 'Email ou senha incorretos' } };
+      if (error || !user) {
+        setState(prev => ({ ...prev, loading: false, error: 'Credenciais inválidas' }));
+        throw new Error('Credenciais inválidas');
       }
 
-      // Criar uma sessão simulada para o usuário autenticado
-      const mockUser: User = {
-        id: usuario.id.toString(),
-        aud: 'authenticated',
-        role: 'authenticated',
-        email: usuario.email,
-        email_confirmed_at: new Date().toISOString(),
-        phone: '',
-        confirmed_at: new Date().toISOString(),
-        last_sign_in_at: new Date().toISOString(),
-        app_metadata: {},
-        user_metadata: {
-          nome: usuario.nome,
-          cargo: usuario.cargo
+      // Salvar sessão
+      localStorage.setItem('ts_school_session', JSON.stringify({ userId: user.id }));
+      
+      setState(prev => ({
+        ...prev,
+        user: {
+          id: user.id,
+          nome: user.nome,
+          email: user.email,
+          cargo: user.cargo,
+          created_at: user.created_at,
+          updated_at: user.updated_at
         },
-        identities: [],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-
-      const mockSession: Session = {
-        access_token: 'mock-token',
-        refresh_token: 'mock-refresh-token',
-        expires_in: 3600,
-        expires_at: Math.floor(Date.now() / 1000) + 3600,
-        token_type: 'bearer',
-        user: mockUser
-      };
-
-      // Salvar no localStorage
-      localStorage.setItem('auth_session', JSON.stringify(mockSession));
-      localStorage.setItem('auth_user', JSON.stringify(mockUser));
-      
-      // Atualizar o estado manualmente
-      setUser(mockUser);
-      setSession(mockSession);
-      
-      return { error: null };
+        loading: false,
+        error: null
+      }));
     } catch (error) {
-      return { error: { message: 'Erro ao fazer login' } };
+      console.error('Erro no login:', error);
+      setState(prev => ({ ...prev, loading: false, error: 'Erro no login' }));
+      throw error instanceof Error ? error : new Error('Erro no login');
     }
   };
 
   const signOut = async () => {
+    localStorage.removeItem('ts_school_session');
+    setState({
+      user: null,
+      loading: false,
+      error: null
+    });
+  };
+
+  const signUp = async (userData: SignUpData) => {
     try {
-      // Limpar localStorage
-      localStorage.removeItem('auth_session');
-      localStorage.removeItem('auth_user');
-      
-      // Limpar o estado local
-      setUser(null);
-      setSession(null);
-      
-      // Tentar fazer signOut do Supabase (pode falhar se não houver sessão real)
-      await supabase.auth.signOut();
+      const { error } = await supabase
+        .from('usuarios_pendentes')
+        .insert([userData]);
+
+      if (error) {
+        if (error.code === '23505') {
+          throw new Error('Este email já está cadastrado');
+        }
+        throw error;
+      }
     } catch (error) {
-      // Ignorar erros do signOut já que estamos usando autenticação customizada
-      console.log('SignOut completed');
-    } finally {
-      // Redirecionar para auth
-      window.location.href = '/auth';
+      console.error('Erro ao criar conta:', error);
+      throw error instanceof Error ? error : new Error('Erro ao criar conta');
     }
   };
 
-  return (
-      <AuthContext.Provider value={{
-        user,
-        session,
-        loading,
-        signIn,
-        signOut,
-      }}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+  return {
+    user: state.user,
+    loading: state.loading,
+    error: state.error,
+    signIn,
+    signOut,
+    signUp
+  };
+}

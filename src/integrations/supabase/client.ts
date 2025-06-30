@@ -9,3 +9,19 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+// Configurar sessão simulada se existir no localStorage
+if (typeof window !== 'undefined') {
+  const savedSession = localStorage.getItem('auth_session');
+  if (savedSession) {
+    try {
+      const parsedSession = JSON.parse(savedSession);
+      // Verificar se a sessão não expirou
+      if (parsedSession.expires_at > Math.floor(Date.now() / 1000)) {
+        supabase.auth.setSession(parsedSession);
+      }
+    } catch (error) {
+      console.log('Erro ao configurar sessão:', error);
+    }
+  }
+}

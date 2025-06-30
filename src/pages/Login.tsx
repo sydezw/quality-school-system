@@ -19,7 +19,7 @@ const Login = () => {
 
   // If user is logged in, redirect to dashboard
   if (user) {
-    return <Navigate to="/app/dashboard" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   // If not logged in, redirect to auth page
