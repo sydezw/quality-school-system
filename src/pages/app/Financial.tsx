@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, DollarSign, Receipt, CreditCard, ChevronDown, ChevronRight, Check, Send, History, Filter } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
+import FinancialPlanForm from '@/components/financial/FinancialPlanForm';
 
 
 interface Boleto {
@@ -1013,229 +1014,17 @@ const Financial = () => {
                   Criar Plano de Pagamento
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Criar Plano de Pagamento</DialogTitle>
                 </DialogHeader>
-                <form onSubmit={handleSubmit(criarNovoPlano)} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="aluno_id">Aluno *</Label>
-                      <Controller
-                        name="aluno_id"
-                        control={control}
-                        rules={{ required: true }}
-                        render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione o aluno" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {students.map((student) => (
-                                <SelectItem key={student.id} value={student.id}>
-                                  {student.nome}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="plano_id">Plano *</Label>
-                      <Controller
-                        name="plano_id"
-                        control={control}
-                        rules={{ required: true }}
-                        render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione o plano" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {planosGenericos.map((plano) => (
-                                <SelectItem key={plano.id} value={plano.id}>
-                                  {plano.nome} - R$ {(plano.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* Informações do Plano Selecionado */}
-                  {watch('plano_id') && (
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <h4 className="font-semibold mb-2">Informações do Plano</h4>
-                      {(() => {
-                        const planoSelecionado = planosGenericos.find(p => p.id === watch('plano_id'));
-                        if (planoSelecionado) {
-                          return (
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                              <div>Valor Total: R$ {(planoSelecionado.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-                              <div>Valor por Aula: R$ {(planoSelecionado.valor_por_aula || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </div>
-                  )}
-                  
-                  <div>
-                    <Label htmlFor="aulas_pagas">Quantas aulas esse aluno vai pagar? *</Label>
-                    <Input
-                      id="aulas_pagas"
-                      type="number"
-                      min="1"
-                      max="36"
-                      {...register('aulas_pagas', { required: true, min: 1, max: 36 })}
-                      placeholder="Ex: 22"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Máximo: 36 aulas (semestre completo)</p>
-                  </div>
-                  
-                  {/* Cálculos Automáticos */}
-                  {watch('plano_id') && watch('aulas_pagas') && (
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                      <h4 className="font-semibold mb-2">Cálculos Automáticos</h4>
-                      {(() => {
-                        const planoSelecionado = planosGenericos.find(p => p.id === watch('plano_id'));
-                        const aulasPagas = parseInt(watch('aulas_pagas')) || 0;
-                        if (planoSelecionado && aulasPagas > 0) {
-                          const aulasGratuitas = 36 - aulasPagas;
-                          const valorCalculado = aulasPagas * (planoSelecionado.valor_por_aula || 0);
-                          const descontoReais = aulasGratuitas * (planoSelecionado.valor_por_aula || 0);
-                          return (
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                              <div>Aulas Gratuitas: {aulasGratuitas}</div>
-                              <div>Valor Calculado: R$ {valorCalculado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-                              <div className="col-span-2">Desconto: R$ {descontoReais.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </div>
-                  )}
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="valor_matricula">Valor da Matrícula</Label>
-                      <Input
-                        id="valor_matricula"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        {...register('valor_matricula')}
-                        placeholder="0,00"
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="valor_material">Valor do Material</Label>
-                      <Input
-                        id="valor_material"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        {...register('valor_material')}
-                        placeholder="0,00"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="forma_pagamento">Forma de Pagamento</Label>
-                      <Controller
-                        name="forma_pagamento"
-                        control={control}
-                        render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="boleto">Boleto</SelectItem>
-                              <SelectItem value="cartao">Cartão</SelectItem>
-                              <SelectItem value="pix">PIX</SelectItem>
-                              <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                              <SelectItem value="transferencia">Transferência</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="numero_parcelas">Número de Parcelas *</Label>
-                      <Controller
-                        name="numero_parcelas"
-                        control={control}
-                        rules={{ required: true }}
-                        render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((num) => (
-                                <SelectItem key={num} value={num.toString()}>
-                                  {num} {num === 1 ? 'parcela' : 'parcelas'}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* Valor Total do Contrato */}
-                  {watch('plano_id') && watch('aulas_pagas') && (
-                    <div className="bg-green-50 p-4 rounded-lg">
-                      <h4 className="font-semibold mb-2">Valor Total do Contrato</h4>
-                      {(() => {
-                        const planoSelecionado = planosGenericos.find(p => p.id === watch('plano_id'));
-                        const aulasPagas = parseInt(watch('aulas_pagas')) || 0;
-                        const valorMatricula = parseFloat(watch('valor_matricula')) || 0;
-                        const valorMaterial = parseFloat(watch('valor_material')) || 0;
-                        if (planoSelecionado && aulasPagas > 0) {
-                          const valorCalculado = aulasPagas * (planoSelecionado.valor_por_aula || 0);
-                          const valorTotal = valorCalculado + valorMatricula + valorMaterial;
-                          return (
-                            <div className="text-lg font-bold text-green-700">
-                              R$ {valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                            </div>
-                          );
-                        }
-                        return <div className="text-gray-500">Preencha os campos acima para ver o cálculo</div>;
-                      })()}
-                    </div>
-                  )}
-                  
-                  <div>
-                    <Label htmlFor="data_vencimento_primeira">Data de Vencimento da 1ª Parcela *</Label>
-                    <Input
-                      id="data_vencimento_primeira"
-                      type="date"
-                      {...register('data_vencimento_primeira', { required: true })}
-                    />
-                  </div>
-                  
-                  <div className="flex gap-2 pt-4">
-                    <Button type="submit" className="flex-1 bg-brand-red hover:bg-brand-red/90">
-                      Criar Plano
-                    </Button>
-                    <Button type="button" variant="outline" onClick={() => setIsNovoPlanoDialogOpen(false)}>
-                      Cancelar
-                    </Button>
-                  </div>
-                </form>
+                <FinancialPlanForm 
+                  onSuccess={async () => {
+                    setIsNovoPlanoDialogOpen(false);
+                    await Promise.all([fetchBoletos(), fetchContratos()]);
+                  }}
+                  onCancel={() => setIsNovoPlanoDialogOpen(false)}
+                />
               </DialogContent>
             </Dialog>
           </div>

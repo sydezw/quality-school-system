@@ -8,7 +8,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, Search, Edit, Trash2, Users, Clock, BookOpen, CheckCircle, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-
 import PlanForm from '@/components/plans/PlanForm';
 import PlanStudentsModal from '@/components/plans/PlanStudentsModal';
 
@@ -33,6 +32,7 @@ const Plans = () => {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [filteredPlans, setFilteredPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
@@ -43,47 +43,64 @@ const Plans = () => {
   
   const { toast } = useToast();
 
-
-
-
   useEffect(() => {
-    fetchPlans();
+    const initializePlans = async () => {
+      try {
+        await fetchPlans();
+      } catch (err) {
+        console.error('Erro ao inicializar planos:', err);
+        setError('Erro ao carregar a página de planos');
+        setLoading(false);
+      }
+    };
+    
+    initializePlans();
   }, []);
 
   useEffect(() => {
-    const filtered = plans.filter(plan =>
-      plan.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      plan.descricao.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredPlans(filtered);
+    try {
+      const filtered = plans.filter(plan =>
+        plan.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        plan.descricao.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredPlans(filtered);
+    } catch (err) {
+      console.error('Erro ao filtrar planos:', err);
+      setFilteredPlans(plans);
+    }
   }, [plans, searchTerm]);
 
   const fetchPlans = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      setError(null);
+      
+      const { data, error: supabaseError } = await supabase
         .from('planos')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Erro ao buscar planos:', error);
-        toast({
-          title: 'Erro',
-          description: 'Erro ao carregar planos.',
-          variant: 'destructive',
-        });
-        return;
+      if (supabaseError) {
+        throw supabaseError;
       }
 
-      setPlans(data || []);
+      const plansData = data || [];
+      
+      // Debug: verificar estrutura dos dados
+      console.log('Plans data from database:', plansData);
+      if (plansData.length > 0) {
+        console.log('First plan frequencia_aulas:', plansData[0].frequencia_aulas, typeof plansData[0].frequencia_aulas);
+      }
+      
+      setPlans(plansData);
       
       // Buscar contagem de alunos para cada plano
-      if (data && data.length > 0) {
-        await fetchStudentCounts(data.map(plan => plan.id));
+      if (plansData.length > 0) {
+        await fetchStudentCounts(plansData.map(plan => plan.id));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao buscar planos:', error);
+      setError(error.message || 'Erro ao carregar planos');
       toast({
         title: 'Erro',
         description: 'Erro ao carregar planos.',
@@ -112,7 +129,7 @@ const Plans = () => {
           counts[contract.plano_id] = (counts[contract.plano_id] || 0) + 1;
         }
       });
-
+      
       setStudentCounts(counts);
     } catch (error) {
       console.error('Erro ao buscar contagem de alunos:', error);
@@ -129,7 +146,11 @@ const Plans = () => {
     setShowForm(true);
   };
 
-  const handleDeletePlan = async () => {
+  const handleDeletePlan = (plan: Plan) => {
+    setDeletingPlan(plan);
+  };
+
+  const confirmDeletePlan = async () => {
     if (!deletingPlan) return;
 
     try {
@@ -186,29 +207,22 @@ const Plans = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Planos</h1>
-          <p className="text-muted-foreground">
-            Gerencie os planos de ensino da escola
-          </p>
-        </div>
-        <Button onClick={handleCreatePlan} className="flex items-center gap-2">
-          <Plus className="w-4 h-4" />
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold tracking-tight">Planos</h1>
+        <Button onClick={handleCreatePlan}>
+          <Plus className="mr-2 h-4 w-4" />
           Novo Plano
         </Button>
       </div>
 
       <div className="flex items-center space-x-2">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar planos..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-8"
-          />
-        </div>
+        <Search className="h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar planos..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-sm"
+        />
       </div>
 
       {loading ? (
@@ -216,6 +230,18 @@ const Plans = () => {
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
             <p className="text-muted-foreground">Carregando planos...</p>
+          </div>
+        </div>
+      ) : error ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-destructive mb-2">Erro ao carregar planos</h3>
+              <p className="text-muted-foreground mb-4">{error}</p>
+              <Button onClick={() => fetchPlans()} variant="outline">
+                Tentar Novamente
+              </Button>
+            </div>
           </div>
         </div>
       ) : filteredPlans.length === 0 ? (
@@ -275,7 +301,7 @@ const Plans = () => {
                 </div>
                 
                 <div className="text-sm">
-                  <p><strong>Frequência:</strong> {plan.frequencia_aulas}</p>
+                  <p><strong>Frequência:</strong> {typeof plan.frequencia_aulas === 'string' ? plan.frequencia_aulas : 'Não definida'}</p>
                   {plan.carga_horaria_total && (
                     <p><strong>Carga horária:</strong> {plan.carga_horaria_total}h</p>
                   )}
@@ -315,7 +341,7 @@ const Plans = () => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setDeletingPlan(plan)}
+                      onClick={() => handleDeletePlan(plan)}
                       className="text-destructive hover:text-destructive"
                     >
                       <Trash2 className="w-3 h-3" />
@@ -357,7 +383,7 @@ const Plans = () => {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDeletePlan}
+              onClick={confirmDeletePlan}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Excluir

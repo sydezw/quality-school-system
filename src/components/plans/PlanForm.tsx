@@ -18,6 +18,7 @@ interface Plan {
   carga_horaria_total: number | null;
   valor_total: number | null;
   valor_por_aula: number | null;
+  horario_por_aulas: number | null;
   permite_cancelamento: boolean;
   permite_parcelamento: boolean;
   observacoes: string | null;
@@ -40,6 +41,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
     carga_horaria_total: '',
     valor_total: '',
     valor_por_aula: '',
+    horario_por_aulas: '',
     permite_cancelamento: false,
     permite_parcelamento: false,
     observacoes: '',
@@ -47,6 +49,25 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
   });
 
   const { toast } = useToast();
+
+  // Função para formatar carga horária em formato HH:MM
+  const formatCargaHoraria = (value: string): string => {
+    const numericValue = parseFloat(value);
+    if (isNaN(numericValue)) return '';
+    
+    const parteInteira = Math.floor(numericValue);
+    const parteDecimal = numericValue - parteInteira;
+    
+    // Se não há parte decimal, exibe apenas o número inteiro
+    if (parteDecimal === 0) {
+      return parteInteira.toString();
+    }
+    
+    // Converte a parte decimal para dois dígitos (ex: 0.25 -> 25, 0.5 -> 50)
+    const decimalFormatted = Math.round(parteDecimal * 100).toString().padStart(2, '0');
+    
+    return `${parteInteira}:${decimalFormatted}`;
+  };
 
   useEffect(() => {
     if (plan) {
@@ -58,6 +79,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
         carga_horaria_total: plan.carga_horaria_total?.toString() || '',
         valor_total: plan.valor_total?.toString() || '',
         valor_por_aula: plan.valor_por_aula?.toString() || '',
+        horario_por_aulas: plan.horario_por_aulas?.toString() || '',
         permite_cancelamento: plan.permite_cancelamento,
         permite_parcelamento: plan.permite_parcelamento,
         observacoes: plan.observacoes || '',
@@ -66,25 +88,88 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
     }
   }, [plan]);
 
+  // Cálculos automáticos em tempo real
+  useEffect(() => {
+    const valorTotal = parseFloat(formData.valor_total) || 0;
+    const numeroAulas = formData.numero_aulas || 0;
+    const horarioPorAulas = parseFloat(formData.horario_por_aulas) || 0;
+
+    // Calcular valor por aula automaticamente
+    if (valorTotal > 0 && numeroAulas > 0) {
+      const valorPorAula = (valorTotal / numeroAulas).toFixed(2);
+      if (formData.valor_por_aula !== valorPorAula) {
+        setFormData(prev => ({ ...prev, valor_por_aula: valorPorAula }));
+      }
+    }
+
+    // Calcular carga horária total automaticamente
+    if (numeroAulas > 0 && horarioPorAulas > 0) {
+      const cargaHorariaTotal = (numeroAulas * horarioPorAulas).toFixed(1);
+      if (formData.carga_horaria_total !== cargaHorariaTotal) {
+        setFormData(prev => ({ ...prev, carga_horaria_total: cargaHorariaTotal }));
+      }
+    }
+  }, [formData.valor_total, formData.numero_aulas, formData.horario_por_aulas]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      // Validações
+      const valorTotal = parseFloat(formData.valor_total) || 0;
+      const numeroAulas = formData.numero_aulas || 0;
+      const horarioPorAulas = parseFloat(formData.horario_por_aulas) || 0;
+
+      if (valorTotal <= 0) {
+        toast({
+          title: "Erro de Validação",
+          description: "Valor Total deve ser maior que zero.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      if (numeroAulas <= 0) {
+        toast({
+          title: "Erro de Validação",
+          description: "Número de Aulas deve ser maior que zero.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      if (horarioPorAulas <= 0) {
+        toast({
+          title: "Erro de Validação",
+          description: "Horário por Aula deve ser maior que zero.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Recalcular valores no servidor para garantir consistência
+      const valorPorAula = valorTotal / numeroAulas;
+      const cargaHorariaTotal = numeroAulas * horarioPorAulas;
+
       const planData = {
         nome: formData.nome,
         descricao: formData.descricao,
-        numero_aulas: formData.numero_aulas,
+        numero_aulas: numeroAulas,
         frequencia_aulas: formData.frequencia_aulas,
-        carga_horaria_total: formData.carga_horaria_total ? parseFloat(formData.carga_horaria_total) : null,
-        valor_total: formData.valor_total ? parseFloat(formData.valor_total) : null,
-        valor_por_aula: formData.valor_por_aula ? parseFloat(formData.valor_por_aula) : null,
+        carga_horaria_total: cargaHorariaTotal,
+        valor_total: valorTotal,
+        valor_por_aula: valorPorAula,
+        horario_por_aulas: horarioPorAulas,
         permite_cancelamento: formData.permite_cancelamento,
         permite_parcelamento: formData.permite_parcelamento,
         observacoes: formData.observacoes || null,
         ativo: formData.ativo
       };
-
+  
       let error;
       if (plan) {
         const { error: updateError } = await supabase
@@ -98,16 +183,16 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
           .insert([planData]);
         error = insertError;
       }
-
+  
       if (error) {
         throw error;
       }
-
+  
       toast({
         title: "Sucesso!",
         description: plan ? "Plano atualizado com sucesso." : "Plano criado com sucesso.",
       });
-
+  
       onSuccess();
     } catch (error) {
       console.error('Erro ao salvar plano:', error);
@@ -178,28 +263,45 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="carga_horaria_total">Carga Horária Total (horas)</Label>
+          <Label htmlFor="horario_por_aulas">Horário por Aula (horas) *</Label>
           <Input
-            id="carga_horaria_total"
+            id="horario_por_aulas"
             type="number"
             step="0.5"
-            min="0"
-            value={formData.carga_horaria_total}
-            onChange={(e) => handleInputChange('carga_horaria_total', e.target.value)}
+            min="0.5"
+            value={formData.horario_por_aulas}
+            onChange={(e) => handleInputChange('horario_por_aulas', e.target.value)}
+            required
+            placeholder="Ex: 1.5"
           />
         </div>
       </div>
 
+      <div className="space-y-2">
+        <Label htmlFor="carga_horaria_total">Carga Horária Total (horas)</Label>
+        <Input
+          id="carga_horaria_total"
+          type="text"
+          value={formatCargaHoraria(formData.carga_horaria_total)} 
+          readOnly
+          className="bg-gray-50 cursor-not-allowed"
+          placeholder="Calculado automaticamente"
+        />
+        <p className="text-sm text-gray-500">Calculado automaticamente</p> {/* Ajuste 2: Texto simplificado */}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="valor_total">Valor Total (R$)</Label>
+          <Label htmlFor="valor_total">Valor Total (R$) *</Label>
           <Input
             id="valor_total"
             type="number"
             step="0.01"
-            min="0"
+            min="0.01"
             value={formData.valor_total}
             onChange={(e) => handleInputChange('valor_total', e.target.value)}
+            required
+            placeholder="Ex: 1500.00"
           />
         </div>
 
@@ -211,8 +313,11 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
             step="0.01"
             min="0"
             value={formData.valor_por_aula}
-            onChange={(e) => handleInputChange('valor_por_aula', e.target.value)}
+            readOnly
+            className="bg-gray-50 cursor-not-allowed"
+            placeholder="Calculado automaticamente"
           />
+          <p className="text-sm text-gray-500">Calculado automaticamente</p> {/* Ajuste 3: Texto simplificado */}
         </div>
       </div>
 

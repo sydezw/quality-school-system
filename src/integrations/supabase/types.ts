@@ -992,6 +992,7 @@ export type Database = {
           carga_horaria_total: number | null
           valor_total: number | null
           valor_por_aula: number | null
+          horario_por_aulas: number | null
           permite_cancelamento: boolean
           permite_parcelamento: boolean
           observacoes: string | null
@@ -1008,6 +1009,7 @@ export type Database = {
           carga_horaria_total?: number | null
           valor_total?: number | null
           valor_por_aula?: number | null
+          horario_por_aulas?: number | null
           permite_cancelamento?: boolean
           permite_parcelamento?: boolean
           observacoes?: string | null
@@ -1024,6 +1026,7 @@ export type Database = {
           carga_horaria_total?: number | null
           valor_total?: number | null
           valor_por_aula?: number | null
+          horario_por_aulas?: number | null
           permite_cancelamento?: boolean
           permite_parcelamento?: boolean
           observacoes?: string | null
