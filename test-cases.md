@@ -26,7 +26,7 @@
   "numero_aulas": 20,
   "frequencia_aulas": "semanal",
   "valor_total": 1000.00,
-  "horario_por_aulas": 1.5,
+  "horario_por_aula": 1.5,
   "permite_cancelamento": true,
   "permite_parcelamento": true,
   "observacoes": "Material incluso",
@@ -46,7 +46,7 @@
   "numero_aulas": 40,
   "frequencia_aulas": "intensivo",
   "valor_total": 3200.00,
-  "horario_por_aulas": 4.0,
+  "horario_por_aula": 4.0,
   "permite_cancelamento": false,
   "permite_parcelamento": true,
   "observacoes": "Certificado incluso",
@@ -66,7 +66,7 @@
   "numero_aulas": 12,
   "frequencia_aulas": "quinzenal",
   "valor_total": 750.00,
-  "horario_por_aulas": 1.5,
+  "horario_por_aula": 1.5,
   "permite_cancelamento": true,
   "permite_parcelamento": false,
   "observacoes": null,
@@ -87,7 +87,7 @@
   "descricao": "Teste de validação",
   "numero_aulas": 10,
   "valor_total": 0,
-  "horario_por_aulas": 2.0
+  "horario_por_aula": 2.0
 }
 ```
 **Erro Esperado**: "Valor Total deve ser maior que zero"
@@ -99,7 +99,7 @@
   "descricao": "Teste de validação",
   "numero_aulas": 0,
   "valor_total": 1000.00,
-  "horario_por_aulas": 2.0
+  "horario_por_aula": 2.0
 }
 ```
 **Erro Esperado**: "Número de Aulas deve ser maior que zero"
@@ -111,7 +111,7 @@
   "descricao": "Teste de validação",
   "numero_aulas": 10,
   "valor_total": 1000.00,
-  "horario_por_aulas": 0
+  "horario_por_aula": 0
 }
 ```
 **Erro Esperado**: "Horário por Aula deve ser maior que zero"
@@ -148,10 +148,10 @@
 ### Nova Coluna Adicionada
 ```sql
 ALTER TABLE planos 
-ADD COLUMN horario_por_aulas NUMERIC NOT NULL DEFAULT 0;
+ADD COLUMN horario_por_aula NUMERIC NOT NULL DEFAULT 0;
 
 ALTER TABLE planos 
-ADD CONSTRAINT horario_por_aulas_positive CHECK (horario_por_aulas > 0);
+ADD CONSTRAINT horario_por_aula_positive CHECK (horario_por_aula > 0);
 ```
 
 ### Campos da Tabela `planos`
@@ -162,8 +162,8 @@ ADD CONSTRAINT horario_por_aulas_positive CHECK (horario_por_aulas > 0);
 - `frequencia_aulas`: VARCHAR (semanal, quinzenal, mensal, intensivo)
 - `valor_total`: NUMERIC (Valor total do plano)
 - `valor_por_aula`: NUMERIC (Calculado: valor_total ÷ numero_aulas)
-- `horario_por_aulas`: NUMERIC (Nova coluna: duração de cada aula em horas)
-- `carga_horaria_total`: NUMERIC (Calculado: numero_aulas × horario_por_aulas)
+- `horario_por_aula`: NUMERIC (Duração de cada aula em horas)
+- `carga_horaria_total`: NUMERIC (Calculado: numero_aulas × horario_por_aula)
 - `permite_cancelamento`: BOOLEAN
 - `permite_parcelamento`: BOOLEAN
 - `observacoes`: TEXT (Opcional)

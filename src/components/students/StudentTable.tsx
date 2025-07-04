@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Student } from '@/integrations/supabase/types';
-import { Edit, Trash2 } from 'lucide-react';
+import { Edit, Trash2, DollarSign } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -18,10 +18,11 @@ interface StudentTableProps {
   students: Student[];
   onEdit: (student: Student) => void;
   onDelete?: (student: Student, plan: DeletionPlan) => void;
+  onCreateFinancialPlan?: (student: Student) => void;
   isDeleting?: boolean;
 }
 
-const StudentTable = ({ students, onEdit, onDelete, isDeleting = false }: StudentTableProps) => {
+const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, isDeleting = false }: StudentTableProps) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
 
@@ -99,6 +100,17 @@ const StudentTable = ({ students, onEdit, onDelete, isDeleting = false }: Studen
                 >
                   <Edit className="h-4 w-4" />
                 </Button>
+                {onCreateFinancialPlan && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onCreateFinancialPlan(student)}
+                    className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                    title="Criar Plano Financeiro"
+                  >
+                    <DollarSign className="h-4 w-4" />
+                  </Button>
+                )}
                 {onDelete && (
                   <Button
                     variant="outline"

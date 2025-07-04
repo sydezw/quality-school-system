@@ -74,8 +74,7 @@ const ContractAlerts = () => {
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-
+    <>
       {/* Contratos Vencendo */}
       <Card
         className={contractsExpiring.length > 0 ? "border-orange-300 bg-orange-50 cursor-pointer" : "cursor-pointer"}
@@ -145,8 +144,7 @@ const ContractAlerts = () => {
           )}
         </CardContent>
       </Card>
-
-    </div>
+    </>
   );
 };
 

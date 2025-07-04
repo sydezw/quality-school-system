@@ -17,7 +17,7 @@ interface PlanPayload {
   numero_aulas: number;
   frequencia_aulas: string;
   valor_total: number;
-  horario_por_aulas: number;
+  horario_por_aula: number;
   permite_cancelamento?: boolean;
   permite_parcelamento?: boolean;
   observacoes?: string;
@@ -44,17 +44,17 @@ export async function createPlan(payload: PlanPayload) {
       };
     }
 
-    if (payload.horario_por_aulas <= 0) {
+    if (payload.horario_por_aula <= 0) {
       return {
         success: false,
         error: 'Horário por aula deve ser maior que zero',
-        code: 'INVALID_HORARIO_POR_AULAS'
+        code: 'INVALID_HORARIO_POR_AULA'
       };
     }
 
     // Recalcular valores no servidor para garantir consistência
     const valor_por_aula = payload.valor_total / payload.numero_aulas;
-    const carga_horaria_total = payload.numero_aulas * payload.horario_por_aulas;
+    const carga_horaria_total = payload.numero_aulas * payload.horario_por_aula;
 
     // Preparar dados para inserção
     const planData = {
@@ -64,7 +64,7 @@ export async function createPlan(payload: PlanPayload) {
       frequencia_aulas: payload.frequencia_aulas,
       valor_total: payload.valor_total,
       valor_por_aula: Number(valor_por_aula.toFixed(2)),
-      horario_por_aulas: payload.horario_por_aulas,
+      horario_por_aula: payload.horario_por_aula,
       carga_horaria_total: Number(carga_horaria_total.toFixed(1)),
       permite_cancelamento: payload.permite_cancelamento ?? false,
       permite_parcelamento: payload.permite_parcelamento ?? false,
@@ -84,11 +84,11 @@ export async function createPlan(payload: PlanPayload) {
       
       // Tratar erros específicos de constraint
       if (error.code === '23514') { // Check constraint violation
-        if (error.message.includes('horario_por_aulas_positive')) {
+        if (error.message.includes('horario_por_aula_positive') || error.message.includes('horario_por_aulas_positive')) {
           return {
             success: false,
             error: 'Horário por aula deve ser maior que zero',
-            code: 'CONSTRAINT_HORARIO_POR_AULAS'
+            code: 'CONSTRAINT_HORARIO_POR_AULA'
           };
         }
       }
@@ -155,11 +155,11 @@ export async function updatePlan(planId: string, payload: Partial<PlanPayload>) 
       };
     }
 
-    if (payload.horario_por_aulas !== undefined && payload.horario_por_aulas <= 0) {
+    if (payload.horario_por_aula !== undefined && payload.horario_por_aula <= 0) {
       return {
         success: false,
         error: 'Horário por aula deve ser maior que zero',
-        code: 'INVALID_HORARIO_POR_AULAS'
+        code: 'INVALID_HORARIO_POR_AULA'
       };
     }
 
@@ -175,12 +175,12 @@ export async function updatePlan(planId: string, payload: Partial<PlanPayload>) 
       }
     }
 
-    if (payload.numero_aulas !== undefined || payload.horario_por_aulas !== undefined) {
+    if (payload.numero_aulas !== undefined || payload.horario_por_aula !== undefined) {
       const numero_aulas = payload.numero_aulas ?? existingPlan.numero_aulas;
-      const horario_por_aulas = payload.horario_por_aulas ?? existingPlan.horario_por_aulas;
+      const horario_por_aula = payload.horario_por_aula ?? existingPlan.horario_por_aula;
       
-      if (numero_aulas && horario_por_aulas) {
-        planData.carga_horaria_total = Number((numero_aulas * horario_por_aulas).toFixed(1));
+      if (numero_aulas && horario_por_aula) {
+        planData.carga_horaria_total = Number((numero_aulas * horario_por_aula).toFixed(1));
       }
     }
 
@@ -197,11 +197,11 @@ export async function updatePlan(planId: string, payload: Partial<PlanPayload>) 
       
       // Tratar erros específicos de constraint
       if (error.code === '23514') {
-        if (error.message.includes('horario_por_aulas_positive')) {
+        if (error.message.includes('horario_por_aula_positive') || error.message.includes('horario_por_aulas_positive')) {
           return {
             success: false,
             error: 'Horário por aula deve ser maior que zero',
-            code: 'CONSTRAINT_HORARIO_POR_AULAS'
+            code: 'CONSTRAINT_HORARIO_POR_AULA'
           };
         }
       }

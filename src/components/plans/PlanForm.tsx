@@ -18,7 +18,7 @@ interface Plan {
   carga_horaria_total: number | null;
   valor_total: number | null;
   valor_por_aula: number | null;
-  horario_por_aulas: number | null;
+  horario_por_aula: number | null;
   permite_cancelamento: boolean;
   permite_parcelamento: boolean;
   observacoes: string | null;
@@ -41,7 +41,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
     carga_horaria_total: '',
     valor_total: '',
     valor_por_aula: '',
-    horario_por_aulas: '',
+    horario_por_aula: '',
     permite_cancelamento: false,
     permite_parcelamento: false,
     observacoes: '',
@@ -79,7 +79,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
         carga_horaria_total: plan.carga_horaria_total?.toString() || '',
         valor_total: plan.valor_total?.toString() || '',
         valor_por_aula: plan.valor_por_aula?.toString() || '',
-        horario_por_aulas: plan.horario_por_aulas?.toString() || '',
+        horario_por_aula: plan.horario_por_aula?.toString() || '',
         permite_cancelamento: plan.permite_cancelamento,
         permite_parcelamento: plan.permite_parcelamento,
         observacoes: plan.observacoes || '',
@@ -92,7 +92,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
   useEffect(() => {
     const valorTotal = parseFloat(formData.valor_total) || 0;
     const numeroAulas = formData.numero_aulas || 0;
-    const horarioPorAulas = parseFloat(formData.horario_por_aulas) || 0;
+    const horarioPorAula = parseFloat(formData.horario_por_aula) || 0;
 
     // Calcular valor por aula automaticamente
     if (valorTotal > 0 && numeroAulas > 0) {
@@ -103,13 +103,14 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
     }
 
     // Calcular carga horária total automaticamente
-    if (numeroAulas > 0 && horarioPorAulas > 0) {
-      const cargaHorariaTotal = (numeroAulas * horarioPorAulas).toFixed(1);
+    // Agora horarioPorAula está em horas, então multiplicamos diretamente
+    if (numeroAulas > 0 && horarioPorAula > 0) {
+      const cargaHorariaTotal = (numeroAulas * horarioPorAula).toFixed(1);
       if (formData.carga_horaria_total !== cargaHorariaTotal) {
         setFormData(prev => ({ ...prev, carga_horaria_total: cargaHorariaTotal }));
       }
     }
-  }, [formData.valor_total, formData.numero_aulas, formData.horario_por_aulas]);
+  }, [formData.valor_total, formData.numero_aulas, formData.horario_por_aula]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,7 +120,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
       // Validações
       const valorTotal = parseFloat(formData.valor_total) || 0;
       const numeroAulas = formData.numero_aulas || 0;
-      const horarioPorAulas = parseFloat(formData.horario_por_aulas) || 0;
+      const horarioPorAula = parseFloat(formData.horario_por_aula) || 0;
 
       if (valorTotal <= 0) {
         toast({
@@ -141,7 +142,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
         return;
       }
 
-      if (horarioPorAulas <= 0) {
+      if (horarioPorAula <= 0) {
         toast({
           title: "Erro de Validação",
           description: "Horário por Aula deve ser maior que zero.",
@@ -153,7 +154,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
 
       // Recalcular valores no servidor para garantir consistência
       const valorPorAula = valorTotal / numeroAulas;
-      const cargaHorariaTotal = numeroAulas * horarioPorAulas;
+      const cargaHorariaTotal = numeroAulas * horarioPorAula;
 
       const planData = {
         nome: formData.nome,
@@ -163,7 +164,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
         carga_horaria_total: cargaHorariaTotal,
         valor_total: valorTotal,
         valor_por_aula: valorPorAula,
-        horario_por_aulas: horarioPorAulas,
+        horario_por_aula: horarioPorAula,
         permite_cancelamento: formData.permite_cancelamento,
         permite_parcelamento: formData.permite_parcelamento,
         observacoes: formData.observacoes || null,
@@ -213,125 +214,133 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="nome">Nome do Plano *</Label>
+        <div>
+          <Label htmlFor="nome">Nome do Plano</Label>
           <Input
             id="nome"
+            type="text"
             value={formData.nome}
             onChange={(e) => handleInputChange('nome', e.target.value)}
             required
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="numero_aulas">Número de Aulas *</Label>
+        <div>
+          <Label htmlFor="numero_aulas">Número de Aulas</Label>
           <Input
             id="numero_aulas"
             type="number"
             min="1"
             value={formData.numero_aulas}
-            onChange={(e) => handleInputChange('numero_aulas', parseInt(e.target.value))}
+            onChange={(e) => handleInputChange('numero_aulas', parseInt(e.target.value) || 0)}
             required
           />
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="descricao">Descrição *</Label>
+      <div>
+        <Label htmlFor="descricao">Descrição</Label>
         <Textarea
           id="descricao"
           value={formData.descricao}
           onChange={(e) => handleInputChange('descricao', e.target.value)}
-          required
+          rows={3}
+          placeholder="Descreva o plano de pagamento..."
         />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
+        <div>
           <Label htmlFor="frequencia_aulas">Frequência das Aulas</Label>
-          <Select value={formData.frequencia_aulas} onValueChange={(value) => handleInputChange('frequencia_aulas', value)}>
+          <Select
+            value={formData.frequencia_aulas}
+            onValueChange={(value) => handleInputChange('frequencia_aulas', value)}
+          >
             <SelectTrigger>
-              <SelectValue />
+              <SelectValue placeholder="Selecione a frequência" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="diaria">Diária</SelectItem>
               <SelectItem value="semanal">Semanal</SelectItem>
               <SelectItem value="quinzenal">Quinzenal</SelectItem>
               <SelectItem value="mensal">Mensal</SelectItem>
-              <SelectItem value="intensivo">Intensivo</SelectItem>
+              <SelectItem value="bimestral">Bimestral</SelectItem>
+              <SelectItem value="trimestral">Trimestral</SelectItem>
+              <SelectItem value="semestral">Semestral</SelectItem>
+              <SelectItem value="anual">Anual</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="horario_por_aulas">Horário por Aula (horas) *</Label>
+        <div>
+          <Label htmlFor="horario_por_aula">Horário por Aula (horas)</Label>
           <Input
-            id="horario_por_aulas"
+            id="horario_por_aula"
             type="number"
-            step="0.5"
-            min="0.5"
-            value={formData.horario_por_aulas}
-            onChange={(e) => handleInputChange('horario_por_aulas', e.target.value)}
-            required
+            min="0.1"
+            step="0.1"
+            value={formData.horario_por_aula || ''}
+            onChange={(e) => handleInputChange('horario_por_aula', parseFloat(e.target.value) || null)}
             placeholder="Ex: 1.5"
           />
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div>
         <Label htmlFor="carga_horaria_total">Carga Horária Total (horas)</Label>
         <Input
           id="carga_horaria_total"
-          type="text"
-          value={formatCargaHoraria(formData.carga_horaria_total)} 
+          type="number"
+          min="0"
+          step="0.5"
+          value={formData.carga_horaria_total || ''}
           readOnly
-          className="bg-gray-50 cursor-not-allowed"
+          className="bg-gray-50"
           placeholder="Calculado automaticamente"
         />
-        <p className="text-sm text-gray-500">Calculado automaticamente</p> {/* Ajuste 2: Texto simplificado */}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="valor_total">Valor Total (R$) *</Label>
+        <div>
+          <Label htmlFor="valor_total">Valor Total (R$)</Label>
           <Input
             id="valor_total"
             type="number"
+            min="0"
             step="0.01"
-            min="0.01"
-            value={formData.valor_total}
-            onChange={(e) => handleInputChange('valor_total', e.target.value)}
-            required
-            placeholder="Ex: 1500.00"
+            value={formData.valor_total || ''}
+            onChange={(e) => handleInputChange('valor_total', parseFloat(e.target.value) || null)}
+            placeholder="0,00"
           />
         </div>
 
-        <div className="space-y-2">
+        <div>
           <Label htmlFor="valor_por_aula">Valor por Aula (R$)</Label>
           <Input
-            id="valor_por_aula"
-            type="number"
-            step="0.01"
-            min="0"
-            value={formData.valor_por_aula}
-            readOnly
-            className="bg-gray-50 cursor-not-allowed"
-            placeholder="Calculado automaticamente"
-          />
-          <p className="text-sm text-gray-500">Calculado automaticamente</p> {/* Ajuste 3: Texto simplificado */}
+          id="valor_por_aula"
+          type="number"
+          min="0"
+          step="0.01"
+          value={formData.valor_por_aula || ''}
+          readOnly
+          className="bg-gray-50"
+          placeholder="Calculado automaticamente"
+        />
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div>
         <Label htmlFor="observacoes">Observações</Label>
         <Textarea
           id="observacoes"
-          value={formData.observacoes}
+          value={formData.observacoes || ''}
           onChange={(e) => handleInputChange('observacoes', e.target.value)}
-          rows={3}
+          rows={2}
+          placeholder="Observações adicionais sobre o plano..."
         />
       </div>
 
-      <div className="flex flex-col space-y-4">
+      <div className="flex flex-col space-y-2">
         <div className="flex items-center space-x-2">
           <Switch
             id="permite_cancelamento"

@@ -13,9 +13,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, DollarSign, Receipt, CreditCard, ChevronDown, ChevronRight, Check, Send, History, Filter } from 'lucide-react';
+import { Plus, Edit, Trash2, DollarSign, Receipt, CreditCard, ChevronDown, ChevronRight, Check, Send, History, Filter, RefreshCw } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
-import FinancialPlanForm from '@/components/financial/FinancialPlanForm';
+import FinancialPlanDialog from '@/components/financial/FinancialPlanDialog';
+import RenewalAlertsTable from '@/components/financial/RenewalAlertsTable';
+import FinancialRecordsTable from '@/components/financial/FinancialRecordsTable';
 
 
 interface Boleto {
@@ -147,20 +149,39 @@ const Financial = () => {
   const fetchBoletos = async () => {
     try {
       const { data, error } = await supabase
-        .from('boletos')
+        .from('financeiro_alunos')
         .select(`
           *,
-          alunos (nome)
+          alunos (nome),
+          planos (nome)
         `)
-        .order('data_vencimento', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setBoletos(data || []);
+      
+      // Converter dados de financeiro_alunos para formato de boletos
+      const boletosConvertidos = data?.map(registro => ({
+        id: registro.id,
+        aluno_id: registro.aluno_id,
+        data_vencimento: registro.data_primeiro_vencimento,
+        valor: registro.valor_total,
+        status: registro.status_geral === 'Pago' ? 'Pago' : 'Pendente',
+        descricao: `Plano: ${registro.planos?.nome || 'N/A'}`,
+        link_pagamento: null,
+        data_pagamento: null,
+        metodo_pagamento: registro.forma_pagamento_plano,
+        observacoes: null,
+        numero_parcela: 1,
+        contrato_id: null,
+        alunos: registro.alunos
+      })) || [];
+      
+      setBoletos(boletosConvertidos);
     } catch (error) {
-      console.error('Erro ao buscar boletos:', error);
+      console.error('Erro ao buscar registros financeiros:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível carregar os boletos.",
+        description: "Não foi possível carregar os registros financeiros.",
         variant: "destructive",
       });
     } finally {
@@ -179,6 +200,11 @@ const Financial = () => {
       setDespesas(data || []);
     } catch (error) {
       console.error('Erro ao buscar despesas:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar as despesas.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -199,18 +225,8 @@ const Financial = () => {
 
   const fetchHistoricoPagamentos = async () => {
     try {
-      const { data, error } = await supabase
-        .from('historico_pagamentos')
-        .select(`
-          *,
-          alunos(nome),
-          boletos(descricao),
-          usuarios(nome)
-        `)
-        .order('data_pagamento', { ascending: false });
-
-      if (error) throw error;
-      setHistoricoPagamentos(data || []);
+      // Como não temos tabela historico_pagamentos, vamos deixar vazio
+      setHistoricoPagamentos([]);
     } catch (error) {
       console.error('Erro ao buscar histórico de pagamentos:', error);
       setHistoricoPagamentos([]);
@@ -385,26 +401,11 @@ const Financial = () => {
       };
 
       if (editingBoleto) {
-        const { error } = await supabase
-          .from('boletos')
-          .update(formData)
-          .eq('id', editingBoleto.id);
-
-        if (error) throw error;
-        toast({
-          title: "Sucesso",
-          description: "Boleto atualizado com sucesso!",
-        });
+        // Funcionalidade desabilitada - tabela boletos não existe
+        throw new Error('Funcionalidade de edição de boletos não disponível');
       } else {
-        const { error } = await supabase
-          .from('boletos')
-          .insert([formData]);
-
-        if (error) throw error;
-        toast({
-          title: "Sucesso",
-          description: "Boleto criado com sucesso!",
-        });
+        // Funcionalidade desabilitada - tabela boletos não existe
+        throw new Error('Funcionalidade de criação de boletos não disponível');
       }
 
       setIsBoletoDialogOpen(false);
@@ -429,22 +430,26 @@ const Financial = () => {
       };
 
       if (editingDespesa) {
+        // Atualizar despesa existente
         const { error } = await supabase
           .from('despesas')
           .update(formData)
           .eq('id', editingDespesa.id);
 
         if (error) throw error;
+
         toast({
           title: "Sucesso",
           description: "Despesa atualizada com sucesso!",
         });
       } else {
+        // Criar nova despesa
         const { error } = await supabase
           .from('despesas')
           .insert([formData]);
 
         if (error) throw error;
+
         toast({
           title: "Sucesso",
           description: "Despesa criada com sucesso!",
@@ -469,42 +474,8 @@ const Financial = () => {
     if (!confirm('Tem certeza que deseja excluir este boleto?')) return;
 
     try {
-      // Primeiro, verificar se o boleto existe
-      const { data: boletoExists, error: checkError } = await supabase
-        .from('boletos')
-        .select('id, descricao')
-        .eq('id', id)
-        .single();
-
-      if (checkError || !boletoExists) {
-        throw new Error('Boleto não encontrado.');
-      }
-
-      // Executar a exclusão
-      const { error: deleteError } = await supabase
-        .from('boletos')
-        .delete()
-        .eq('id', id);
-
-      if (deleteError) {
-        // Tratar diferentes tipos de erro
-        if (deleteError.code === 'PGRST116') {
-          throw new Error('Boleto não encontrado.');
-        } else if (deleteError.code === '23503') {
-          throw new Error('Não é possível excluir este boleto pois existem registros relacionados. Para resolver este problema, execute as migrações do banco de dados ou entre em contato com o administrador do sistema.');
-        } else {
-          throw new Error(`Erro no banco de dados: ${deleteError.message}`);
-        }
-      }
-      
-      toast({
-        title: "Sucesso",
-        description: `Boleto "${boletoExists.descricao}" excluído com sucesso!`,
-        duration: 5000,
-      });
-      
-      // Atualizar a lista de boletos
-      await fetchBoletos();
+      // Funcionalidade desabilitada - tabela boletos não existe
+      throw new Error('Funcionalidade de exclusão de boletos não disponível');
     } catch (error) {
       console.error('Erro ao excluir boleto:', error);
       toast({
@@ -519,42 +490,19 @@ const Financial = () => {
     if (!confirm('Tem certeza que deseja excluir esta despesa?')) return;
 
     try {
-      // Primeiro, verificar se a despesa existe
-      const { data: despesaExists, error: checkError } = await supabase
-        .from('despesas')
-        .select('id, descricao')
-        .eq('id', id)
-        .single();
-
-      if (checkError || !despesaExists) {
-        throw new Error('Despesa não encontrada.');
-      }
-
-      // Executar a exclusão
-      const { error: deleteError } = await supabase
+      const { error } = await supabase
         .from('despesas')
         .delete()
         .eq('id', id);
 
-      if (deleteError) {
-        // Tratar diferentes tipos de erro
-        if (deleteError.code === 'PGRST116') {
-          throw new Error('Despesa não encontrada.');
-        } else if (deleteError.code === '23503') {
-          throw new Error('Não é possível excluir esta despesa pois existem registros relacionados. Para resolver este problema, execute as migrações do banco de dados ou entre em contato com o administrador do sistema.');
-        } else {
-          throw new Error(`Erro no banco de dados: ${deleteError.message}`);
-        }
-      }
-      
+      if (error) throw error;
+
       toast({
         title: "Sucesso",
-        description: `Despesa "${despesaExists.descricao}" excluída com sucesso!`,
-        duration: 5000,
+        description: "Despesa excluída com sucesso!",
       });
-      
-      // Atualizar a lista de despesas
-      await fetchDespesas();
+
+      fetchDespesas();
     } catch (error) {
       console.error('Erro ao excluir despesa:', error);
       toast({
@@ -575,14 +523,12 @@ const Financial = () => {
   };
 
   const openEditBoletoDialog = (boleto: Boleto) => {
-    setEditingBoleto(boleto);
-    setValueBoleto('aluno_id', boleto.aluno_id);
-    setValueBoleto('data_vencimento', boleto.data_vencimento);
-    setValueBoleto('valor', boleto.valor);
-    setValueBoleto('status', boleto.status);
-    setValueBoleto('descricao', boleto.descricao);
-    setValueBoleto('link_pagamento', boleto.link_pagamento || '');
-    setIsBoletoDialogOpen(true);
+    // Funcionalidade desabilitada - usar tabela financeiro_alunos
+    toast({
+      title: "Funcionalidade Indisponível",
+      description: "A edição de registros financeiros foi desabilitada. Use a aba Registros para gerenciar os dados.",
+      variant: "destructive",
+    });
   };
 
   const openEditDespesaDialog = (despesa: Despesa) => {
@@ -598,20 +544,20 @@ const Financial = () => {
   // Ações rápidas para alunos
   const marcarComoPago = async (boletoId: string, metodo: string = 'Dinheiro') => {
     try {
-      // Primeiro, buscar os dados do boleto
-      const { data: boleto, error: boletoError } = await supabase
-        .from('boletos')
+      // Buscar o registro na tabela financeiro_alunos
+      const { data: registro, error: registroError } = await supabase
+        .from('financeiro_alunos')
         .select('*')
         .eq('id', boletoId)
         .single();
 
-      if (boletoError) throw boletoError;
+      if (registroError) throw registroError;
 
       const dataAtual = new Date().toISOString().split('T')[0];
 
-      // Atualizar o boleto
+      // Atualizar o registro financeiro
       const { error: updateError } = await supabase
-        .from('boletos')
+        .from('financeiro_alunos')
         .update({
           status: 'Pago',
           data_pagamento: dataAtual,
@@ -621,48 +567,24 @@ const Financial = () => {
 
       if (updateError) throw updateError;
 
-      // Inserir no histórico de pagamentos
-      const { error: historicoError } = await supabase
-        .from('historico_pagamentos')
-        .insert({
-          boleto_id: boletoId,
-          aluno_id: boleto.aluno_id,
-          valor_original: boleto.valor,
-          valor_pago: boleto.valor,
-          juros: 0,
-          multa: 0,
-          desconto: 0,
-          metodo_pagamento: metodo,
-          data_pagamento: dataAtual,
-          data_vencimento_original: boleto.data_vencimento,
-          tipo_transacao: 'pagamento',
-          status_anterior: boleto.status,
-          status_novo: 'Pago'
-        });
-
-      if (historicoError) throw historicoError;
-
       toast({
         title: "Sucesso",
-        description: "Boleto marcado como pago!",
+        description: "Registro marcado como pago!",
       });
 
-      // Nova estratégia: refresh completo com timeout maior
+      // Atualizar os dados
       setTimeout(async () => {
         await Promise.all([
           fetchBoletos(),
           fetchStudents(),
           fetchHistoricoPagamentos()
         ]);
-        
-        // Verificar se deve gerar próxima parcela automaticamente
-        await verificarEGerarProximaParcela(boleto.aluno_id, boleto);
       }, 300);
     } catch (error) {
       console.error('Erro ao marcar como pago:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível marcar o boleto como pago.",
+        description: "Não foi possível marcar o registro como pago.",
         variant: "destructive",
       });
     }
@@ -695,16 +617,8 @@ const Financial = () => {
         numero_parcela: numeroParcelaPaga + 1
       };
       
-      const { error } = await supabase
-        .from('boletos')
-        .insert(novaParcela);
-      
-      if (error) throw error;
-      
-      toast({
-        title: "Próxima Parcela Gerada",
-        description: `Parcela ${numeroParcelaPaga + 1} criada automaticamente!`,
-      });
+      // Funcionalidade desabilitada - usar tabela financeiro_alunos
+      throw new Error('Funcionalidade de geração de parcelas não disponível');
       
     } catch (error) {
       console.error('Erro ao gerar próxima parcela:', error);
@@ -739,13 +653,8 @@ const Financial = () => {
         status: 'Ativo' as const
       };
       
-      const { data: contratoData, error: contratoError } = await supabase
-        .from('contratos')
-        .insert(novoContrato)
-        .select()
-        .single();
-      
-      if (contratoError) throw contratoError;
+      // Funcionalidade desabilitada - tabela contratos não existe
+      throw new Error('Funcionalidade de criação de contratos não disponível');
       
       // Criar todas as parcelas
       const parcelas = [];
@@ -766,11 +675,8 @@ const Financial = () => {
         });
       }
       
-      const { error: boletoError } = await supabase
-        .from('boletos')
-        .insert(parcelas);
-      
-      if (boletoError) throw boletoError;
+      // Funcionalidade desabilitada - usar tabela financeiro_alunos
+      throw new Error('Funcionalidade de criação de parcelas não disponível');
       
       toast({
         title: "Plano Criado",
@@ -807,20 +713,8 @@ const Financial = () => {
         numero_parcela: proximoNumero
       };
       
-      const { error } = await supabase
-        .from('boletos')
-        .insert(novaParcela);
-      
-      if (error) throw error;
-      
-      toast({
-        title: "Parcela Avulsa Criada",
-        description: "Parcela avulsa criada com sucesso!",
-      });
-      
-      setIsParcelaAvulsaDialogOpen(false);
-      setAlunoSelecionadoParcela(null);
-      await fetchBoletos();
+      // Funcionalidade desabilitada - usar tabela financeiro_alunos
+      throw new Error('Funcionalidade de criação de parcela avulsa não disponível');
       
     } catch (error) {
       console.error('Erro ao criar parcela avulsa:', error);
@@ -884,24 +778,8 @@ const Financial = () => {
         matricula: 'Taxa de Matrícula'
       };
 
-      const { data, error } = await supabase
-        .from('boletos')
-        .insert({
-          aluno_id: alunoId,
-          descricao: `${descricoes[tipo]} - Parcela ${dados.parcela || 1}`,
-          valor: dados.valor || valores[tipo],
-          data_vencimento: dados.vencimento,
-          status: 'Pendente'
-        });
-
-      if (error) throw error;
-
-      toast({
-        title: "Sucesso",
-        description: `Boleto de ${tipo} criado com sucesso!`,
-      });
-
-      fetchBoletos();
+      // Funcionalidade desabilitada - usar tabela financeiro_alunos
+      throw new Error('Funcionalidade de criação de boletos por tipo não disponível');
     } catch (error) {
       console.error('Erro ao criar boleto:', error);
       toast({
@@ -998,35 +876,29 @@ const Financial = () => {
         <TabsList>
           <TabsTrigger value="cobrancas">Cobranças de Alunos</TabsTrigger>
           <TabsTrigger value="operacional">Financeiro Operacional</TabsTrigger>
+          <TabsTrigger value="registros">Registros</TabsTrigger>
+          <TabsTrigger value="renovacao">Renovações</TabsTrigger>
           <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
         </TabsList>
 
         <TabsContent value="cobrancas" className="space-y-4">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold">Cobrança de Alunos</h2>
-            <Dialog open={isNovoPlanoDialogOpen} onOpenChange={setIsNovoPlanoDialogOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  onClick={() => { setIsNovoPlanoDialogOpen(true); }}
-                  className="bg-brand-red hover:bg-brand-red/90"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Criar Plano de Pagamento
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Criar Plano de Pagamento</DialogTitle>
-                </DialogHeader>
-                <FinancialPlanForm 
-                  onSuccess={async () => {
-                    setIsNovoPlanoDialogOpen(false);
-                    await Promise.all([fetchBoletos(), fetchContratos()]);
-                  }}
-                  onCancel={() => setIsNovoPlanoDialogOpen(false)}
-                />
-              </DialogContent>
-            </Dialog>
+            <Button
+              onClick={() => { setIsNovoPlanoDialogOpen(true); }}
+              className="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-3 w-48 h-12 rounded-lg shadow-md hover:shadow-lg ml-auto mt-6"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Criar Plano de Pagamento
+            </Button>
+            
+            <FinancialPlanDialog
+              isOpen={isNovoPlanoDialogOpen}
+              onOpenChange={setIsNovoPlanoDialogOpen}
+              onSuccess={async () => {
+                await Promise.all([fetchBoletos(), fetchContratos()]);
+              }}
+            />
           </div>
             
             {/* Botões antigos comentados para preservar funcionalidade */}
@@ -1135,16 +1007,9 @@ const Financial = () => {
             <div className="flex gap-4 items-center">
               <div className="flex gap-2">
                 <Button
-                  variant={viewMode === 'agrupado' ? 'default' : 'outline'}
+                  variant="default"
                   size="sm"
-                  onClick={() => setViewMode('agrupado')}
-                >
-                  Agrupado por Aluno
-                </Button>
-                <Button
-                  variant={viewMode === 'lista' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setViewMode('lista')}
+                  disabled
                 >
                   Lista Simples
                 </Button>
@@ -1190,477 +1055,8 @@ const Financial = () => {
                   <p className="text-gray-500">Nenhum boleto cadastrado ainda.</p>
                   <p className="text-sm text-gray-400">Clique no botão "Novo Boleto" para começar.</p>
                 </div>
-              ) : viewMode === 'agrupado' ? (
-                <div className="space-y-4">
-                  {filtrarAlunosPorStatus(alunosFinanceiros).map((aluno) => (
-                    <Card key={aluno.id} className="border">
-                      <Collapsible
-                        open={expandedAlunos.has(aluno.id)}
-                        onOpenChange={() => toggleAlunoExpanded(aluno.id)}
-                      >
-                        <CollapsibleTrigger asChild>
-                          <CardHeader className="cursor-pointer hover:bg-gray-50 transition-colors py-6">
-                            <div className="flex items-center justify-between w-full min-h-[60px]">
-                              <div className="flex items-start gap-3 flex-1">
-                                <div className="flex items-center justify-center h-full pt-1">
-                                  {expandedAlunos.has(aluno.id) ? (
-                                    <ChevronDown className="h-4 w-4 flex-shrink-0" />
-                                  ) : (
-                                    <ChevronRight className="h-4 w-4 flex-shrink-0" />
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <CardTitle className="text-lg mb-2">{aluno.nome}</CardTitle>
-                                  <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-3">
-                                    <span className="font-medium">Total geral: R$ 350,00</span>
-                                    <span className="font-medium text-green-600">Pago: R$ 270,00</span>
-                                    <span className="font-medium text-red-600">Em aberto: R$ 80,00</span>
-                                    {aluno.boletosVencidos > 0 && (
-                                      <span className="text-red-600 font-medium">
-                                        1 vencido(s)
-                                      </span>
-                                    )}
-                                    {aluno.ultimoPagamento && (
-                                      <span>Último pagamento: {new Date(aluno.ultimoPagamento).toLocaleDateString('pt-BR')}</span>
-                                    )}
-                                  </div>
-                                  
-                                  {/* Informações consolidadas */}
-                                  <div className="flex flex-wrap gap-4 text-sm">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-gray-500">Plano:</span>
-                                      <Badge variant="outline" className="text-xs">
-                                        {obterPlanoAluno(aluno.id)}
-                                      </Badge>
-                                    </div>
-                                    
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-gray-500">Status Geral:</span>
-                                      <Badge variant="secondary" className="text-xs">
-                                        Parcialmente Pago
-                                      </Badge>
-                                    </div>
-                                    
-                                    <div className="flex items-center gap-2 min-w-[250px]">
-                                      <span className="text-gray-500">Progresso Geral:</span>
-                                      <div className="flex-1">
-                                        <Progress value={77} className="h-2" />
-                                        <span className="text-xs text-gray-400 mt-1">
-                                          77% do valor total pago (R$ 270,00 / R$ 350,00)
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                              
-                              <div className="flex gap-2 items-center ml-4 flex-shrink-0">
-                                {aluno.boletosVencidos > 0 && (
-                                  <Badge variant="destructive" className="whitespace-nowrap">
-                                    Em Atraso
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          </CardHeader>
-                        </CollapsibleTrigger>
-                        
-                        <CollapsibleContent>
-                          <CardContent className="pt-0">
-                            {/* Tipos de Cobrança */}
-                            <div className="mb-6">
-                              <h4 className="font-medium mb-3 flex items-center gap-2">
-                                <CreditCard className="h-4 w-4" />
-                                Tipos de Cobrança
-                              </h4>
-                              
-                              <div className="space-y-3">
-                                {/* Toggle Plano Contratado */}
-                                <div className="border rounded-lg p-3">
-                                  <Collapsible
-                                    open={expandedToggles[aluno.id]?.plano || false}
-                                    onOpenChange={() => toggleTipoCobranca(aluno.id, 'plano')}
-                                  >
-                                    <CollapsibleTrigger asChild>
-                                      <div className="flex items-center justify-between cursor-pointer hover:bg-gray-50 p-2 rounded">
-                                        <div className="flex items-center gap-3 flex-1">
-                                          <Badge variant="outline">
-                                            Plano Contratado
-                                          </Badge>
-                                          <div className="flex items-center gap-2 flex-1">
-                                            <div className="flex-1 max-w-[200px]">
-                                              <Progress value={75} className="h-2" />
-                                              <span className="text-xs text-gray-400 mt-1">3/4 parcelas pagas</span>
-                                            </div>
-                                            <div className="text-sm">
-                                              <span className="text-gray-600">R$ 150,00/mês</span>
-                                              <Badge variant="outline" className="ml-2 text-xs">Em dia</Badge>
-                                            </div>
-                                          </div>
-                                        </div>
-                                        {expandedToggles[aluno.id]?.plano ? (
-                                          <ChevronDown className="h-4 w-4" />
-                                        ) : (
-                                          <ChevronRight className="h-4 w-4" />
-                                        )}
-                                      </div>
-                                    </CollapsibleTrigger>
-                                    <CollapsibleContent>
-                                      <div className="mt-3 space-y-4">
-                                        {/* Boletos existentes do plano */}
-                                        {aluno.boletos.length > 0 && (
-                                          <div>
-                                            <h5 className="font-medium mb-2 text-sm">Boletos do Plano ({aluno.boletos.length})</h5>
-                                            <Table>
-                                              <TableHeader>
-                                                <TableRow>
-                                                  <TableHead>Descrição</TableHead>
-                                                  <TableHead>Valor</TableHead>
-                                                  <TableHead>Vencimento</TableHead>
-                                                  <TableHead>Status</TableHead>
-                                                  <TableHead>Ações</TableHead>
-                                                </TableRow>
-                                              </TableHeader>
-                                              <TableBody>
-                                                {aluno.boletos.map((boleto) => (
-                                                  <TableRow key={boleto.id}>
-                                                    <TableCell>{boleto.descricao}</TableCell>
-                                                    <TableCell className="font-medium">
-                                                      R$ {boleto.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                      {new Date(boleto.data_vencimento).toLocaleDateString('pt-BR')}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                      <Badge className={getStatusColor(boleto.status)}>
-                                                        {boleto.status}
-                                                      </Badge>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                      <div className="flex gap-1">
-                                                        {boleto.status !== 'Pago' && (
-                                                          <Button
-                                                            
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() => marcarComoPago(boleto.id)}
-                                                            className="text-green-600 hover:text-green-700"
-                                                          >
-                                                            <Check className="h-3 w-3" />
-                                                          </Button>
-                                                        )}
-                                                        <Button
-                                                          
-                                                          size="sm"
-                                                          variant="outline"
-                                                          onClick={() => openEditBoletoDialog(boleto)}
-                                                        >
-                                                          <Edit className="h-3 w-3" />
-                                                        </Button>
-                                                         <Button
- 
-                                                          size="sm"
-                                                          variant="outline"
-                                                          onClick={() => deleteBoleto(boleto.id)}
-                                                          className="text-red-600 hover:text-red-700"
-                                                        >
-                                                          <Trash2 className="h-3 w-3" />
-                                                        </Button>
-                                                      </div>
-                                                    </TableCell>
-                                                  </TableRow>
-                                                ))}
-                                              </TableBody>
-                                            </Table>
-                                          </div>
-                                        )}
-                                        
-                                        {/* Botão Parcela Avulsa */}
-                                        <div className="p-3 bg-gray-50 rounded">
-                                          <Button
-                                            
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => {
-                                              setAlunoSelecionadoParcela(aluno.id);
-                                              setIsParcelaAvulsaDialogOpen(true);
-                                            }}
-                                            className="text-brand-red hover:text-red-800 border-brand-red hover:bg-brand-red hover:text-white"
-                                          >
-                                            <Plus className="h-3 w-3 mr-1" />
-                                            Parcela Avulsa
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    </CollapsibleContent>
-                                  </Collapsible>
-                                </div>
-                                
-                                {/* Toggle Material */}
-                                <div className="border rounded-lg p-3">
-                                  <Collapsible
-                                    open={expandedToggles[aluno.id]?.material || false}
-                                    onOpenChange={() => toggleTipoCobranca(aluno.id, 'material')}
-                                  >
-                                    <CollapsibleTrigger asChild>
-                                      <div className="flex items-center justify-between cursor-pointer hover:bg-gray-50 p-2 rounded">
-                                        <div className="flex items-center gap-3 flex-1">
-                                          <Badge variant="outline">
-                                            Material Didático
-                                          </Badge>
-                                          <div className="flex items-center gap-2 flex-1">
-                                            <div className="flex-1 max-w-[200px]">
-                                              <Progress value={0} className="h-2" />
-                                              <span className="text-xs text-gray-400 mt-1">0/2 parcelas pagas</span>
-                                            </div>
-                                            <div className="text-sm">
-                                              <span className="text-gray-600">R$ 80,00</span>
-                                              <Badge variant="destructive" className="ml-2 text-xs">Pendente</Badge>
-                                            </div>
-                                          </div>
-                                        </div>
-                                        {expandedToggles[aluno.id]?.material ? (
-                                          <ChevronDown className="h-4 w-4" />
-                                        ) : (
-                                          <ChevronRight className="h-4 w-4" />
-                                        )}
-                                      </div>
-                                    </CollapsibleTrigger>
-                                    <CollapsibleContent>
-                                      <div className="mt-3 space-y-4">
-                                        {/* Boletos de demonstração para material */}
-                                        <div>
-                                          <h5 className="font-medium mb-2 text-sm">Boletos de Material (2)</h5>
-                                          <Table>
-                                            <TableHeader>
-                                              <TableRow>
-                                                <TableHead>Descrição</TableHead>
-                                                <TableHead>Valor</TableHead>
-                                                <TableHead>Vencimento</TableHead>
-                                                <TableHead>Status</TableHead>
-                                                <TableHead>Ações</TableHead>
-                                              </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                              <TableRow>
-                                                <TableCell>Material Didático - 1ª Parcela</TableCell>
-                                                <TableCell className="font-medium">R$ 40,00</TableCell>
-                                                <TableCell>15/02/2025</TableCell>
-                                                <TableCell>
-                                                  <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
-                                                    Pendente
-                                                  </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                  <div className="flex gap-1">
-                                                    <Button size="sm" variant="outline" className="text-green-600 hover:text-green-700">
-                                                      <Check className="h-3 w-3" />
-                                                    </Button>
-                                                    <Button size="sm" variant="outline">
-                                                      <Edit className="h-3 w-3" />
-                                                    </Button>
-                                                    <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700">
-                                                      <Trash2 className="h-3 w-3" />
-                                                    </Button>
-                                                  </div>
-                                                </TableCell>
-                                              </TableRow>
-                                              <TableRow>
-                                                <TableCell>Material Didático - 2ª Parcela</TableCell>
-                                                <TableCell className="font-medium">R$ 40,00</TableCell>
-                                                <TableCell>15/03/2025</TableCell>
-                                                <TableCell>
-                                                  <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
-                                                    Pendente
-                                                  </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                  <div className="flex gap-1">
-                                                    <Button size="sm" variant="outline" className="text-green-600 hover:text-green-700">
-                                                      <Check className="h-3 w-3" />
-                                                    </Button>
-                                                    <Button size="sm" variant="outline">
-                                                      <Edit className="h-3 w-3" />
-                                                    </Button>
-                                                    <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700">
-                                                      <Trash2 className="h-3 w-3" />
-                                                    </Button>
-                                                  </div>
-                                                </TableCell>
-                                              </TableRow>
-                                            </TableBody>
-                                          </Table>
-                                        </div>
-                                        
-                                        {/* Botão Parcela Avulsa */}
-                                        <div className="p-3 bg-gray-50 rounded">
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => {
-                                              setAlunoSelecionadoParcela(aluno.id);
-                                              setIsParcelaAvulsaDialogOpen(true);
-                                            }}
-                                            className="text-brand-red hover:text-red-800 border-brand-red hover:bg-brand-red hover:text-white"
-                                          >
-                                            <Plus className="h-3 w-3 mr-1" />
-                                            Parcela Avulsa
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    </CollapsibleContent>
-                                  </Collapsible>
-                                </div>
-                                
-                                {/* Toggle Matrícula */}
-                                <div className="border rounded-lg p-3">
-                                  <Collapsible
-                                    open={expandedToggles[aluno.id]?.matricula || false}
-                                    onOpenChange={() => toggleTipoCobranca(aluno.id, 'matricula')}
-                                  >
-                                    <CollapsibleTrigger asChild>
-                                      <div className="flex items-center justify-between cursor-pointer hover:bg-gray-50 p-2 rounded">
-                                        <div className="flex items-center gap-3 flex-1">
-                                          <Badge variant="outline">
-                                            Taxa de Matrícula
-                                          </Badge>
-                                          <div className="flex items-center gap-2 flex-1">
-                                            <div className="flex-1 max-w-[200px]">
-                                              <Progress value={100} className="h-2" />
-                                              <span className="text-xs text-gray-400 mt-1">1/1 parcela paga</span>
-                                            </div>
-                                            <div className="text-sm">
-                                              <span className="text-gray-600">R$ 120,00</span>
-                                              <Badge variant="default" className="ml-2 text-xs">Pago</Badge>
-                                            </div>
-                                          </div>
-                                        </div>
-                                        {expandedToggles[aluno.id]?.matricula ? (
-                                          <ChevronDown className="h-4 w-4" />
-                                        ) : (
-                                          <ChevronRight className="h-4 w-4" />
-                                        )}
-                                      </div>
-                                    </CollapsibleTrigger>
-                                    <CollapsibleContent>
-                                      <div className="mt-3 space-y-4">
-                                        {/* Boletos de demonstração para matrícula */}
-                                        <div>
-                                          <h5 className="font-medium mb-2 text-sm">Boletos de Matrícula (1)</h5>
-                                          <Table>
-                                            <TableHeader>
-                                              <TableRow>
-                                                <TableHead>Descrição</TableHead>
-                                                <TableHead>Valor</TableHead>
-                                                <TableHead>Vencimento</TableHead>
-                                                <TableHead>Status</TableHead>
-                                                <TableHead>Ações</TableHead>
-                                              </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                              <TableRow>
-                                                <TableCell>Taxa de Matrícula 2025</TableCell>
-                                                <TableCell className="font-medium">R$ 120,00</TableCell>
-                                                <TableCell>10/01/2025</TableCell>
-                                                <TableCell>
-                                                  <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                                                    Pago
-                                                  </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                  <div className="flex gap-1">
-                                                    <Button size="sm" variant="outline">
-                                                      <Edit className="h-3 w-3" />
-                                                    </Button>
-                                                    <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700">
-                                                      <Trash2 className="h-3 w-3" />
-                                                    </Button>
-                                                  </div>
-                                                </TableCell>
-                                              </TableRow>
-                                            </TableBody>
-                                          </Table>
-                                        </div>
-                                        
-                                        {/* Botão Parcela Avulsa */}
-                                        <div className="p-3 bg-gray-50 rounded">
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => {
-                                              setAlunoSelecionadoParcela(aluno.id);
-                                              setIsParcelaAvulsaDialogOpen(true);
-                                            }}
-                                            className="text-brand-red hover:text-red-800 border-brand-red hover:bg-brand-red hover:text-white"
-                                          >
-                                            <Plus className="h-3 w-3 mr-1" />
-                                            Parcela Avulsa
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    </CollapsibleContent>
-                                  </Collapsible>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            {/* Histórico de Pagamentos */}
-                            {aluno.historicoPagamentos.length > 0 && (
-                              <div>
-                                <h4 className="font-medium mb-3 flex items-center gap-2">
-                                  <History className="h-4 w-4" />
-                                  Histórico de Pagamentos ({aluno.historicoPagamentos.length})
-                                </h4>
-                                <Table>
-                                  <TableHeader>
-                                    <TableRow>
-                                      <TableHead>Data</TableHead>
-                                      <TableHead>Tipo</TableHead>
-                                      <TableHead>Valor</TableHead>
-                                      <TableHead>Método</TableHead>
-                                      <TableHead>Observações</TableHead>
-                                    </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                    {aluno.historicoPagamentos.slice(0, 5).map((historico) => (
-                                      <TableRow key={historico.id}>
-                                        <TableCell>
-                                          {new Date(historico.data_pagamento).toLocaleDateString('pt-BR')}
-                                        </TableCell>
-                                        <TableCell>
-                                          <Badge variant="secondary">{historico.tipo_transacao}</Badge>
-                                        </TableCell>
-                                        <TableCell className="font-medium">
-                                          R$ {historico.valor_pago.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                        </TableCell>
-                                        <TableCell>{historico.metodo_pagamento}</TableCell>
-                                        <TableCell className="text-sm text-gray-600">
-                                          {historico.observacoes || '-'}
-                                        </TableCell>
-                                      </TableRow>
-                                    ))}
-                                  </TableBody>
-                                </Table>
-                                {aluno.historicoPagamentos.length > 5 && (
-                                  <p className="text-sm text-gray-500 mt-2">
-                                    Mostrando os 5 pagamentos mais recentes de {aluno.historicoPagamentos.length} total.
-                                  </p>
-                                )}
-                              </div>
-                            )}
-                          </CardContent>
-                        </CollapsibleContent>
-                      </Collapsible>
-                    </Card>
-                  ))}
-                  
-                  {filtrarAlunosPorStatus(alunosFinanceiros).length === 0 && (
-                    <div className="text-center py-8">
-                      <p className="text-gray-500">Nenhum aluno encontrado com os filtros aplicados.</p>
-                    </div>
-                  )}
-                </div>
               ) : (
+
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1880,6 +1276,14 @@ const Financial = () => {
           </Card>
         </TabsContent>
 
+        <TabsContent value="registros" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold">Registros Financeiros</h2>
+          </div>
+          
+          <FinancialRecordsTable />
+        </TabsContent>
+
         <TabsContent value="relatorios" className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Relatórios e Análises Financeiras</h2>
@@ -1977,6 +1381,68 @@ const Financial = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="renovacao" className="space-y-4">
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">Renovações de Planos</h2>
+            </div>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <RefreshCw className="h-5 w-5" />
+                  Sistema de Alertas de Renovação
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <h3 className="font-semibold text-yellow-800 mb-2">Como funciona:</h3>
+                    <div className="space-y-2 text-sm text-yellow-700">
+                      <div className="flex items-start gap-2">
+                        <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2 flex-shrink-0"></div>
+                        <p>O sistema monitora automaticamente as parcelas 1x até 12x de cada aluno</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2 flex-shrink-0"></div>
+                        <p>Quando a última parcela com valor é detectada, um alerta é gerado</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2 flex-shrink-0"></div>
+                        <p>A data de renovação é calculada como 12 meses após a primeira parcela</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2 flex-shrink-0"></div>
+                        <p>Alertas aparecem no dashboard quando faltam 30 dias ou menos para renovação</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h3 className="font-semibold text-blue-800 mb-2">Ações Recomendadas:</h3>
+                    <div className="space-y-2 text-sm text-blue-700">
+                      <div className="flex items-start gap-2">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                        <p>Entre em contato com o aluno para discutir a renovação do plano</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                        <p>Crie um novo plano de pagamento na aba "Cobranças de Alunos"</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                        <p>Atualize os dados financeiros do aluno conforme necessário</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+               </CardContent>
+             </Card>
+             
+             <RenewalAlertsTable />
+           </div>
+         </TabsContent>
         
 
         

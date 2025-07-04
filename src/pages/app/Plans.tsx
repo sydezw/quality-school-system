@@ -17,6 +17,7 @@ interface Plan {
   descricao: string;
   numero_aulas: number;
   frequencia_aulas: string;
+  horario_por_aula: number | null;
   carga_horaria_total: number | null;
   valor_total: number | null;
   valor_por_aula: number | null;
@@ -34,9 +35,10 @@ const Plans = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showForm, setShowForm] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [deletingPlan, setDeletingPlan] = useState<Plan | null>(null);
+  const [studentsModalOpen, setStudentsModalOpen] = useState(false);
   const [showStudentsModal, setShowStudentsModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [studentCounts, setStudentCounts] = useState<Record<string, number>>({});
@@ -136,14 +138,14 @@ const Plans = () => {
     }
   };
 
-  const handleCreatePlan = () => {
+  const handleNewPlan = () => {
     setEditingPlan(null);
-    setShowForm(true);
+    setIsFormOpen(true);
   };
 
   const handleEditPlan = (plan: Plan) => {
     setEditingPlan(plan);
-    setShowForm(true);
+    setIsFormOpen(true);
   };
 
   const handleDeletePlan = (plan: Plan) => {
@@ -188,13 +190,13 @@ const Plans = () => {
   };
 
   const handleFormSuccess = () => {
-    setShowForm(false);
+    setIsFormOpen(false);
     setEditingPlan(null);
     fetchPlans();
   };
 
   const handleFormCancel = () => {
-    setShowForm(false);
+    setIsFormOpen(false);
     setEditingPlan(null);
   };
 
@@ -209,7 +211,7 @@ const Plans = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Planos</h1>
-        <Button onClick={handleCreatePlan}>
+        <Button onClick={handleNewPlan}>
           <Plus className="mr-2 h-4 w-4" />
           Novo Plano
         </Button>
@@ -226,27 +228,20 @@ const Plans = () => {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Carregando planos...</p>
-          </div>
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       ) : error ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold text-destructive mb-2">Erro ao carregar planos</h3>
-              <p className="text-muted-foreground mb-4">{error}</p>
-              <Button onClick={() => fetchPlans()} variant="outline">
-                Tentar Novamente
-              </Button>
-            </div>
-          </div>
+        <div className="text-center py-12">
+          <h3 className="text-lg font-semibold text-destructive mb-2">Erro ao carregar planos</h3>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <Button onClick={fetchPlans} variant="outline">
+            Tentar novamente
+          </Button>
         </div>
       ) : filteredPlans.length === 0 ? (
         <div className="text-center py-12">
-          <BookOpen className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+          <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-semibold mb-2">
             {searchTerm ? 'Nenhum plano encontrado' : 'Nenhum plano cadastrado'}
           </h3>
@@ -256,7 +251,7 @@ const Plans = () => {
               : 'Comece criando seu primeiro plano de ensino'}
           </p>
           {!searchTerm && (
-            <Button onClick={handleCreatePlan}>
+            <Button onClick={handleNewPlan}>
               <Plus className="w-4 h-4 mr-2" />
               Criar Primeiro Plano
             </Button>
@@ -355,7 +350,7 @@ const Plans = () => {
       )}
 
       {/* Modal do Formulário */}
-      <Dialog open={showForm} onOpenChange={setShowForm}>
+      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>

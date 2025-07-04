@@ -4,10 +4,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Check, ChevronsUpDown } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
+import { cn } from '@/lib/utils';
+
+// HELPER FUNCTION: Formatação de valores decimais para padrão brasileiro
+const formatarDecimalBR = (valor: number): string => {
+  return valor.toFixed(2).replace('.', ',');
+};
 
 interface PlanoGenerico {
   id: string;
@@ -28,6 +38,7 @@ interface Student {
 interface FinancialPlanFormProps {
   onSuccess: () => void;
   onCancel: () => void;
+  preSelectedStudent?: Student | null;
 }
 
 interface FormData {
@@ -44,15 +55,14 @@ interface FormData {
   forma_pagamento_matricula: string;
   numero_parcelas_matricula: string;
   data_vencimento_primeira: string;
-  desconto: string;
 }
 
-const FinancialPlanForm = ({ onSuccess, onCancel }: FinancialPlanFormProps) => {
+const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: FinancialPlanFormProps) => {
   const [loading, setLoading] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
   const [planosGenericos, setPlanosGenericos] = useState<PlanoGenerico[]>([]);
-  const [hoveredPlan, setHoveredPlan] = useState<PlanoGenerico | null>(null);
-  const [hoverPosition, setHoverPosition] = useState({ x: 0, y: 0 });
+
+  const [openStudentSearch, setOpenStudentSearch] = useState(false);
   const { toast } = useToast();
 
   const { register, handleSubmit, reset, control, watch, setValue } = useForm<FormData>({
@@ -68,8 +78,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel }: FinancialPlanFormProps) => {
       numero_parcelas_material: '1',
       forma_pagamento_matricula: 'boleto',
       numero_parcelas_matricula: '1',
-      data_vencimento_primeira: '',
-      desconto: '0'
+      data_vencimento_primeira: ''
     }
   });
 
@@ -78,7 +87,12 @@ const FinancialPlanForm = ({ onSuccess, onCancel }: FinancialPlanFormProps) => {
   useEffect(() => {
     fetchStudents();
     fetchPlanos();
-  }, []);
+    
+    // Se há um aluno pré-selecionado, define no formulário
+    if (preSelectedStudent) {
+      setValue('aluno_id', preSelectedStudent.id);
+    }
+  }, [preSelectedStudent]);
 
   const fetchStudents = async () => {
     try {
@@ -116,178 +130,194 @@ const FinancialPlanForm = ({ onSuccess, onCancel }: FinancialPlanFormProps) => {
     }
   };
 
-  const handlePlanHover = (plan: PlanoGenerico, event: React.MouseEvent) => {
-    setHoveredPlan(plan);
-    const rect = event.currentTarget.getBoundingClientRect();
-    setHoverPosition({
-      x: rect.right + 10,
-      y: rect.top
-    });
-  };
 
-  const handlePlanLeave = () => {
-    setHoveredPlan(null);
-  };
 
   const getCalculatedValues = () => {
     const planoSelecionado = planosGenericos.find(p => p.id === watchedValues.plano_id);
-    const aulasPagas = parseInt(watchedValues.aulas_pagas) || 0;
+    const aulasQueAlunoVaiPagar = parseInt(watchedValues.aulas_pagas) || 0;
     const valorMatricula = parseFloat(watchedValues.valor_matricula) || 0;
     const valorMaterial = parseFloat(watchedValues.valor_material) || 0;
-    const desconto = parseFloat(watchedValues.desconto) || 0;
 
-    if (!planoSelecionado || aulasPagas <= 0) {
+    if (!planoSelecionado || aulasQueAlunoVaiPagar <= 0) {
       return {
         aulasTotal: 0,
         aulasGratuitas: 0,
-        valorCalculado: 0,
+        aulasAPagar: 0,
+        valorAPagar: 0,
         valorTotal: 0,
-        valorComDesconto: 0
+        valorComDesconto: 0,
+        descontoCalculado: 0,
+        valorPlano: 0,
+        precoPorAula: 0,
+        ajuste: 0
       };
     }
 
-    const aulasTotal = planoSelecionado.numero_aulas || 0;
-    const aulasGratuitas = Math.max(0, aulasTotal - aulasPagas);
-    const valorCalculado = aulasPagas * (planoSelecionado.valor_por_aula || 0);
-    const valorTotal = valorCalculado + valorMatricula + valorMaterial;
-    const valorComDesconto = valorTotal - desconto;
+    // Nova lógica de cálculo
+    const valorTotalPlano = planoSelecionado.valor_total || 0;
+    const aulasTotaisNoPlano = planoSelecionado.numero_aulas || 0;
+    
+    // 1. precoPorAula = valorTotalPlano ÷ aulasTotaisNoPlano
+    const precoPorAula = aulasTotaisNoPlano > 0 ? valorTotalPlano / aulasTotaisNoPlano : 0;
+    
+    // 2. valorAPagar = aulasQueAlunoVaiPagar × precoPorAula
+    const valorAPagar = aulasQueAlunoVaiPagar * precoPorAula;
+    
+    // 3. ajuste = valorAPagar − valorTotalPlano
+    const ajuste = valorAPagar - valorTotalPlano;
+    
+    // Para compatibilidade com o resto do código
+    const aulasTotal = aulasTotaisNoPlano;
+    const aulasGratuitas = Math.max(0, aulasTotal - aulasQueAlunoVaiPagar);
+    const aulasAPagar = aulasQueAlunoVaiPagar;
+    const valorPlano = valorTotalPlano;
+    const descontoCalculado = Math.abs(ajuste < 0 ? ajuste : 0); // Desconto quando ajuste é negativo
+    
+    const valorTotal = valorAPagar + valorMatricula + valorMaterial;
+    const valorComDesconto = valorTotal - descontoCalculado;
 
     return {
       aulasTotal,
       aulasGratuitas,
-      valorCalculado,
+      aulasAPagar,
+      valorAPagar,
       valorTotal,
-      valorComDesconto
+      valorComDesconto,
+      descontoCalculado,
+      valorPlano,
+      precoPorAula,
+      ajuste
     };
   };
+  
+  // O desconto é agora calculado automaticamente e exibido como texto
 
   const onSubmit = async (data: FormData) => {
+    console.log('=== INÍCIO DA SUBMISSÃO ===');
+    console.log('Dados do formulário:', data);
+    
+    // Validações básicas
+    if (!data.aluno_id) {
+      toast({
+        title: "Erro",
+        description: "Por favor, selecione um aluno.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!data.plano_id) {
+      toast({
+        title: "Erro",
+        description: "Por favor, selecione um plano.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!data.aulas_pagas || parseInt(data.aulas_pagas) <= 0) {
+      toast({
+        title: "Erro",
+        description: "Por favor, informe o número de aulas pagas.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!data.data_vencimento_primeira) {
+      toast({
+        title: "Erro",
+        description: "Por favor, informe a data de vencimento da primeira parcela.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setLoading(true);
     try {
       const planoSelecionado = planosGenericos.find(p => p.id === data.plano_id);
+      console.log('Plano selecionado:', planoSelecionado);
+      
       const aulasPagas = parseInt(data.aulas_pagas) || 0;
       const valorMatricula = parseFloat(data.valor_matricula) || 0;
       const valorMaterial = parseFloat(data.valor_material) || 0;
-      const desconto = parseFloat(data.desconto) || 0;
       
-      // Calcular valores
-      const valorAulas = aulasPagas * (planoSelecionado?.valor_por_aula || 0);
-      const valorTotalContrato = valorAulas + valorMatricula + valorMaterial - desconto;
+      console.log('Valores:', { aulasPagas, valorMatricula, valorMaterial });
       
-      // Criar contrato com informações do plano
-      const novoContrato = {
+      // Calcular valores usando a mesma lógica da função getCalculatedValues
+      const valorTotalPlano = planoSelecionado?.valor_total || 0;
+      const aulasTotaisNoPlano = planoSelecionado?.numero_aulas || 0;
+      const precoPorAula = aulasTotaisNoPlano > 0 ? valorTotalPlano / aulasTotaisNoPlano : 0;
+      const valorAPagar = aulasPagas * precoPorAula;
+      const ajuste = valorAPagar - valorTotalPlano;
+      const descontoCalculado = Math.abs(ajuste < 0 ? ajuste : 0);
+      
+      console.log('Cálculos:', { valorTotalPlano, aulasTotaisNoPlano, precoPorAula, valorAPagar, descontoCalculado });
+      
+      // Criar registro financeiro na nova tabela
+      const novoFinanceiroAluno = {
         aluno_id: data.aluno_id,
         plano_id: data.plano_id,
-        valor_mensalidade: valorTotalContrato, // Será dividido pelas parcelas
-        valor_total: valorTotalContrato,
-        aulas_pagas: aulasPagas,
-        valor_matricula: valorMatricula,
+        valor_plano: valorAPagar,
         valor_material: valorMaterial,
-        forma_pagamento: data.forma_pagamento_plano,
-        numero_parcelas: parseInt(data.numero_parcelas_plano),
-        data_inicio: new Date().toISOString().split('T')[0],
-        status: 'Ativo' as const
+        valor_matricula: valorMatricula,
+        desconto_total: descontoCalculado,
+        // valor_total será calculado automaticamente pelo trigger
+        valor_total: valorAPagar + valorMatricula + valorMaterial - descontoCalculado,
+         status_geral: 'Pendente',
+        data_primeiro_vencimento: data.data_vencimento_primeira,
+        // Métodos de pagamento e parcelas
+        forma_pagamento_plano: data.forma_pagamento_plano,
+        numero_parcelas_plano: parseInt(data.numero_parcelas_plano),
+        forma_pagamento_material: data.forma_pagamento_material,
+        numero_parcelas_material: parseInt(data.numero_parcelas_material),
+        forma_pagamento_matricula: data.forma_pagamento_matricula,
+        numero_parcelas_matricula: parseInt(data.numero_parcelas_matricula)
       };
       
-      const { data: contratoData, error: contratoError } = await supabase
-        .from('contratos')
-        .insert(novoContrato)
+      console.log('Dados para inserir:', novoFinanceiroAluno);
+      
+      const { data: financeiroData, error: financeiroError } = await supabase
+        .schema('public')
+        .from('financeiro_alunos')
+        .insert(novoFinanceiroAluno)
         .select()
         .single();
       
-      if (contratoError) throw contratoError;
+      console.log('Resultado da inserção:', { financeiroData, financeiroError });
       
-      // Criar boletos para cada item com seus respectivos métodos de pagamento
-      const boletos = [];
-      const dataVencimento = new Date(data.data_vencimento_primeira);
-      
-      // Boletos do Plano
-      if (valorAulas > 0) {
-        const parcelasPlano = parseInt(data.numero_parcelas_plano);
-        const valorParcelaPlano = valorAulas / parcelasPlano;
-        
-        for (let i = 1; i <= parcelasPlano; i++) {
-          const dataVencimentoParcela = new Date(dataVencimento);
-          dataVencimentoParcela.setMonth(dataVencimentoParcela.getMonth() + (i - 1));
-          
-          boletos.push({
-            aluno_id: data.aluno_id,
-            contrato_id: contratoData.id,
-            descricao: `Plano - Parcela ${i}/${parcelasPlano} - ${planoSelecionado?.nome || 'Plano'}`,
-            valor: valorParcelaPlano,
-            data_vencimento: dataVencimentoParcela.toISOString().split('T')[0],
-            status: 'Pendente' as const,
-            numero_parcela: i,
-            metodo_pagamento: data.forma_pagamento_plano
-          });
-        }
+      if (financeiroError) {
+        console.error('Erro do Supabase:', financeiroError);
+        throw financeiroError;
       }
       
-      // Boletos de Material
-      if (valorMaterial > 0) {
-        const parcelasMaterial = parseInt(data.numero_parcelas_material);
-        const valorParcelaMaterial = valorMaterial / parcelasMaterial;
-        
-        for (let i = 1; i <= parcelasMaterial; i++) {
-          const dataVencimentoParcela = new Date(dataVencimento);
-          dataVencimentoParcela.setMonth(dataVencimentoParcela.getMonth() + (i - 1));
-          
-          boletos.push({
-            aluno_id: data.aluno_id,
-            contrato_id: contratoData.id,
-            descricao: `Material - Parcela ${i}/${parcelasMaterial}`,
-            valor: valorParcelaMaterial,
-            data_vencimento: dataVencimentoParcela.toISOString().split('T')[0],
-            status: 'Pendente' as const,
-            numero_parcela: i,
-            metodo_pagamento: data.forma_pagamento_material
-          });
-        }
-      }
-      
-      // Boletos de Matrícula
-      if (valorMatricula > 0) {
-        const parcelasMatricula = parseInt(data.numero_parcelas_matricula);
-        const valorParcelaMatricula = valorMatricula / parcelasMatricula;
-        
-        for (let i = 1; i <= parcelasMatricula; i++) {
-          const dataVencimentoParcela = new Date(dataVencimento);
-          dataVencimentoParcela.setMonth(dataVencimentoParcela.getMonth() + (i - 1));
-          
-          boletos.push({
-            aluno_id: data.aluno_id,
-            contrato_id: contratoData.id,
-            descricao: `Taxa de Matrícula - Parcela ${i}/${parcelasMatricula}`,
-            valor: valorParcelaMatricula,
-            data_vencimento: dataVencimentoParcela.toISOString().split('T')[0],
-            status: 'Pendente' as const,
-            numero_parcela: i,
-            metodo_pagamento: data.forma_pagamento_matricula
-          });
-        }
-      }
-      
-      if (boletos.length > 0) {
-        const { error: boletoError } = await supabase
-          .from('boletos')
-          .insert(boletos);
-        
-        if (boletoError) throw boletoError;
-      }
+      console.log('Plano criado com sucesso!');
       
       toast({
         title: "Plano Criado",
-        description: `Plano criado com sucesso! ${boletos.length} boleto(s) gerado(s).`,
+        description: "Plano financeiro criado com sucesso!",
       });
       
       reset();
       onSuccess();
       
     } catch (error) {
-      console.error('Erro ao criar plano:', error);
+      console.error('=== ERRO AO CRIAR PLANO ===');
+      console.error('Erro completo:', error);
+      console.error('Tipo do erro:', typeof error);
+      console.error('Stack trace:', error instanceof Error ? error.stack : 'N/A');
+      
+      let errorMessage = "Não foi possível criar o plano.";
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null) {
+        errorMessage = JSON.stringify(error);
+      }
+      
       toast({
         title: "Erro",
-        description: "Não foi possível criar o plano.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -321,30 +351,69 @@ const FinancialPlanForm = ({ onSuccess, onCancel }: FinancialPlanFormProps) => {
   }
 
   return (
-    <div className="relative">
+    <div className="w-full mx-auto bg-white rounded p-6 space-y-4 shadow-md h-auto relative">
+      <h2 className="text-2xl font-bold mb-4">Criar Plano de Pagamento</h2>
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {/* Seleção de Aluno e Plano */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <div>
             <Label htmlFor="aluno_id">Aluno *</Label>
+            {preSelectedStudent && (
+              <p className="text-sm text-blue-600 mb-2">
+                Aluno selecionado: {preSelectedStudent.nome}
+              </p>
+            )}
             <Controller
               name="aluno_id"
               control={control}
               rules={{ required: true }}
-              render={({ field }) => (
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o aluno" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {students.map((student) => (
-                      <SelectItem key={student.id} value={student.id}>
-                        {student.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+              render={({ field }) => {
+                const selectedStudent = students.find(student => student.id === field.value);
+                return (
+                  <Popover open={openStudentSearch} onOpenChange={setOpenStudentSearch}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={openStudentSearch}
+                        className="w-full justify-between"
+                        disabled={!!preSelectedStudent}
+                      >
+                        {selectedStudent ? selectedStudent.nome : "Buscar aluno..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0">
+                      <Command>
+                        <CommandInput placeholder="Digite o nome do aluno..." />
+                        <CommandEmpty>Nenhum aluno encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandList className="max-h-[200px] overflow-y-auto">
+                            {students.map((student) => (
+                              <CommandItem
+                                key={student.id}
+                                value={student.nome}
+                                onSelect={() => {
+                                  field.onChange(student.id);
+                                  setOpenStudentSearch(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    field.value === student.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {student.nome}
+                              </CommandItem>
+                            ))}
+                          </CommandList>
+                        </CommandGroup>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                );
+              }}
             />
           </div>
           
@@ -354,28 +423,41 @@ const FinancialPlanForm = ({ onSuccess, onCancel }: FinancialPlanFormProps) => {
               name="plano_id"
               control={control}
               rules={{ required: true }}
-              render={({ field }) => (
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o plano" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {planosGenericos.map((plano) => (
-                      <SelectItem 
-                        key={plano.id} 
-                        value={plano.id}
-                        onMouseEnter={(e) => handlePlanHover(plano, e)}
-                        onMouseLeave={handlePlanLeave}
-                        className="cursor-pointer hover:bg-gray-50"
-                      >
-                        {plano.nome} - R$ {(plano.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+              render={({ field }) => {
+                return (
+                  <div className="space-y-4">
+                    {/* Select tradicional para compatibilidade */}
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger className="w-full px-2 py-1 text-sm">
+                        <SelectValue placeholder="Selecione o plano" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {planosGenericos.map((plano) => (
+                          <SelectItem 
+                            key={plano.id}
+                            value={plano.id}
+                            className="cursor-pointer hover:bg-gray-50"
+                          >
+                            {plano.nome} - R$ {(plano.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                  </div>
+                );
+              }
+            }
             />
+
           </div>
+        </div>
+
+
+
+        {/* Espaço para futura barra de pesquisa de alunos */}
+        <div className="mb-6 h-12">
+          {/* Espaço para futura barra de pesquisa de alunos */}
         </div>
 
         {/* Campo de Aulas Pagas */}
@@ -392,35 +474,56 @@ const FinancialPlanForm = ({ onSuccess, onCancel }: FinancialPlanFormProps) => {
           <p className="text-xs text-gray-500 mt-1">Máximo: 100 aulas</p>
         </div>
 
-        {/* Bloco de Cálculos Automáticos - Cor avermelhada */}
+
+
+        {/* Bloco de Cálculos Automáticos */}
         {watchedValues.plano_id && watchedValues.aulas_pagas && (
-          <div className="bg-red-50 border border-red-400 p-4 rounded-lg">
-            <h4 className="font-semibold mb-2 text-red-800">Cálculos Automáticos</h4>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div>Aulas totais: {calculatedValues.aulasTotal}</div>
-              <div>Aulas gratuitas: {calculatedValues.aulasGratuitas}</div>
-              <div className="col-span-2">Valor calculado: R$ {calculatedValues.valorCalculado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+          <div className="bg-white p-4 rounded grid grid-cols-2 gap-x-4">
+            <h4 className="font-semibold mb-2 col-span-2">Cálculos Automáticos</h4>
+            
+            {/* Coluna Esquerda */}
+            <div className="space-y-1 text-left pr-4">
+              <p className="text-black text-sm">Valor a ser pago:</p>
+              <p className="text-green-600 font-semibold text-lg text-left">
+                R$ {formatarDecimalBR(calculatedValues.valorAPagar)}
+              </p>
+              <p className="text-black text-sm">Desconto calculado:</p>
+              <p className="text-green-600 font-semibold text-lg text-left">
+                R$ {formatarDecimalBR(calculatedValues.descontoCalculado)}
+              </p>
+            </div>
+            
+            {/* Coluna Direita */}
+            <div className="space-y-1 text-right pl-4">
+              <p className="text-black text-sm">Aulas totais:</p>
+              <p className="text-black font-medium text-lg text-right">
+                {calculatedValues.aulasTotal}
+              </p>
+              <p className="text-black text-sm">Aulas gratuitas:</p>
+              <p className="text-black font-medium text-lg text-right">
+                {calculatedValues.aulasGratuitas}
+              </p>
+              <p className="text-black text-sm">Aulas a pagar:</p>
+              <p className="text-black font-medium text-lg text-right">
+                {calculatedValues.aulasAPagar}
+              </p>
             </div>
           </div>
         )}
 
-        {/* Campo de Desconto - Posicionado após o valor calculado */}
+        {/* Área "Desconto" - Exibição do valor calculado */}
         <div>
-          <Label htmlFor="desconto">Desconto</Label>
-          <Input
-            id="desconto"
-            type="number"
-            step="0.01"
-            min="0"
-            {...register('desconto')}
-            placeholder="0,00"
-            className="text-green-600 font-semibold"
-          />
-          <p className="text-xs text-green-600 mt-1">Valor do desconto em verde para destaque</p>
+          <Label className="text-black">Desconto</Label>
+          <div className="p-3 border border-gray-200 rounded-md bg-gray-50">
+            <span className="text-green-600 text-lg font-semibold">
+              R$ {formatarDecimalBR(calculatedValues.descontoCalculado)}
+            </span>
+          </div>
+          <p className="text-xs text-green-600 mt-1">Calculado como: Valor do Plano - Valor a Ser Pago</p>
         </div>
 
         {/* Valores de Matrícula e Material */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <div>
             <Label htmlFor="valor_matricula">Valor da Matrícula</Label>
             <Input
@@ -451,13 +554,13 @@ const FinancialPlanForm = ({ onSuccess, onCancel }: FinancialPlanFormProps) => {
           <h4 className="font-semibold text-lg">Métodos de Pagamento</h4>
           
           {/* Plano */}
-          {calculatedValues.valorCalculado > 0 && (
+          {calculatedValues.valorAPagar > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Plano - R$ {calculatedValues.valorCalculado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</CardTitle>
+                <CardTitle className="text-base">Plano - R$ {calculatedValues.valorAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label>Método de Pagamento</Label>
                     <Controller
@@ -512,7 +615,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel }: FinancialPlanFormProps) => {
                 <CardTitle className="text-base">Materiais - R$ {parseFloat(watchedValues.valor_material || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label>Método de Pagamento</Label>
                     <Controller
@@ -567,7 +670,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel }: FinancialPlanFormProps) => {
                 <CardTitle className="text-base">Taxa de Matrícula - R$ {parseFloat(watchedValues.valor_matricula || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label>Método de Pagamento</Label>
                     <Controller
@@ -616,22 +719,34 @@ const FinancialPlanForm = ({ onSuccess, onCancel }: FinancialPlanFormProps) => {
           )}
         </div>
 
-        {/* Valor Total do Contrato */}
-        {calculatedValues.valorComDesconto > 0 && (
-          <div className="bg-green-50 p-4 rounded-lg">
+        {/* Área "Valor Total do Contrato" - Linhas separadas */}
+        {calculatedValues.valorAPagar > 0 && (
+          <div className="bg-green-50 p-4 rounded">
             <h4 className="font-semibold mb-2">Valor Total do Contrato</h4>
-            <div className="space-y-1">
-              <div className="text-sm text-gray-600">
-                Subtotal: R$ {calculatedValues.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </div>
-              {parseFloat(watchedValues.desconto || '0') > 0 && (
-                <div className="text-sm text-green-600 font-semibold">
-                  Desconto: -R$ {parseFloat(watchedValues.desconto || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </div>
-              )}
-              <div className="text-lg font-bold text-green-700">
-                Total: R$ {calculatedValues.valorComDesconto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </div>
+            <div className="text-sm text-gray-700">
+              {(() => {
+                const planoSelecionado = planosGenericos.find(p => p.id === watchedValues.plano_id);
+                const valorMatricula = parseFloat(watchedValues.valor_matricula) || 0;
+                const valorMaterial = parseFloat(watchedValues.valor_material) || 0;
+                const totalBruto = calculatedValues.valorPlano + valorMatricula + valorMaterial;
+                const resultado = totalBruto - calculatedValues.descontoCalculado;
+                
+                return (
+                  <div className="space-y-2">
+                    <p>{planoSelecionado?.nome?.toLowerCase()} : R$ {formatarDecimalBR(calculatedValues.valorPlano)}</p>
+                    {valorMatricula > 0 && (
+                      <p>Taxa de Matrícula : R$ {formatarDecimalBR(valorMatricula)}</p>
+                    )}
+                    {valorMaterial > 0 && (
+                      <p>Materiais : R$ {formatarDecimalBR(valorMaterial)}</p>
+                    )}
+                    {calculatedValues.descontoCalculado > 0 && (
+                      <p className="text-green-600">Desconto : R$ -{formatarDecimalBR(calculatedValues.descontoCalculado)}</p>
+                    )}
+                    <p className="text-green-800 font-semibold">Total: R$ {formatarDecimalBR(resultado)}</p>
+                  </div>
+                );
+              })()} 
             </div>
           </div>
         )}
@@ -647,51 +762,22 @@ const FinancialPlanForm = ({ onSuccess, onCancel }: FinancialPlanFormProps) => {
         </div>
 
         {/* Botões */}
-        <div className="flex gap-2 pt-4">
+        <div className="flex gap-2 pt-4 justify-end">
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancelar
+          </Button>
           <Button 
             type="submit" 
-            className="flex-1 bg-brand-red hover:bg-brand-red/90"
+            className="w-32 bg-red-600 hover:bg-red-700"
             disabled={loading}
           >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Criar Plano
           </Button>
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Cancelar
-          </Button>
         </div>
       </form>
 
-      {/* Card de Hover com Detalhes do Plano */}
-      {hoveredPlan && (
-        <div 
-          className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-sm"
-          style={{
-            left: hoverPosition.x,
-            top: hoverPosition.y,
-            transform: 'translateY(-50%)'
-          }}
-        >
-          <h4 className="font-semibold text-lg mb-2">{hoveredPlan.nome}</h4>
-          <div className="space-y-1 text-sm">
-            <div><strong>Valor Total:</strong> R$ {(hoveredPlan.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-            <div><strong>Valor por Aula:</strong> R$ {(hoveredPlan.valor_por_aula || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-            <div><strong>Número de Aulas:</strong> {hoveredPlan.numero_aulas}</div>
-            {hoveredPlan.carga_horaria_total && (
-              <div><strong>Carga Horária:</strong> {hoveredPlan.carga_horaria_total}h</div>
-            )}
-            {hoveredPlan.frequencia_aulas && (
-              <div><strong>Frequência:</strong> {hoveredPlan.frequencia_aulas}</div>
-            )}
-            {hoveredPlan.descricao && (
-              <div className="mt-2">
-                <strong>Descrição:</strong>
-                <p className="text-gray-600 mt-1">{hoveredPlan.descricao}</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+
     </div>
   );
 };

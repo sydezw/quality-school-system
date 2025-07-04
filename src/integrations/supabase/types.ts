@@ -427,6 +427,84 @@ export type Database = {
           },
         ]
       }
+      financeiro_alunos: {
+        Row: {
+          aluno_id: string
+          created_at: string
+          data_primeiro_vencimento: string
+          desconto_total: number
+          forma_pagamento_matricula: string
+          forma_pagamento_material: string
+          forma_pagamento_plano: string
+          id: string
+          numero_parcelas_matricula: number
+          numero_parcelas_material: number
+          numero_parcelas_plano: number
+          plano_id: string
+          status_geral: string
+          updated_at: string
+          valor_material: number
+          valor_matricula: number
+          valor_plano: number
+          valor_total: number
+        }
+        Insert: {
+          aluno_id: string
+          created_at?: string
+          data_primeiro_vencimento: string
+          desconto_total?: number
+          forma_pagamento_matricula?: string
+          forma_pagamento_material?: string
+          forma_pagamento_plano?: string
+          id?: string
+          numero_parcelas_matricula?: number
+          numero_parcelas_material?: number
+          numero_parcelas_plano?: number
+          plano_id: string
+          status_geral?: string
+          updated_at?: string
+          valor_material?: number
+          valor_matricula?: number
+          valor_plano?: number
+          valor_total: number
+        }
+        Update: {
+          aluno_id?: string
+          created_at?: string
+          data_primeiro_vencimento?: string
+          desconto_total?: number
+          forma_pagamento_matricula?: string
+          forma_pagamento_material?: string
+          forma_pagamento_plano?: string
+          id?: string
+          numero_parcelas_matricula?: number
+          numero_parcelas_material?: number
+          numero_parcelas_plano?: number
+          plano_id?: string
+          status_geral?: string
+          updated_at?: string
+          valor_material?: number
+          valor_matricula?: number
+          valor_plano?: number
+          valor_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financeiro_alunos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "alunos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financeiro_alunos_plano_id_fkey"
+            columns: ["plano_id"]
+            isOneToOne: false
+            referencedRelation: "planos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       despesas: {
         Row: {
           categoria: Database["public"]["Enums"]["categoria_despesa"]
@@ -992,7 +1070,7 @@ export type Database = {
           carga_horaria_total: number | null
           valor_total: number | null
           valor_por_aula: number | null
-          horario_por_aulas: number | null
+          horario_por_aula: number | null
           permite_cancelamento: boolean
           permite_parcelamento: boolean
           observacoes: string | null
@@ -1009,7 +1087,7 @@ export type Database = {
           carga_horaria_total?: number | null
           valor_total?: number | null
           valor_por_aula?: number | null
-          horario_por_aulas?: number | null
+          horario_por_aula?: number | null
           permite_cancelamento?: boolean
           permite_parcelamento?: boolean
           observacoes?: string | null
@@ -1026,7 +1104,7 @@ export type Database = {
           carga_horaria_total?: number | null
           valor_total?: number | null
           valor_por_aula?: number | null
-          horario_por_aulas?: number | null
+          horario_por_aula?: number | null
           permite_cancelamento?: boolean
           permite_parcelamento?: boolean
           observacoes?: string | null

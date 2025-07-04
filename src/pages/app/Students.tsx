@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import StudentDialog from '@/components/students/StudentDialog';
 import StudentTable from '@/components/students/StudentTable';
+import FinancialPlanDialog from '@/components/financial/FinancialPlanDialog';
 import { useStudents } from '@/hooks/useStudents';
 
 import { Student } from '@/integrations/supabase/types';
@@ -13,6 +14,8 @@ const Students = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [query, setQuery] = useState('');
+  const [isFinancialDialogOpen, setIsFinancialDialogOpen] = useState(false);
+  const [selectedStudentForPlan, setSelectedStudentForPlan] = useState<Student | null>(null);
 
   const handleSubmit = async (data: any) => {
     const success = await saveStudent(data, editingStudent);
@@ -34,6 +37,16 @@ const Students = () => {
 
   const handleDelete = async (student: Student, plan: any) => {
     await deleteStudentWithPlan(student, plan);
+  };
+
+  const handleCreateFinancialPlan = (student: Student) => {
+    setSelectedStudentForPlan(student);
+    setIsFinancialDialogOpen(true);
+  };
+
+  const handleFinancialPlanSuccess = () => {
+    // Pode adicionar lógica adicional aqui se necessário
+    console.log('Plano financeiro criado com sucesso!');
   };
 
 
@@ -101,10 +114,18 @@ const Students = () => {
               students={filteredStudents}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              onCreateFinancialPlan={handleCreateFinancialPlan}
               isDeleting={isDeleting}
             />
           </CardContent>
         </Card>
+
+        <FinancialPlanDialog
+          isOpen={isFinancialDialogOpen}
+          onOpenChange={setIsFinancialDialogOpen}
+          selectedStudent={selectedStudentForPlan}
+          onSuccess={handleFinancialPlanSuccess}
+        />
       </div>
     </div>
   );
