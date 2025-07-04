@@ -18,9 +18,13 @@ import { useForm, Controller } from 'react-hook-form';
 import FinancialPlanDialog from '@/components/financial/FinancialPlanDialog';
 import RenewalAlertsTable from '@/components/financial/RenewalAlertsTable';
 import FinancialRecordsTable from '@/components/financial/FinancialRecordsTable';
+import BoletoManager from '@/components/financial/BoletoManager';
+import { useBoletos } from '@/hooks/useBoletos';
 
 
-interface Boleto {
+// Interface movida para useBoletos hook
+// Mantida aqui para compatibilidade com código legado
+interface BoletoLegacy {
   id: string;
   aluno_id: string;
   data_vencimento: string;
@@ -52,7 +56,7 @@ interface HistoricoPagamento {
 interface AlunoFinanceiro {
   id: string;
   nome: string;
-  boletos: Boleto[];
+  boletos: BoletoLegacy[];
   totalDividas: number;
   boletosVencidos: number;
   ultimoPagamento?: string;
@@ -103,7 +107,11 @@ interface ProgressoParcelas {
 type StatusAluno = 'Em dia' | 'Atrasado' | 'Inadimplente';
 
 const Financial = () => {
-  const [boletos, setBoletos] = useState<Boleto[]>([]);
+  // Usar o novo hook de boletos
+  const { boletos: boletosNovos, loading: loadingBoletos } = useBoletos();
+  
+  // Estados legados mantidos para compatibilidade
+  const [boletos, setBoletos] = useState<BoletoLegacy[]>([]);
   const [despesas, setDespesas] = useState<Despesa[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [alunosFinanceiros, setAlunosFinanceiros] = useState<AlunoFinanceiro[]>([]);
@@ -111,7 +119,7 @@ const Financial = () => {
   const [loading, setLoading] = useState(true);
   const [isBoletoDialogOpen, setIsBoletoDialogOpen] = useState(false);
   const [isDespesaDialogOpen, setIsDespesaDialogOpen] = useState(false);
-  const [editingBoleto, setEditingBoleto] = useState<Boleto | null>(null);
+  const [editingBoleto, setEditingBoleto] = useState<BoletoLegacy | null>(null);
   const [editingDespesa, setEditingDespesa] = useState<Despesa | null>(null);
   const [expandedAlunos, setExpandedAlunos] = useState<Set<string>>(new Set());
   const [filtroStatus, setFiltroStatus] = useState<string>('todos');
@@ -522,11 +530,11 @@ const Financial = () => {
     }
   };
 
-  const openEditBoletoDialog = (boleto: Boleto) => {
+  const openEditBoletoDialog = (boleto: BoletoLegacy) => {
     // Funcionalidade desabilitada - usar tabela financeiro_alunos
     toast({
       title: "Funcionalidade Indisponível",
-      description: "A edição de registros financeiros foi desabilitada. Use a aba Registros para gerenciar os dados.",
+      description: "A edição de registros financeiros foi desabilitada. Use a aba Boletos para gerenciar os dados.",
       variant: "destructive",
     });
   };
@@ -591,7 +599,7 @@ const Financial = () => {
   };
 
   // Novas funções para geração automática de parcelas
-  const verificarEGerarProximaParcela = async (alunoId: string, parcelaPaga: Boleto) => {
+  const verificarEGerarProximaParcela = async (alunoId: string, parcelaPaga: BoletoLegacy) => {
     try {
       const contratoAluno = contratos.find(c => c.aluno_id === alunoId);
       if (!contratoAluno) return;
@@ -875,6 +883,7 @@ const Financial = () => {
       <Tabs defaultValue="cobrancas" className="space-y-4">
         <TabsList>
           <TabsTrigger value="cobrancas">Cobranças de Alunos</TabsTrigger>
+          <TabsTrigger value="boletos">Boletos</TabsTrigger>
           <TabsTrigger value="operacional">Financeiro Operacional</TabsTrigger>
           <TabsTrigger value="registros">Registros</TabsTrigger>
           <TabsTrigger value="renovacao">Renovações</TabsTrigger>
@@ -1120,6 +1129,11 @@ const Financial = () => {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="boletos" className="space-y-4">
+          <BoletoManager />
+        </TabsContent>
 
         <TabsContent value="operacional" className="space-y-4">
           <div className="flex justify-between items-center">

@@ -30,14 +30,13 @@ const RenewalAlertsTable: React.FC = () => {
     try {
       setLoading(true);
       
-      // Buscar dados das parcelas com informações dos alunos
-      const { data: parcelas, error } = await supabase
-        .from('parcelas')
+      // Buscar dados dos registros financeiros com informações dos alunos
+      const { data: registrosFinanceiros, error } = await supabase
+        .from('financeiro_alunos')
         .select(`
           id,
           aluno_id,
-          data_criacao,
-          nome_aluno,
+          created_at,
           numero_parcelas_material,
           numero_parcelas_matricula,
           numero_parcelas_plano,
@@ -46,19 +45,22 @@ const RenewalAlertsTable: React.FC = () => {
           matricula_1x, matricula_2x, matricula_3x, matricula_4x, matricula_5x, matricula_6x,
           matricula_7x, matricula_8x, matricula_9x, matricula_10x, matricula_11x, matricula_12x,
           plano_1x, plano_2x, plano_3x, plano_4x, plano_5x, plano_6x,
-          plano_7x, plano_8x, plano_9x, plano_10x, plano_11x, plano_12x
+          plano_7x, plano_8x, plano_9x, plano_10x, plano_11x, plano_12x,
+          alunos!inner(
+            nome
+          )
         `);
 
       if (error) {
-        console.error('Erro ao buscar parcelas:', error);
+        console.error('Erro ao buscar registros financeiros:', error);
         return;
       }
 
       const renewalAlerts: RenewalAlert[] = [];
       const today = new Date();
 
-      parcelas?.forEach((parcela) => {
-        const dataCriacao = new Date(parcela.data_criacao);
+      registrosFinanceiros?.forEach((registro: any) => {
+        const dataCriacao = new Date(registro.created_at);
         const dataRenovacao = new Date(dataCriacao);
         dataRenovacao.setFullYear(dataRenovacao.getFullYear() + 1);
         
@@ -67,11 +69,11 @@ const RenewalAlertsTable: React.FC = () => {
         // Verificar apenas se faltam 30 dias ou menos para renovação
         if (diasParaRenovacao <= 30 && diasParaRenovacao >= 0) {
           // Verificar material
-          if (parcela.numero_parcelas_material > 0) {
+          if (registro.numero_parcelas_material > 0) {
             const materialParcelas = [
-              parcela.material_1x, parcela.material_2x, parcela.material_3x, parcela.material_4x,
-              parcela.material_5x, parcela.material_6x, parcela.material_7x, parcela.material_8x,
-              parcela.material_9x, parcela.material_10x, parcela.material_11x, parcela.material_12x
+              registro.material_1x, registro.material_2x, registro.material_3x, registro.material_4x,
+              registro.material_5x, registro.material_6x, registro.material_7x, registro.material_8x,
+              registro.material_9x, registro.material_10x, registro.material_11x, registro.material_12x
             ];
             
             let ultimaParcela = 0;
@@ -81,14 +83,14 @@ const RenewalAlertsTable: React.FC = () => {
               }
             }
             
-            if (ultimaParcela === parcela.numero_parcelas_material) {
+            if (ultimaParcela === registro.numero_parcelas_material) {
               renewalAlerts.push({
-                id: `${parcela.id}-material`,
-                aluno_id: parcela.aluno_id,
-                nome_aluno: parcela.nome_aluno,
+                id: `${registro.id}-material`,
+                aluno_id: registro.aluno_id,
+                nome_aluno: registro.alunos.nome,
                 tipo: 'material',
                 ultima_parcela: ultimaParcela,
-                data_criacao: parcela.data_criacao,
+                data_criacao: registro.created_at,
                 data_renovacao: dataRenovacao.toISOString().split('T')[0],
                 dias_para_renovacao: diasParaRenovacao
               });
@@ -96,11 +98,11 @@ const RenewalAlertsTable: React.FC = () => {
           }
           
           // Verificar matrícula
-          if (parcela.numero_parcelas_matricula > 0) {
+          if (registro.numero_parcelas_matricula > 0) {
             const matriculaParcelas = [
-              parcela.matricula_1x, parcela.matricula_2x, parcela.matricula_3x, parcela.matricula_4x,
-              parcela.matricula_5x, parcela.matricula_6x, parcela.matricula_7x, parcela.matricula_8x,
-              parcela.matricula_9x, parcela.matricula_10x, parcela.matricula_11x, parcela.matricula_12x
+              registro.matricula_1x, registro.matricula_2x, registro.matricula_3x, registro.matricula_4x,
+              registro.matricula_5x, registro.matricula_6x, registro.matricula_7x, registro.matricula_8x,
+              registro.matricula_9x, registro.matricula_10x, registro.matricula_11x, registro.matricula_12x
             ];
             
             let ultimaParcela = 0;
@@ -110,14 +112,14 @@ const RenewalAlertsTable: React.FC = () => {
               }
             }
             
-            if (ultimaParcela === parcela.numero_parcelas_matricula) {
+            if (ultimaParcela === registro.numero_parcelas_matricula) {
               renewalAlerts.push({
-                id: `${parcela.id}-matricula`,
-                aluno_id: parcela.aluno_id,
-                nome_aluno: parcela.nome_aluno,
+                id: `${registro.id}-matricula`,
+                aluno_id: registro.aluno_id,
+                nome_aluno: registro.alunos.nome,
                 tipo: 'matricula',
                 ultima_parcela: ultimaParcela,
-                data_criacao: parcela.data_criacao,
+                data_criacao: registro.created_at,
                 data_renovacao: dataRenovacao.toISOString().split('T')[0],
                 dias_para_renovacao: diasParaRenovacao
               });
@@ -125,11 +127,11 @@ const RenewalAlertsTable: React.FC = () => {
           }
           
           // Verificar plano
-          if (parcela.numero_parcelas_plano > 0) {
+          if (registro.numero_parcelas_plano > 0) {
             const planoParcelas = [
-              parcela.plano_1x, parcela.plano_2x, parcela.plano_3x, parcela.plano_4x,
-              parcela.plano_5x, parcela.plano_6x, parcela.plano_7x, parcela.plano_8x,
-              parcela.plano_9x, parcela.plano_10x, parcela.plano_11x, parcela.plano_12x
+              registro.plano_1x, registro.plano_2x, registro.plano_3x, registro.plano_4x,
+              registro.plano_5x, registro.plano_6x, registro.plano_7x, registro.plano_8x,
+              registro.plano_9x, registro.plano_10x, registro.plano_11x, registro.plano_12x
             ];
             
             let ultimaParcela = 0;
@@ -139,14 +141,14 @@ const RenewalAlertsTable: React.FC = () => {
               }
             }
             
-            if (ultimaParcela === parcela.numero_parcelas_plano) {
+            if (ultimaParcela === registro.numero_parcelas_plano) {
               renewalAlerts.push({
-                id: `${parcela.id}-plano`,
-                aluno_id: parcela.aluno_id,
-                nome_aluno: parcela.nome_aluno,
+                id: `${registro.id}-plano`,
+                aluno_id: registro.aluno_id,
+                nome_aluno: registro.alunos.nome,
                 tipo: 'plano',
                 ultima_parcela: ultimaParcela,
-                data_criacao: parcela.data_criacao,
+                data_criacao: registro.created_at,
                 data_renovacao: dataRenovacao.toISOString().split('T')[0],
                 dias_para_renovacao: diasParaRenovacao
               });
