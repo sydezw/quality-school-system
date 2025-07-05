@@ -25,48 +25,38 @@ const PlanRenewalAlerts = () => {
     try {
       setLoading(true);
       
-      // Buscar dados da tabela parcelas com informações do aluno
-      const { data: parcelasData, error } = await supabase
-        .from('parcelas')
+      // Buscar dados da tabela financeiro_alunos com informações do aluno
+      const { data: financialData, error } = await supabase
+        .from('financeiro_alunos')
         .select(`
           id,
           aluno_id,
-          nome_aluno,
-          data_criacao,
-          material_1x, material_2x, material_3x, material_4x, material_5x, material_6x,
-          material_7x, material_8x, material_9x, material_10x, material_11x, material_12x,
-          matricula_1x, matricula_2x, matricula_3x, matricula_4x, matricula_5x, matricula_6x,
-          matricula_7x, matricula_8x, matricula_9x, matricula_10x, matricula_11x, matricula_12x,
-          plano_1x, plano_2x, plano_3x, plano_4x, plano_5x, plano_6x,
-          plano_7x, plano_8x, plano_9x, plano_10x, plano_11x, plano_12x
+          numero_parcelas_material,
+          numero_parcelas_matricula,
+          numero_parcelas_plano,
+          created_at,
+          alunos(nome)
         `)
-        .order('data_criacao', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
       const alerts: PlanRenewalAlert[] = [];
 
-      parcelasData?.forEach((parcela) => {
-        // Verificar a última parcela para cada tipo (material, matrícula, plano)
-        const tipos = ['material', 'matricula', 'plano'];
+      financialData?.forEach((financial) => {
+        // Verificar cada tipo de pagamento (material, matrícula, plano)
+        const tipos = [
+          { nome: 'material', parcelas: financial.numero_parcelas_material },
+          { nome: 'matricula', parcelas: financial.numero_parcelas_matricula },
+          { nome: 'plano', parcelas: financial.numero_parcelas_plano }
+        ];
         
         tipos.forEach((tipo) => {
-          let ultimaParcela = 0;
-          
-          // Encontrar a última parcela com valor
-          for (let i = 12; i >= 1; i--) {
-            const coluna = `${tipo}_${i}x`;
-            if (parcela[coluna] && parcela[coluna] > 0) {
-              ultimaParcela = i;
-              break;
-            }
-          }
-          
-          // Se encontrou uma última parcela, calcular data de renovação
-          if (ultimaParcela > 0) {
-            const dataBase = new Date(parcela.data_criacao);
+          if (tipo.parcelas && tipo.parcelas > 0) {
+            // Calcular data de renovação (1 ano após a criação)
+            const dataBase = new Date(financial.created_at);
             const dataRenovacao = new Date(dataBase);
-            dataRenovacao.setMonth(dataRenovacao.getMonth() + 12); // 12 meses após a primeira parcela
+            dataRenovacao.setFullYear(dataRenovacao.getFullYear() + 1);
             
             const hoje = new Date();
             const diasParaRenovacao = Math.ceil((dataRenovacao.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
@@ -74,10 +64,10 @@ const PlanRenewalAlerts = () => {
             // Alertar quando faltam 30 dias ou menos para renovação
             if (diasParaRenovacao <= 30 && diasParaRenovacao >= 0) {
               alerts.push({
-                id: `${parcela.id}_${tipo}`,
-                nome_aluno: parcela.nome_aluno,
-                aluno_id: parcela.aluno_id,
-                ultima_parcela: ultimaParcela,
+                id: `${financial.id}_${tipo.nome}`,
+                nome_aluno: financial.alunos?.nome || 'Nome não encontrado',
+                aluno_id: financial.aluno_id,
+                ultima_parcela: tipo.parcelas,
                 data_renovacao: dataRenovacao.toISOString().split('T')[0],
                 dias_para_renovacao: diasParaRenovacao
               });

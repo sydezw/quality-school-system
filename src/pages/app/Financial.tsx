@@ -13,7 +13,7 @@ import { useFinancial } from '@/hooks/useFinancial';
 import FinancialDialogs from '@/components/financial/FinancialDialogs';
 import FinancialPlanDialog from '@/components/financial/FinancialPlanDialog';
 import RenewalAlertsTable from '@/components/financial/RenewalAlertsTable';
-import FinancialRecordsTable from '@/components/financial/FinancialRecordsTable';
+import FinancialRecordsTable from '@/components/Financial/FinancialRecordsTable';
 import { StatusAluno } from '@/types/financial';
 
 
@@ -449,20 +449,19 @@ const Financial = () => {
         
 
         
+        {/* Todos os diálogos foram movidos para o componente FinancialDialogs */}
+        <FinancialDialogs 
+          dialogState={dialogState}
+          setDialogState={setDialogState}
+          students={students}
+          planosGenericos={planosGenericos}
+          onSubmitBoleto={() => Promise.resolve()}
+          onSubmitDespesa={() => Promise.resolve()}
+          criarNovoPlano={() => Promise.resolve()}
+          criarParcelaAvulsa={() => Promise.resolve()}
+          openEditDespesaDialog={() => {}}
+        />
       </Tabs>
-      
-      {/* Todos os diálogos foram movidos para o componente FinancialDialogs */}
-      <FinancialDialogs 
-        dialogState={dialogState}
-        setDialogState={setDialogState}
-        students={students}
-        planosGenericos={planosGenericos}
-        onSubmitBoleto={() => Promise.resolve()}
-        onSubmitDespesa={() => Promise.resolve()}
-        criarNovoPlano={() => Promise.resolve()}
-        criarParcelaAvulsa={() => Promise.resolve()}
-        openEditDespesaDialog={() => {}}
-      />
     </div>
   );
 };

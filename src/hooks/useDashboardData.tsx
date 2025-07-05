@@ -62,26 +62,35 @@ export const useDashboardData = () => {
 
       if (contratosError) throw contratosError;
 
-      // Buscar boletos em atraso (inadimplentes)
-      const hoje = new Date().toISOString().split('T')[0];
-      const { data: boletosVencidos, error: boletosError } = await supabase
-        .from('boletos')
-        .select('*')
-        .eq('status', 'Pendente')
-        .lt('data_vencimento', hoje);
+      // Buscar registros financeiros para calcular inadimplentes e receitas
+      const { data: financeiros, error: financeirosError } = await supabase
+        .from('financeiro_alunos')
+        .select('*');
 
-      if (boletosError) throw boletosError;
+      if (financeirosError) throw financeirosError;
 
-      // Buscar receitas do mês atual (boletos pagos)
+      // Calcular boletos vencidos e receitas do mês
+      const hoje = new Date();
       const inicioMes = new Date();
       inicioMes.setDate(1);
-      const { data: receitasMes, error: receitasError } = await supabase
-        .from('boletos')
-        .select('valor')
-        .eq('status', 'Pago')
-        .gte('created_at', inicioMes.toISOString());
-
-      if (receitasError) throw receitasError;
+      
+      let boletosVencidosCount = 0;
+      let receitasMesTotal = 0;
+      
+      financeiros?.forEach(registro => {
+        const dataVencimento = new Date(registro.data_primeiro_vencimento);
+        const dataCriacao = new Date(registro.created_at);
+        
+        // Contar boletos vencidos (status não pago e data vencida)
+        if (registro.status_geral !== 'Pago' && dataVencimento < hoje) {
+          boletosVencidosCount++;
+        }
+        
+        // Somar receitas do mês (registros pagos criados no mês atual)
+        if (registro.status_geral === 'Pago' && dataCriacao >= inicioMes) {
+          receitasMesTotal += Number(registro.valor_total);
+        }
+      });
 
       // Buscar despesas para gráfico
       const { data: despesas, error: despesasError } = await supabase
@@ -91,16 +100,13 @@ export const useDashboardData = () => {
 
       if (despesasError) throw despesasError;
 
-      // Buscar receitas para gráfico
-      const { data: receitas, error: receitasGraficoError } = await supabase
-        .from('boletos')
-        .select('valor, created_at')
-        .eq('status', 'Pago')
-        .gte('created_at', new Date(new Date().getFullYear(), 0, 1).toISOString());
+      // Processar receitas do ano para o gráfico
+      const receitasAno = financeiros?.filter(registro => {
+        const dataCriacao = new Date(registro.created_at);
+        return registro.status_geral === 'Pago' && dataCriacao.getFullYear() === new Date().getFullYear();
+      }) || [];
 
-      if (receitasGraficoError) throw receitasGraficoError;
-
-      console.log('Receitas encontradas:', receitas?.length);
+      console.log('Receitas encontradas:', receitasAno?.length);
       console.log('Despesas encontradas:', despesas?.length);
 
       // Processar dados para alunos por idioma
@@ -120,10 +126,10 @@ export const useDashboardData = () => {
       const anoAtual = new Date().getFullYear();
       
       for (let mes = 0; mes < 12; mes++) {
-        const receitasMesCalc = receitas?.filter(r => {
+        const receitasMesCalc = receitasAno?.filter(r => {
           const dataReceita = new Date(r.created_at);
           return dataReceita.getMonth() === mes && dataReceita.getFullYear() === anoAtual;
-        }).reduce((sum, r) => sum + Number(r.valor), 0) || 0;
+        }).reduce((sum, r) => sum + Number(r.valor_total), 0) || 0;
 
         const despesasMes = despesas?.filter(d => {
           const dataDespesa = new Date(d.data);
@@ -140,14 +146,11 @@ export const useDashboardData = () => {
 
       console.log('Dados processados do gráfico:', receitasDespesas);
 
-      // Calcular faturamento do mês
-      const faturamentoMes = receitasMes?.reduce((sum, boleto) => sum + Number(boleto.valor), 0) || 0;
-
       setDashboardData({
         totalAlunos: alunos?.length || 0,
         totalTurmas: turmas?.length || 0,
-        faturamentoMes,
-        inadimplentes: boletosVencidos?.length || 0,
+        faturamentoMes: receitasMesTotal,
+        inadimplentes: boletosVencidosCount,
         professoresAtivos: professores?.length || 0,
         contratosAtivos: contratos?.length || 0,
         receitasDespesas,
@@ -170,17 +173,17 @@ export const useDashboardData = () => {
     fetchDashboardData();
 
     // Configurar real-time subscriptions
-    const boletosChannel = supabase
-      .channel('boletos-changes')
+    const financeirosChannel = supabase
+      .channel('financeiros-changes')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'boletos'
+          table: 'financeiro_alunos'
         },
         () => {
-          console.log('Mudança detectada na tabela boletos, atualizando dashboard...');
+          console.log('Mudança detectada na tabela financeiro_alunos, atualizando dashboard...');
           fetchDashboardData();
         }
       )
@@ -203,7 +206,7 @@ export const useDashboardData = () => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(boletosChannel);
+      supabase.removeChannel(financeirosChannel);
       supabase.removeChannel(despesasChannel);
     };
   }, []);
