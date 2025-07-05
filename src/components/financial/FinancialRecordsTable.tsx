@@ -10,8 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Edit, Trash2, Search, Filter, Undo2 } from 'lucide-react';
+import { Edit, Trash2, Search, Filter, Undo2, Plus } from 'lucide-react';
 import { useForm } from 'react-hook-form';
+import FinancialPlanDialog from './FinancialPlanDialog';
 
 interface FinanceiroAluno {
   id: string;
@@ -61,6 +62,7 @@ const FinancialRecordsTable = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [undoRecord, setUndoRecord] = useState<FinanceiroAluno | null>(null);
   const [showUndoToast, setShowUndoToast] = useState(false);
+  const [isFinancialPlanDialogOpen, setIsFinancialPlanDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const { register, handleSubmit, reset, setValue, watch } = useForm();
@@ -389,7 +391,16 @@ const FinancialRecordsTable = () => {
       {/* Tabela de Registros */}
       <Card>
         <CardHeader>
-          <CardTitle>Registros Financeiros ({filteredRegistros.length})</CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle>Registros Financeiros ({filteredRegistros.length})</CardTitle>
+            <Button
+              onClick={() => setIsFinancialPlanDialogOpen(true)}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Criar Plano de Pagamento
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {filteredRegistros.length === 0 ? (
@@ -740,6 +751,19 @@ const FinancialRecordsTable = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog de Criação de Plano Financeiro */}
+      <FinancialPlanDialog
+        isOpen={isFinancialPlanDialogOpen}
+        onOpenChange={setIsFinancialPlanDialogOpen}
+        onSuccess={() => {
+          fetchData();
+          toast({
+            title: "Sucesso",
+            description: "Plano financeiro criado com sucesso!",
+          });
+        }}
+      />
     </div>
   );
 };

@@ -1,0 +1,386 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { useForm } from 'react-hook-form';
+import {
+  Boleto,
+  Despesa,
+  Student,
+  AlunoFinanceiro,
+  HistoricoPagamento,
+  PlanoGenerico,
+  ContratoAluno,
+  ProgressoParcelas,
+  StatusAluno,
+  FinancialState,
+  DialogState
+} from '@/types/financial';
+
+export const useFinancial = () => {
+  const { toast } = useToast();
+
+  // Estados principais
+  const [state, setState] = useState<FinancialState>({
+    boletos: [],
+    despesas: [],
+    students: [],
+    alunosFinanceiros: [],
+    historicoPagamentos: [],
+    planosGenericos: [],
+    contratos: [],
+    loading: true,
+    filtroStatus: 'todos',
+    viewMode: 'ggrupauoado',
+    expandedAlunos: new Set<string>(),
+    expandedToggles: {}
+  });
+
+  // Estados dos dialogs
+  const [dialogState, setDialogState] = useState<DialogState>({
+    isBoletoDialogOpen: false,
+    isDespesaDialogOpen: false,
+    isNovoPlanoDialogOpen: false,
+    isParcelaAvulsaDialogOpen: false,
+    editingBoleto: null,
+    editingDespesa: null,
+    alunoSelecionadoParcela: null
+  });
+
+  // Forms removidos conforme solicitado
+
+  // Funções de fetch
+  const fetchBoletos = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('financeiro_alunos')
+        .select(`
+          *,
+          alunos (nome),
+          planos (nome)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      const boletosConvertidos = data?.map(registro => ({
+        id: registro.id,
+        aluno_id: registro.aluno_id,
+        data_vencimento: registro.data_primeiro_vencimento,
+        valor: registro.valor_total,
+        status: registro.status_geral === 'Pago' ? 'Pago' : 'Pendente',
+        descricao: `Plano: ${registro.planos?.nome || 'N/A'}`,
+        link_pagamento: null,
+        data_pagamento: null,
+        metodo_pagamento: registro.forma_pagamento_plano,
+        observacoes: null,
+        numero_parcela: 1,
+        contrato_id: null,
+        alunos: registro.alunos
+      })) || [];
+      
+      setState(prev => ({ ...prev, boletos: boletosConvertidos }));
+    } catch (error) {
+      console.error('Erro ao buscar registros financeiros:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar os registros financeiros.",
+        variant: "destructive",
+      });
+    } finally {
+      setState(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const fetchDespesas = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('despesas')
+        .select('*')
+        .order('data', { ascending: false });
+
+      if (error) throw error;
+      setState(prev => ({ ...prev, despesas: data || [] }));
+    } catch (error) {
+      console.error('Erro ao buscar despesas:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar as despesas.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const fetchStudents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('alunos')
+        .select('id, nome')
+        .eq('status', 'Ativo')
+        .order('nome');
+
+      if (error) throw error;
+      setState(prev => ({ ...prev, students: data || [] }));
+    } catch (error) {
+      console.error('Erro ao buscar alunos:', error);
+    }
+  };
+
+  const fetchHistoricoPagamentos = async () => {
+    try {
+      setState(prev => ({ ...prev, historicoPagamentos: [] }));
+    } catch (error) {
+      console.error('Erro ao buscar histórico de pagamentos:', error);
+      setState(prev => ({ ...prev, historicoPagamentos: [] }));
+    }
+  };
+
+  const fetchContratos = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('contratos')
+        .select('*')
+        .eq('status', 'Ativo')
+        .order('data_inicio', { ascending: false });
+
+      if (error) throw error;
+      setState(prev => ({ ...prev, contratos: data || [] }));
+    } catch (error) {
+      console.error('Erro ao buscar contratos:', error);
+      setState(prev => ({ ...prev, contratos: [] }));
+    }
+  };
+
+  const fetchPlanos = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('planos')
+        .select('id, nome, valor_total, valor_por_aula, descricao')
+        .eq('ativo', true)
+        .order('nome');
+
+      if (error) throw error;
+      setState(prev => ({ ...prev, planosGenericos: data || [] }));
+    } catch (error) {
+      console.error('Erro ao buscar planos:', error);
+      setState(prev => ({ ...prev, planosGenericos: [] }));
+    }
+  };
+
+  // Função para processar alunos financeiros
+  const processarAlunosFinanceiros = () => {
+    const alunosMap = new Map<string, AlunoFinanceiro>();
+    
+    state.students.forEach(student => {
+      alunosMap.set(student.id, {
+        id: student.id,
+        nome: student.nome,
+        boletos: [],
+        totalDividas: 0,
+        boletosVencidos: 0,
+        ultimoPagamento: undefined,
+        historicoPagamentos: []
+      });
+    });
+
+    state.boletos.forEach(boleto => {
+      const aluno = alunosMap.get(boleto.aluno_id);
+      if (aluno) {
+        aluno.boletos.push(boleto);
+        
+        if (boleto.status !== 'Pago') {
+          aluno.totalDividas += boleto.valor;
+          
+          const hoje = new Date();
+          const vencimento = new Date(boleto.data_vencimento);
+          if (vencimento < hoje) {
+            aluno.boletosVencidos++;
+          }
+        }
+      }
+    });
+
+    state.historicoPagamentos.forEach(historico => {
+      const aluno = alunosMap.get(historico.aluno_id);
+      if (aluno) {
+        aluno.historicoPagamentos.push(historico);
+        
+        if (!aluno.ultimoPagamento || new Date(historico.data_pagamento) > new Date(aluno.ultimoPagamento)) {
+          aluno.ultimoPagamento = historico.data_pagamento;
+        }
+      }
+    });
+
+    const alunosComDados = Array.from(alunosMap.values())
+      .filter(aluno => aluno.boletos.length > 0 || aluno.historicoPagamentos.length > 0)
+      .sort((a, b) => a.nome.localeCompare(b.nome));
+
+    setState(prev => ({ ...prev, alunosFinanceiros: alunosComDados }));
+  };
+
+  // Funções auxiliares
+  const calcularProgressoParcelas = (alunoId: string): ProgressoParcelas => {
+    const boletosAluno = state.boletos.filter(b => b.aluno_id === alunoId);
+    const contratoAluno = state.contratos.find(c => c.aluno_id === alunoId);
+    
+    const totalParcelas = boletosAluno.length;
+    const parcelasPagas = boletosAluno.filter(b => b.status === 'Pago').length;
+    const valorTotalPlano = contratoAluno ? contratoAluno.valor_mensalidade * totalParcelas : boletosAluno.reduce((sum, b) => sum + b.valor, 0);
+    const valorPago = boletosAluno.filter(b => b.status === 'Pago').reduce((sum, b) => sum + b.valor, 0);
+    const percentualProgresso = totalParcelas > 0 ? (parcelasPagas / totalParcelas) * 100 : 0;
+    
+    return {
+      total: totalParcelas,
+      pagas: parcelasPagas,
+      percentual: percentualProgresso,
+      valor_total: valorTotalPlano,
+      valor_pago: valorPago
+    };
+  };
+
+  const obterStatusAluno = (alunoId: string): StatusAluno => {
+    const boletosAluno = state.boletos.filter(b => b.aluno_id === alunoId);
+    const hoje = new Date();
+    
+    const boletosVencidos = boletosAluno.filter(b => {
+      const vencimento = new Date(b.data_vencimento);
+      return b.status !== 'Pago' && vencimento < hoje;
+    });
+    
+    const boletosPendentes = boletosAluno.filter(b => b.status === 'Pendente');
+    
+    if (boletosVencidos.length > 0) {
+      return 'Inadimplente';
+    }
+    
+    if (boletosPendentes.length > 0) {
+      return 'Atrasado';
+    }
+    
+    return 'Em dia';
+  };
+
+  const obterPlanoAluno = (alunoId: string): string => {
+    const contratoAluno = state.contratos.find(c => c.aluno_id === alunoId);
+    if (contratoAluno && contratoAluno.plano_nome) {
+      return contratoAluno.plano_nome;
+    }
+    
+    if (contratoAluno) {
+      const valorMensal = contratoAluno.valor_mensalidade;
+      if (valorMensal <= 100) return 'Plano Básico';
+      if (valorMensal <= 150) return 'Plano Intermediário';
+      return 'Plano Avançado';
+    }
+    
+    return 'Plano não definido';
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Pago': return 'bg-green-100 text-green-800';
+      case 'Pendente': return 'bg-yellow-100 text-yellow-800';
+      case 'Vencido': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  // Ações
+  const marcarComoPago = async (boletoId: string, metodo: string = 'Dinheiro') => {
+    try {
+      const { data: registro, error: registroError } = await supabase
+        .from('financeiro_alunos')
+        .select('*')
+        .eq('id', boletoId)
+        .single();
+
+      if (registroError) throw registroError;
+
+      const dataAtual = new Date().toISOString().split('T')[0];
+
+      const { error: updateError } = await supabase
+        .from('financeiro_alunos')
+        .update({
+          status: 'Pago',
+          data_pagamento: dataAtual,
+          metodo_pagamento: metodo
+        })
+        .eq('id', boletoId);
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "Sucesso",
+        description: "Registro marcado como pago!",
+      });
+
+      setTimeout(async () => {
+        await Promise.all([
+          fetchBoletos(),
+          fetchStudents(),
+          fetchHistoricoPagamentos()
+        ]);
+      }, 300);
+    } catch (error) {
+      console.error('Erro ao marcar como pago:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível marcar o registro como pago.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const refreshData = async () => {
+    setState(prev => ({ ...prev, loading: true }));
+    await Promise.all([
+      fetchBoletos(),
+      fetchDespesas(),
+      fetchStudents(),
+      fetchHistoricoPagamentos(),
+      fetchContratos(),
+      fetchPlanos()
+    ]);
+  };
+
+  // Effects
+  useEffect(() => {
+    refreshData();
+  }, []);
+
+  useEffect(() => {
+    if (state.boletos.length > 0 && state.students.length > 0) {
+      processarAlunosFinanceiros();
+    }
+  }, [state.boletos, state.students, state.historicoPagamentos]);
+
+  return {
+    // Estados
+    state,
+    setState,
+    dialogState,
+    setDialogState,
+    
+    // Forms removidos
+    
+    // Funções de fetch
+    fetchBoletos,
+    fetchDespesas,
+    fetchStudents,
+    fetchHistoricoPagamentos,
+    fetchContratos,
+    fetchPlanos,
+    refreshData,
+    
+    // Funções auxiliares
+    calcularProgressoParcelas,
+    obterStatusAluno,
+    obterPlanoAluno,
+    getStatusColor,
+    
+    // Ações
+    marcarComoPago,
+    
+    // Toast
+    toast
+  };
+};
