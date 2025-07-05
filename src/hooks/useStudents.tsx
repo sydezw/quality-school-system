@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Student } from '@/integrations/supabase/types';
-import { DeletionPlan } from '@/components/shared/AdvancedDeleteDialog';
+// Remover esta linha:
+// import { DeletionPlan } from '@/components/shared/AdvancedDeleteDialog';
 
 interface Class {
   id: string;
@@ -20,33 +21,29 @@ export const useStudents = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
 
-  const fetchStudents = async () => {
+  const fetchStudents = async (includeArchived = false) => {
     try {
-      const { data, error } = await supabase
+      setLoading(true);
+      
+      let query = supabase
         .from('alunos')
         .select(`
           *,
-          turmas (nome),
-          responsaveis (nome)
-        `)
-        .order('nome');
-
+          turmas(nome, idioma, nivel),
+          responsaveis(nome, telefone)
+        `);
+      
+      if (!includeArchived) {
+        // Mostrar apenas alunos ativos e trancados (não inativos)
+        query = query.in('status', ['Ativo', 'Trancado']);
+      }
+      
+      const { data, error } = await query.order('nome');
+      
       if (error) throw error;
-
-      // Ajuste: converter data_nascimento de string para Date | null
-      const mapped = (data || []).map((aluno: any) => ({
-        ...aluno,
-        data_nascimento: aluno.data_nascimento ? new Date(aluno.data_nascimento) : null,
-      }));
-
-      setStudents(mapped);
+      setStudents(data || []);
     } catch (error) {
       console.error('Erro ao buscar alunos:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar os alunos.",
-        variant: "destructive",
-      });
     } finally {
       setLoading(false);
     }
@@ -117,52 +114,169 @@ export const useStudents = () => {
     }
   };
 
-  const deleteStudentWithPlan = async (student: Student, plan: DeletionPlan) => {
-    setIsDeleting(true);
+  const deleteStudentWithPlan = async (student: Student, deleteOptions?: {
+    deleteType: 'soft' | 'hard';
+    deleteFinancialRecords?: boolean;
+    deleteContracts?: boolean;
+    deleteBoletos?: boolean;
+    deletePresences?: boolean;
+  }) => {
     try {
-      // Primeiro, aplicar as regras do plano de exclusão
-      // Para dados que devem ser mantidos (SET NULL), não fazemos nada especial
-      // pois as constraints do banco já estão configuradas
+      setIsDeleting(true);
       
-      // Para dados que devem ser excluídos (CASCADE), também não precisamos
-      // fazer nada especial pois as constraints estão configuradas
-      
-      // A exclusão do aluno vai respeitar as constraints do banco
-      const { error } = await supabase
-        .from('alunos')
-        .delete()
-        .eq('id', student.id);
-
-      if (error) {
-        // Se houver erro de constraint, explicar ao usuário
-        if (error.code === '23503') {
-          toast({
-            title: "Erro de Dependência",
-            description: "Não foi possível excluir o aluno devido a registros relacionados. Verifique se existem dados que impedem a exclusão.",
-            variant: "destructive",
-          });
-        } else {
-          throw error;
+      if (deleteOptions?.deleteType === 'hard') {
+        // HARD DELETE: Excluir tudo em cascade permanentemente
+        
+        // Excluir contratos (não tem CASCADE)
+        const { error: contratosError } = await supabase
+          .from('contratos')
+          .delete()
+          .eq('aluno_id', student.id);
+        
+        if (contratosError) {
+          console.error('Erro ao excluir contratos:', contratosError);
+          throw contratosError;
         }
-        return false;
+        
+        // Excluir boletos (não tem CASCADE)
+        const { error: boletosError } = await supabase
+          .from('boletos')
+          .delete()
+          .eq('aluno_id', student.id);
+        
+        if (boletosError) {
+          console.error('Erro ao excluir boletos:', boletosError);
+          throw boletosError;
+        }
+        
+        // Excluir avaliações (não tem CASCADE)
+        const { error: avaliacoesError } = await supabase
+          .from('avaliacoes')
+          .delete()
+          .eq('aluno_id', student.id);
+        
+        if (avaliacoesError) {
+          console.error('Erro ao excluir avaliações:', avaliacoesError);
+          throw avaliacoesError;
+        }
+        
+        // Agora excluir o aluno - as tabelas com CASCADE serão excluídas automaticamente
+        const { error: deleteError } = await supabase
+          .from('alunos')
+          .delete()
+          .eq('id', student.id);
+        
+        if (deleteError) {
+          console.error('Erro ao excluir aluno permanentemente:', deleteError);
+          throw deleteError;
+        }
+        
+        toast({
+          title: "Aluno excluído permanentemente",
+          description: `${student.nome} e todos os registros relacionados foram removidos permanentemente do sistema.`,
+        });
+        
+      } else {
+        // SOFT DELETE: Marcar aluno como inativo, mas permitir excluir registros selecionados permanentemente
+        
+        // Primeiro, excluir registros relacionados selecionados permanentemente
+        if (deleteOptions?.deleteFinancialRecords) {
+          const { error: financeiroError } = await supabase
+            .from('financeiro_alunos')
+            .delete()
+            .eq('aluno_id', student.id);
+          
+          if (financeiroError) {
+            console.error('Erro ao excluir registros financeiros:', financeiroError);
+            throw financeiroError;
+          }
+        }
+        
+        if (deleteOptions?.deleteBoletos) {
+          const { error: boletosError } = await supabase
+            .from('boletos')
+            .delete()
+            .eq('aluno_id', student.id);
+          
+          if (boletosError) {
+            console.error('Erro ao excluir boletos:', boletosError);
+            throw boletosError;
+          }
+        }
+        
+        if (deleteOptions?.deleteContracts) {
+          const { error: contratosError } = await supabase
+            .from('contratos')
+            .delete()
+            .eq('aluno_id', student.id);
+          
+          if (contratosError) {
+            console.error('Erro ao excluir contratos:', contratosError);
+            throw contratosError;
+          }
+        }
+        
+        if (deleteOptions?.deletePresences) {
+          const { error: presencasError } = await supabase
+            .from('presencas')
+            .delete()
+            .eq('aluno_id', student.id);
+          
+          if (presencasError) {
+            console.error('Erro ao excluir presenças:', presencasError);
+            throw presencasError;
+          }
+        }
+        
+        // Agora fazer soft delete do aluno (marcar como inativo)
+        const { error: softDeleteError } = await supabase
+          .from('alunos')
+          .update({
+            status: 'Inativo',
+            data_exclusao: new Date().toISOString()
+          })
+          .eq('id', student.id);
+        
+        if (softDeleteError) {
+          console.error('Erro ao fazer soft delete do aluno:', softDeleteError);
+          throw softDeleteError;
+        }
+        
+        const deletedRecords = [];
+        if (deleteOptions?.deleteFinancialRecords) deletedRecords.push('registros financeiros');
+        if (deleteOptions?.deleteBoletos) deletedRecords.push('boletos');
+        if (deleteOptions?.deleteContracts) deletedRecords.push('contratos');
+        if (deleteOptions?.deletePresences) deletedRecords.push('presenças');
+        
+        const deletedText = deletedRecords.length > 0 
+          ? ` Os seguintes registros foram excluídos permanentemente: ${deletedRecords.join(', ')}.`
+          : '';
+        
+        toast({
+          title: "Aluno arquivado",
+          description: `${student.nome} foi marcado como inativo e pode ser restaurado posteriormente.${deletedText}`,
+        });
       }
-
-      toast({
-        title: "Sucesso",
-        description: `Aluno ${student.nome} foi excluído com sucesso!`,
-      });
       
       // Atualizar a lista de alunos
       await fetchStudents();
-      return true;
-    } catch (error) {
-      console.error('Erro ao excluir aluno:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível excluir o aluno. Tente novamente.",
-        variant: "destructive",
-      });
-      return false;
+      
+    } catch (error: any) {
+      console.error('Erro na exclusão do aluno:', error);
+      
+      if (error.code === '23503') {
+        toast({
+          title: "Erro de dependência",
+          description: "Este aluno possui registros relacionados que impedem a exclusão. Verifique as opções de exclusão.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Erro ao excluir aluno",
+          description: error.message || "Ocorreu um erro inesperado.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsDeleting(false);
     }

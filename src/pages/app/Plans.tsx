@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Plus, Search, Edit, Trash2, Users, Clock, BookOpen, CheckCircle, XCircle } from 'lucide-react';
@@ -10,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import PlanForm from '@/components/plans/PlanForm';
 import PlanStudentsModal from '@/components/plans/PlanStudentsModal';
+
 
 interface Plan {
   id: string;
@@ -25,6 +27,7 @@ interface Plan {
   permite_parcelamento: boolean;
   observacoes: string | null;
   ativo: boolean;
+  idioma: 'Inglês' | 'Japonês'; // Mudança aqui também
   created_at: string;
   updated_at: string;
 }
@@ -42,6 +45,7 @@ const Plans = () => {
   const [showStudentsModal, setShowStudentsModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [studentCounts, setStudentCounts] = useState<Record<string, number>>({});
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('todos');
   
   const { toast } = useToast();
 
@@ -61,16 +65,22 @@ const Plans = () => {
 
   useEffect(() => {
     try {
-      const filtered = plans.filter(plan =>
+      let filtered = plans.filter(plan =>
         plan.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
         plan.descricao.toLowerCase().includes(searchTerm.toLowerCase())
       );
+      
+      // Filtrar por idioma
+      if (selectedLanguage !== 'todos') {
+        filtered = filtered.filter(plan => plan.idioma === selectedLanguage);
+      }
+      
       setFilteredPlans(filtered);
     } catch (err) {
       console.error('Erro ao filtrar planos:', err);
       setFilteredPlans(plans);
     }
-  }, [plans, searchTerm]);
+  }, [plans, searchTerm, selectedLanguage]);
 
   const fetchPlans = async () => {
     try {
@@ -217,14 +227,28 @@ const Plans = () => {
         </Button>
       </div>
 
-      <div className="flex items-center space-x-2">
-        <Search className="h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar planos..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-sm"
-        />
+      <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar planos..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="max-w-sm"
+          />
+        </div>
+        
+        {/* Filtro por idioma */}
+        <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Filtrar por idioma" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos os idiomas</SelectItem>
+            <SelectItem value="Inglês">Inglês</SelectItem>
+            <SelectItem value="Japonês">Japonês</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {loading ? (
@@ -265,6 +289,9 @@ const Plans = () => {
                 <div className="flex justify-between items-start">
                   <CardTitle className="text-lg line-clamp-2">{plan.nome}</CardTitle>
                   <div className="flex items-center gap-1">
+                    <Badge variant="outline" className="text-xs mr-1">
+                      {plan.idioma}
+                    </Badge>
                     {plan.ativo ? (
                       <Badge variant="default" className="text-xs">
                         <CheckCircle className="w-3 h-3 mr-1" />

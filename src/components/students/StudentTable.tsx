@@ -12,17 +12,17 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { AdvancedDeleteDialog, DeletionPlan } from '@/components/shared/AdvancedDeleteDialog';
+import AdvancedStudentDeleteDialog from './AdvancedStudentDeleteDialog';
 
 interface StudentTableProps {
   students: Student[];
   onEdit: (student: Student) => void;
-  onDelete?: (student: Student, plan: DeletionPlan) => void;
+  onDelete?: (student: Student, hardDeleteOptions?: any) => void;
   onCreateFinancialPlan?: (student: Student) => void;
   isDeleting?: boolean;
 }
 
-const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, isDeleting = false }: StudentTableProps) => {
+const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, isDeleting }: StudentTableProps) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
 
@@ -31,19 +31,24 @@ const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, isDel
     setDeleteDialogOpen(true);
   };
 
-  const handleDeleteConfirm = (plan: DeletionPlan) => {
+  const handleDeleteConfirm = (hardDeleteOptions?: any) => {
     if (studentToDelete && onDelete) {
-      onDelete(studentToDelete, plan);
+      onDelete(studentToDelete, hardDeleteOptions);
       setDeleteDialogOpen(false);
       setStudentToDelete(null);
     }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setStudentToDelete(null);
   };
   
   const getStatusColor = (student: Student) => {
     switch (student.status) {
       case 'Ativo': return 'bg-green-100 text-green-800';
       case 'Trancado': return 'bg-yellow-100 text-yellow-800';
-      case 'Cancelado': return 'bg-red-100 text-red-800';
+      case 'Inativo': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -58,85 +63,85 @@ const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, isDel
   }
 
   return (
-    <>
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Nome</TableHead>
-          <TableHead>CPF</TableHead>
-          <TableHead>Idioma</TableHead>
-          <TableHead>Turma</TableHead>
-          <TableHead>Responsável</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Contato</TableHead>
-          <TableHead>Ações</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {students.map((student) => (
-          <TableRow key={student.id}>
-            <TableCell className="font-medium">{student.nome}</TableCell>
-            <TableCell>{student.cpf || 'Não informado'}</TableCell>
-            <TableCell>{student.idioma}</TableCell>
-            <TableCell>{student.turmas?.nome || 'Sem turma'}</TableCell>
-            <TableCell>{student.responsaveis?.nome || 'Sem responsável'}</TableCell>
-            <TableCell>
-              <Badge className={getStatusColor(student)}>
-                {student.status}
-              </Badge>
-            </TableCell>
-            <TableCell>
-              <div className="text-sm">
-                {student.telefone && <div>{student.telefone}</div>}
-                {student.email && <div className="text-gray-500">{student.email}</div>}
-              </div>
-            </TableCell>
-            <TableCell>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onEdit(student)}
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
-                {onCreateFinancialPlan && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onCreateFinancialPlan(student)}
-                    className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                    title="Criar Plano Financeiro"
-                  >
-                    <DollarSign className="h-4 w-4" />
-                  </Button>
-                )}
-                {onDelete && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDeleteClick(student)}
-                    disabled={isDeleting}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            </TableCell>
+    <div className="space-y-4">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Nome</TableHead>
+            <TableHead>CPF</TableHead>
+            <TableHead>Idioma</TableHead>
+            <TableHead>Turma</TableHead>
+            <TableHead>Responsável</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Contato</TableHead>
+            <TableHead>Ações</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-    
-    <AdvancedDeleteDialog
-      open={deleteDialogOpen}
-      onOpenChange={setDeleteDialogOpen}
-      entityType="student"
-      entityName={studentToDelete?.nome || ''}
-      onConfirm={handleDeleteConfirm}
-      isLoading={isDeleting}
-    />
-  </>);
+        </TableHeader>
+        <TableBody>
+          {students.map((student) => (
+            <TableRow key={student.id}>
+              <TableCell className="font-medium">{student.nome}</TableCell>
+              <TableCell>{student.cpf || 'Não informado'}</TableCell>
+              <TableCell>{student.idioma}</TableCell>
+              <TableCell>{student.turmas?.nome || 'Sem turma'}</TableCell>
+              <TableCell>{student.responsaveis?.nome || 'Sem responsável'}</TableCell>
+              <TableCell>
+                <Badge className={getStatusColor(student)}>
+                  {student.status}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <div className="text-sm">
+                  {student.telefone && <div>{student.telefone}</div>}
+                  {student.email && <div className="text-gray-500">{student.email}</div>}
+                </div>
+              </TableCell>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onEdit(student)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  {onCreateFinancialPlan && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onCreateFinancialPlan(student)}
+                      className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                      title="Criar Plano Financeiro"
+                    >
+                      <DollarSign className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {onDelete && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteClick(student)}
+                      disabled={isDeleting}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      
+      <AdvancedStudentDeleteDialog
+        student={studentToDelete}
+        isOpen={deleteDialogOpen}
+        onClose={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        isLoading={isDeleting}
+      />
+    </div>
+  );
 };
 
 export default StudentTable;

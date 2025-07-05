@@ -23,6 +23,7 @@ interface Plan {
   permite_parcelamento: boolean;
   observacoes: string | null;
   ativo: boolean;
+  idioma: 'Inglês' | 'Japonês'; // Mudança aqui: de string para union type
 }
 
 interface PlanFormProps {
@@ -38,6 +39,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
     descricao: '',
     numero_aulas: 1,
     frequencia_aulas: 'semanal',
+    idioma: 'Inglês' as 'Inglês' | 'Japonês', // Type assertion aqui também
     carga_horaria_total: '',
     valor_total: '',
     valor_por_aula: '',
@@ -76,6 +78,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
         descricao: plan.descricao,
         numero_aulas: plan.numero_aulas,
         frequencia_aulas: plan.frequencia_aulas,
+        idioma: plan.idioma || 'Inglês', // Novo campo
         carga_horaria_total: plan.carga_horaria_total?.toString() || '',
         valor_total: plan.valor_total?.toString() || '',
         valor_por_aula: plan.valor_por_aula?.toString() || '',
@@ -161,6 +164,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
         descricao: formData.descricao,
         numero_aulas: numeroAulas,
         frequencia_aulas: formData.frequencia_aulas,
+        idioma: formData.idioma, // Novo campo
         carga_horaria_total: cargaHorariaTotal,
         valor_total: valorTotal,
         valor_por_aula: valorPorAula,
@@ -223,6 +227,19 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
             onChange={(e) => handleInputChange('nome', e.target.value)}
             required
           />
+        </div>
+
+        <div>
+          <Label htmlFor="idioma">Idioma</Label>
+          <Select value={formData.idioma} onValueChange={(value) => handleInputChange('idioma', value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione o idioma" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Inglês">Inglês</SelectItem>
+              <SelectItem value="Japonês">Japonês</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div>

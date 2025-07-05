@@ -10,17 +10,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Edit } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Contract } from '@/hooks/useContracts';
 
-interface Contract {
-  id: string;
-  aluno_id: string;
-  aluno_nome: string;
-  data_inicio: string;
-  data_fim: string;
-  valor_mensalidade: number;
-  status: 'Ativo' | 'Trancado' | 'Cancelado' | 'Encerrado';
-  observacao?: string;
-}
+
 
 interface EditContractDialogProps {
   contract: Contract;
@@ -36,7 +28,7 @@ export const EditContractDialog = ({ contract, onContractUpdated }: EditContract
     data_inicio: contract.data_inicio,
     data_fim: contract.data_fim,
     valor_mensalidade: contract.valor_mensalidade.toString(),
-    status: contract.status as 'Ativo' | 'Trancado' | 'Cancelado' | 'Encerrado',
+    status: contract.status_contrato as 'Ativo' | 'Agendado' | 'Vencendo' | 'Vencido' | 'Cancelado', // ✅ Usar status_contrato
     observacao: contract.observacao || ''
   });
   const { toast } = useToast();
@@ -71,7 +63,7 @@ export const EditContractDialog = ({ contract, onContractUpdated }: EditContract
         data_inicio: contract.data_inicio,
         data_fim: contract.data_fim,
         valor_mensalidade: contract.valor_mensalidade.toString(),
-        status: contract.status as 'Ativo' | 'Trancado' | 'Cancelado' | 'Encerrado',
+        status: contract.status_contrato as 'Ativo' | 'Agendado' | 'Vencendo' | 'Vencido' | 'Cancelado', // ✅ Usar status_contrato
         observacao: contract.observacao || ''
       });
     }
@@ -99,7 +91,7 @@ export const EditContractDialog = ({ contract, onContractUpdated }: EditContract
           data_inicio: formData.data_inicio,
           data_fim: formData.data_fim,
           valor_mensalidade: parseFloat(formData.valor_mensalidade),
-          status: formData.status,
+          status_contrato: formData.status,
           observacao: formData.observacao || null
         })
         .eq('id', contract.id);
@@ -194,14 +186,15 @@ export const EditContractDialog = ({ contract, onContractUpdated }: EditContract
 
           <div className="space-y-2">
             <Label htmlFor="status">Status *</Label>
-            <Select value={formData.status} onValueChange={(value: 'Ativo' | 'Trancado' | 'Cancelado' | 'Encerrado') => setFormData(prev => ({ ...prev, status: value }))}>
+            <Select value={formData.status} onValueChange={(value: 'Ativo' | 'Agendado' | 'Vencendo' | 'Vencido' | 'Cancelado') => setFormData(prev => ({ ...prev, status: value }))}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione o status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Ativo">Ativo</SelectItem>
-                <SelectItem value="Encerrado">Encerrado</SelectItem>
-                <SelectItem value="Trancado">Trancado</SelectItem>
+                <SelectItem value="Agendado">Agendado</SelectItem>
+                <SelectItem value="Vencendo">Vencendo</SelectItem>
+                <SelectItem value="Vencido">Vencido</SelectItem>
                 <SelectItem value="Cancelado">Cancelado</SelectItem>
               </SelectContent>
             </Select>
@@ -231,3 +224,6 @@ export const EditContractDialog = ({ contract, onContractUpdated }: EditContract
     </Dialog>
   );
 };
+
+// Remove a interface Contract local (linha 14-22)
+// E use a importada do useContracts

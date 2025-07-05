@@ -314,7 +314,7 @@ ALTER TYPE public.nivel OWNER TO postgres;
 CREATE TYPE public.status_aluno AS ENUM (
     'Ativo',
     'Trancado',
-    'Cancelado'
+    'Inativo'
 );
 
 
@@ -339,9 +339,10 @@ ALTER TYPE public.status_boleto OWNER TO postgres;
 
 CREATE TYPE public.status_contrato AS ENUM (
     'Ativo',
-    'Trancado',
-    'Cancelado',
-    'Encerrado'
+    'Agendado',
+    'Vencendo',
+    'Vencido',
+    'Cancelado'
 );
 
 
@@ -957,27 +958,16 @@ ALTER FUNCTION pgbouncer.get_auth(p_usename text) OWNER TO supabase_admin;
 CREATE FUNCTION public.calculate_valor_por_aula() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
-
 BEGIN
-
   -- Calcular valor_por_aula como valor_total / 36 (aulas totais do semestre)
-
   IF NEW.valor_total IS NOT NULL THEN
-
     NEW.valor_por_aula = NEW.valor_total / 36;
-
   ELSE
-
     NEW.valor_por_aula = NULL;
-
   END IF;
-
   
-
   RETURN NEW;
-
 END;
-
 $$;
 
 
@@ -990,43 +980,24 @@ ALTER FUNCTION public.calculate_valor_por_aula() OWNER TO postgres;
 CREATE FUNCTION public.check_aluno_dependencies(p_aluno_id uuid) RETURNS json
     LANGUAGE plpgsql
     AS $$
-
 DECLARE
-
   v_deps JSON;
-
 BEGIN
-
   SELECT json_build_object(
-
     'contratos', (SELECT COUNT(*) FROM contratos WHERE aluno_id = p_aluno_id),
-
     'boletos', (SELECT COUNT(*) FROM boletos WHERE aluno_id = p_aluno_id),
-
     'parcelas', (SELECT COUNT(*) FROM parcelas WHERE aluno_id = p_aluno_id),
-
     'recibos', (SELECT COUNT(*) FROM recibos WHERE aluno_id = p_aluno_id),
-
     'presencas', (SELECT COUNT(*) FROM presencas WHERE aluno_id = p_aluno_id),
-
     'avaliacoes', (SELECT COUNT(*) FROM avaliacoes WHERE aluno_id = p_aluno_id),
-
     'avaliacoes_competencia', (SELECT COUNT(*) FROM avaliacoes_competencia WHERE aluno_id = p_aluno_id),
-
     'documentos', (SELECT COUNT(*) FROM documentos WHERE aluno_id = p_aluno_id),
-
     'notificacoes', (SELECT COUNT(*) FROM notificacoes WHERE destinatario_id = p_aluno_id),
-
     'materiais_entregues', (SELECT COUNT(*) FROM materiais_entregues WHERE aluno_id = p_aluno_id)
-
   ) INTO v_deps;
-
   
-
   RETURN v_deps;
-
 END;
-
 $$;
 
 
@@ -1039,212 +1010,22 @@ ALTER FUNCTION public.check_aluno_dependencies(p_aluno_id uuid) OWNER TO postgre
 CREATE FUNCTION public.check_professor_dependencies(p_professor_id uuid) RETURNS json
     LANGUAGE plpgsql
     AS $$
-
 DECLARE
-
   v_deps JSON;
-
 BEGIN
-
   SELECT json_build_object(
-
     'turmas_ativas', (SELECT COUNT(*) FROM turmas WHERE professor_id = p_professor_id AND status = 'ativa'),
-
     'turmas_encerradas', (SELECT COUNT(*) FROM turmas WHERE professor_id = p_professor_id AND status = 'encerrada'),
-
     'folha_pagamento', (SELECT COUNT(*) FROM folha_pagamento WHERE professor_id = p_professor_id),
-
     'planos_aula', (SELECT COUNT(*) FROM planos_aula WHERE professor_id = p_professor_id)
-
   ) INTO v_deps;
-
   
-
   RETURN v_deps;
-
 END;
-
 $$;
 
 
 ALTER FUNCTION public.check_professor_dependencies(p_professor_id uuid) OWNER TO postgres;
-
-
-
---
--- Name: hard_delete_professor(uuid, boolean, boolean); Type: FUNCTION; Schema: public; Owner: postgres
---
-
-CREATE FUNCTION public.hard_delete_professor(p_professor_id uuid, p_delete_financeiro boolean DEFAULT false, p_delete_academico boolean DEFAULT false) RETURNS json
-    LANGUAGE plpgsql
-    AS $$
-
-DECLARE
-
-  v_result JSON;
-
-  v_deleted_tables TEXT[] := ARRAY[]::TEXT[];
-
-  v_errors TEXT[] := ARRAY[]::TEXT[];
-
-  v_professor_nome TEXT;
-
-  v_turmas_ativas INTEGER;
-
-BEGIN
-
-  -- Verificar se o professor existe
-
-  SELECT nome INTO v_professor_nome FROM professores WHERE id = p_professor_id;
-
-  
-
-  IF v_professor_nome IS NULL THEN
-
-    RETURN json_build_object(
-
-      'success', false,
-
-      'error', 'Professor não encontrado',
-
-      'deleted_tables', ARRAY[]::TEXT[]
-
-    );
-
-  END IF;
-
-
-
-  -- Verificar se há turmas ativas vinculadas
-
-  SELECT COUNT(*) INTO v_turmas_ativas 
-
-  FROM turmas 
-
-  WHERE professor_id = p_professor_id AND status = 'ativa';
-
-  
-
-  IF v_turmas_ativas > 0 THEN
-
-    RETURN json_build_object(
-
-      'success', false,
-
-      'error', 'Professor possui ' || v_turmas_ativas || ' turma(s) ativa(s). Remova ou transfira as turmas antes de excluir.',
-
-      'deleted_tables', ARRAY[]::TEXT[]
-
-    );
-
-  END IF;
-
-
-
-  -- Iniciar transação
-
-  BEGIN
-
-    
-
-    -- 1. FINANCEIRO (se selecionado)
-
-    IF p_delete_financeiro THEN
-
-      -- Deletar folha de pagamento
-
-      DELETE FROM folha_pagamento WHERE professor_id = p_professor_id;
-
-      v_deleted_tables := array_append(v_deleted_tables, 'folha_pagamento');
-
-    END IF;
-
-
-
-    -- 2. ACADÊMICO (se selecionado)
-
-    IF p_delete_academico THEN
-
-      -- Deletar planos de aula
-
-      DELETE FROM planos_aula WHERE professor_id = p_professor_id;
-
-      v_deleted_tables := array_append(v_deleted_tables, 'planos_aula');
-
-    END IF;
-
-
-
-    -- 3. SEMPRE DELETAR: Logs relacionados (operacional)
-
-    DELETE FROM logs WHERE registro_id = p_professor_id AND tabela_afetada = 'professores';
-
-    v_deleted_tables := array_append(v_deleted_tables, 'logs');
-
-
-
-    -- 4. RELACIONAMENTOS: Remover referências (SET NULL)
-
-    -- Turmas encerradas que ainda referenciam o professor
-
-    UPDATE turmas SET professor_id = NULL WHERE professor_id = p_professor_id;
-
-    IF FOUND THEN
-
-      v_deleted_tables := array_append(v_deleted_tables, 'turmas (referências removidas)');
-
-    END IF;
-
-    
-
-    -- 5. DELETAR O PROFESSOR (sempre por último)
-
-    DELETE FROM professores WHERE id = p_professor_id;
-
-    v_deleted_tables := array_append(v_deleted_tables, 'professores');
-
-
-
-    -- Retornar sucesso
-
-    RETURN json_build_object(
-
-      'success', true,
-
-      'message', 'Professor ' || v_professor_nome || ' excluído permanentemente',
-
-      'deleted_tables', v_deleted_tables,
-
-      'professor_nome', v_professor_nome
-
-    );
-
-
-
-  EXCEPTION WHEN OTHERS THEN
-
-    -- Em caso de erro, fazer rollback
-
-    RAISE;
-
-    RETURN json_build_object(
-
-      'success', false,
-
-      'error', SQLERRM,
-
-      'deleted_tables', ARRAY[]::TEXT[]
-
-    );
-
-  END;
-
-END;
-
-$$;
-
-
-ALTER FUNCTION public.hard_delete_professor(p_professor_id uuid, p_delete_financeiro boolean, p_delete_academico boolean) OWNER TO postgres;
 
 --
 -- Name: obter_permissoes_usuario(uuid); Type: FUNCTION; Schema: public; Owner: postgres
@@ -1253,71 +1034,38 @@ ALTER FUNCTION public.hard_delete_professor(p_professor_id uuid, p_delete_financ
 CREATE FUNCTION public.obter_permissoes_usuario(usuario_id uuid) RETURNS json
     LANGUAGE plpgsql SECURITY DEFINER
     AS $$
-
 DECLARE
-
     permissoes_json json;
-
 BEGIN
-
     SELECT json_build_object(
-
         'criar_alunos', perm_criar_alunos,
-
         'editar_alunos', perm_editar_alunos,
-
         'remover_alunos', perm_remover_alunos,
-
         'criar_turmas', perm_criar_turmas,
-
         'editar_turmas', perm_editar_turmas,
-
         'remover_turmas', perm_remover_turmas,
-
         'criar_contratos', perm_criar_contratos,
-
         'editar_contratos', perm_editar_contratos,
-
         'remover_contratos', perm_remover_contratos,
-
         'aprovar_contratos', perm_aprovar_contratos,
-
         'criar_aulas', perm_criar_aulas,
-
         'editar_aulas', perm_editar_aulas,
-
         'remover_aulas', perm_remover_aulas,
-
         'gerenciar_presencas', perm_gerenciar_presencas,
-
         'criar_avaliacoes', perm_criar_avaliacoes,
-
         'editar_avaliacoes', perm_editar_avaliacoes,
-
         'remover_avaliacoes', perm_remover_avaliacoes,
-
         'gerenciar_boletos', perm_gerenciar_boletos,
-
         'gerenciar_despesas', perm_gerenciar_despesas,
-
         'gerenciar_folha', perm_gerenciar_folha,
-
         'gerenciar_usuarios', perm_gerenciar_usuarios
-
     )
-
     INTO permissoes_json
-
     FROM usuarios
-
     WHERE id = usuario_id;
-
     
-
     RETURN permissoes_json;
-
 END;
-
 $$;
 
 
@@ -1330,83 +1078,44 @@ ALTER FUNCTION public.obter_permissoes_usuario(usuario_id uuid) OWNER TO postgre
 CREATE FUNCTION public.registrar_pagamento_historico() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
-
 BEGIN
-
   -- Registrar no histórico quando status muda para 'Pago'
-
   IF NEW.status = 'Pago' AND (OLD.status IS NULL OR OLD.status != 'Pago') THEN
-
     INSERT INTO public.historico_pagamentos (
-
       boleto_id,
-
       aluno_id,
-
       contrato_id,
-
       valor_original,
-
       valor_pago,
-
       juros,
-
       multa,
-
       metodo_pagamento,
-
       data_pagamento,
-
       data_vencimento_original,
-
       observacoes,
-
       tipo_transacao,
-
       status_anterior,
-
       status_novo
-
     ) VALUES (
-
       NEW.id,
-
       NEW.aluno_id,
-
       NEW.contrato_id,
-
       NEW.valor,
-
       COALESCE(NEW.valor + COALESCE(NEW.juros, 0) + COALESCE(NEW.multa, 0), NEW.valor),
-
       COALESCE(NEW.juros, 0),
-
       COALESCE(NEW.multa, 0),
-
       COALESCE(NEW.metodo_pagamento, 'Não informado'),
-
       COALESCE(NEW.data_pagamento, CURRENT_DATE),
-
       NEW.data_vencimento,
-
       NEW.observacoes,
-
       'pagamento',
-
       COALESCE(OLD.status, 'Pendente'),
-
       NEW.status
-
     );
-
   END IF;
-
   
-
   RETURN NEW;
-
 END;
-
 $$;
 
 
@@ -1419,83 +1128,44 @@ ALTER FUNCTION public.registrar_pagamento_historico() OWNER TO postgres;
 CREATE FUNCTION public.registrar_pagamento_parcela_historico() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
-
 BEGIN
-
   -- Registrar no histórico quando status muda para 'Pago'
-
   IF NEW.status = 'Pago' AND (OLD.status IS NULL OR OLD.status != 'Pago') THEN
-
     INSERT INTO public.historico_pagamentos (
-
       parcela_id,
-
       aluno_id,
-
       contrato_id,
-
       valor_original,
-
       valor_pago,
-
       juros,
-
       multa,
-
       metodo_pagamento,
-
       data_pagamento,
-
       data_vencimento_original,
-
       observacoes,
-
       tipo_transacao,
-
       status_anterior,
-
       status_novo
-
     ) VALUES (
-
       NEW.id,
-
       NEW.aluno_id,
-
       NEW.contrato_id,
-
       NEW.valor,
-
       COALESCE(NEW.valor_pago, NEW.valor),
-
       COALESCE(NEW.juros, 0),
-
       COALESCE(NEW.multa, 0),
-
       COALESCE(NEW.metodo_pagamento, 'Não informado'),
-
       COALESCE(NEW.data_pagamento, CURRENT_DATE),
-
       NEW.data_vencimento,
-
       NEW.observacao,
-
       'pagamento',
-
       COALESCE(OLD.status, 'Pendente'),
-
       NEW.status
-
     );
-
   END IF;
-
   
-
   RETURN NEW;
-
 END;
-
 $$;
 
 
@@ -1508,15 +1178,10 @@ ALTER FUNCTION public.registrar_pagamento_parcela_historico() OWNER TO postgres;
 CREATE FUNCTION public.update_updated_at_column() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
-
 begin
-
   new.updated_at = now();
-
   return new;
-
 end;
-
 $$;
 
 
@@ -1529,31 +1194,18 @@ ALTER FUNCTION public.update_updated_at_column() OWNER TO postgres;
 CREATE FUNCTION public.validate_valor_total() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
-
 begin
-
   new.valor_total = coalesce(new.valor_plano, 0)
-
                   + coalesce(new.valor_material, 0)
-
                   + coalesce(new.valor_matricula, 0)
-
                   - coalesce(new.desconto_total, 0);
 
-
-
   if new.valor_total < 0 then
-
     raise exception 'Valor total não pode ser negativo. Verifique os valores inseridos.';
-
   end if;
 
-
-
   return new;
-
 end;
-
 $$;
 
 
@@ -1566,25 +1218,15 @@ ALTER FUNCTION public.validate_valor_total() OWNER TO postgres;
 CREATE FUNCTION public.verificar_permissao(usuario_id uuid, permissao text) RETURNS boolean
     LANGUAGE plpgsql SECURITY DEFINER
     AS $_$
-
 DECLARE
-
     tem_permissao boolean := false;
-
 BEGIN
-
     EXECUTE format('SELECT %I FROM usuarios WHERE id = $1', 'perm_' || permissao)
-
     INTO tem_permissao
-
     USING usuario_id;
-
     
-
     RETURN COALESCE(tem_permissao, false);
-
 END;
-
 $_$;
 
 
@@ -3104,7 +2746,6 @@ CREATE TABLE public.alunos (
     responsavel_id uuid,
     numero_endereco text,
     data_nascimento date,
-    excluido boolean DEFAULT false,
     data_exclusao timestamp without time zone
 );
 
@@ -3115,7 +2756,7 @@ ALTER TABLE public.alunos OWNER TO postgres;
 -- Name: COLUMN alunos.status; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-COMMENT ON COLUMN public.alunos.status IS 'Status do aluno: Ativo, Trancado, Cancelado';
+COMMENT ON COLUMN public.alunos.status IS 'Status do aluno: Ativo, Trancado, Inativo';
 
 
 --
@@ -3177,7 +2818,7 @@ ALTER TABLE public.avaliacoes_competencia OWNER TO postgres;
 
 CREATE TABLE public.boletos (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
-    aluno_id uuid NOT NULL,
+    aluno_id uuid,
     data_vencimento date NOT NULL,
     valor numeric(10,2) NOT NULL,
     status public.status_boleto DEFAULT 'Pendente'::public.status_boleto NOT NULL,
@@ -3253,11 +2894,11 @@ ALTER TABLE public.configuracoes OWNER TO postgres;
 
 CREATE TABLE public.contratos (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
-    aluno_id uuid NOT NULL,
+    aluno_id uuid,
     data_inicio date NOT NULL,
     data_fim date,
     valor_mensalidade numeric(10,2) NOT NULL,
-    status public.status_contrato DEFAULT 'Ativo'::public.status_contrato NOT NULL,
+    status_contrato public.status_contrato DEFAULT 'Ativo'::public.status_contrato NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     observacao text,
@@ -3284,7 +2925,7 @@ CREATE VIEW public.contratos_vencendo AS
     c.data_inicio,
     c.data_fim,
     c.valor_mensalidade,
-    c.status,
+    c.status_contrato AS status,
     c.created_at,
     c.updated_at,
     c.observacao,
@@ -3297,7 +2938,7 @@ CREATE VIEW public.contratos_vencendo AS
         END AS situacao
    FROM (public.contratos c
      JOIN public.alunos a ON ((c.aluno_id = a.id)))
-  WHERE (c.status = 'Ativo'::public.status_contrato);
+  WHERE (c.status_contrato = 'Ativo'::public.status_contrato);
 
 
 ALTER VIEW public.contratos_vencendo OWNER TO postgres;
@@ -3346,7 +2987,7 @@ ALTER TABLE public.documentos OWNER TO postgres;
 
 CREATE TABLE public.financeiro_alunos (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
-    aluno_id uuid NOT NULL,
+    aluno_id uuid,
     plano_id uuid NOT NULL,
     valor_plano numeric(10,2) DEFAULT 0 NOT NULL,
     valor_material numeric(10,2) DEFAULT 0 NOT NULL,
@@ -3520,7 +3161,6 @@ ALTER TABLE public.folha_pagamento OWNER TO postgres;
 CREATE TABLE public.historico_pagamentos (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     boleto_id uuid,
-    parcela_id uuid,
     aluno_id uuid,
     contrato_id uuid,
     valor_original numeric(10,2) NOT NULL,
@@ -3600,7 +3240,7 @@ ALTER TABLE public.materiais OWNER TO postgres;
 
 CREATE TABLE public.materiais_entregues (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
-    aluno_id uuid NOT NULL,
+    aluno_id uuid,
     material_id uuid NOT NULL,
     data_entrega date NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
@@ -3627,164 +3267,6 @@ CREATE TABLE public.notificacoes (
 
 
 ALTER TABLE public.notificacoes OWNER TO postgres;
-
---
--- Name: parcelas; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.parcelas (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    aluno_id uuid NOT NULL,
-    numero_parcelas_material integer,
-    numero_parcelas_matricula integer,
-    numero_parcelas_plano integer,
-    forma_pagamento_material character varying(50),
-    forma_pagamento_matricula character varying(50),
-    forma_pagamento_plano character varying(50),
-    nome_aluno character varying(255),
-    "1x_material" numeric(10,2) DEFAULT 0,
-    "2x_material" numeric(10,2) DEFAULT 0,
-    "3x_material" numeric(10,2) DEFAULT 0,
-    "4x_material" numeric(10,2) DEFAULT 0,
-    "5x_material" numeric(10,2) DEFAULT 0,
-    "6x_material" numeric(10,2) DEFAULT 0,
-    "7x_material" numeric(10,2) DEFAULT 0,
-    "8x_material" numeric(10,2) DEFAULT 0,
-    "9x_material" numeric(10,2) DEFAULT 0,
-    "10x_material" numeric(10,2) DEFAULT 0,
-    "11x_material" numeric(10,2) DEFAULT 0,
-    "12x_material" numeric(10,2) DEFAULT 0,
-    "1x_matricula" numeric(10,2) DEFAULT 0,
-    "2x_matricula" numeric(10,2) DEFAULT 0,
-    "3x_matricula" numeric(10,2) DEFAULT 0,
-    "4x_matricula" numeric(10,2) DEFAULT 0,
-    "5x_matricula" numeric(10,2) DEFAULT 0,
-    "6x_matricula" numeric(10,2) DEFAULT 0,
-    "7x_matricula" numeric(10,2) DEFAULT 0,
-    "8x_matricula" numeric(10,2) DEFAULT 0,
-    "9x_matricula" numeric(10,2) DEFAULT 0,
-    "10x_matricula" numeric(10,2) DEFAULT 0,
-    "11x_matricula" numeric(10,2) DEFAULT 0,
-    "12x_matricula" numeric(10,2) DEFAULT 0,
-    "1x_plano" numeric(10,2) DEFAULT 0,
-    "2x_plano" numeric(10,2) DEFAULT 0,
-    "3x_plano" numeric(10,2) DEFAULT 0,
-    "4x_plano" numeric(10,2) DEFAULT 0,
-    "5x_plano" numeric(10,2) DEFAULT 0,
-    "6x_plano" numeric(10,2) DEFAULT 0,
-    "7x_plano" numeric(10,2) DEFAULT 0,
-    "8x_plano" numeric(10,2) DEFAULT 0,
-    "9x_plano" numeric(10,2) DEFAULT 0,
-    "10x_plano" numeric(10,2) DEFAULT 0,
-    "11x_plano" numeric(10,2) DEFAULT 0,
-    "12x_plano" numeric(10,2) DEFAULT 0,
-    data_criacao timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    material_1x numeric(10,2),
-    material_2x numeric(10,2),
-    material_3x numeric(10,2),
-    material_4x numeric(10,2),
-    material_5x numeric(10,2),
-    material_6x numeric(10,2),
-    material_7x numeric(10,2),
-    material_8x numeric(10,2),
-    material_9x numeric(10,2),
-    material_10x numeric(10,2),
-    material_11x numeric(10,2),
-    material_12x numeric(10,2),
-    matricula_1x numeric(10,2),
-    matricula_2x numeric(10,2),
-    matricula_3x numeric(10,2),
-    matricula_4x numeric(10,2),
-    matricula_5x numeric(10,2),
-    matricula_6x numeric(10,2),
-    matricula_7x numeric(10,2),
-    matricula_8x numeric(10,2),
-    matricula_9x numeric(10,2),
-    matricula_10x numeric(10,2),
-    matricula_11x numeric(10,2),
-    matricula_12x numeric(10,2),
-    plano_1x numeric(10,2),
-    plano_2x numeric(10,2),
-    plano_3x numeric(10,2),
-    plano_4x numeric(10,2),
-    plano_5x numeric(10,2),
-    plano_6x numeric(10,2),
-    plano_7x numeric(10,2),
-    plano_8x numeric(10,2),
-    plano_9x numeric(10,2),
-    plano_10x numeric(10,2),
-    plano_11x numeric(10,2),
-    plano_12x numeric(10,2),
-    forma_pagamento_material_uuid uuid,
-    forma_pagamento_matricula_uuid uuid,
-    forma_pagamento_plano_uuid uuid
-);
-
-
-ALTER TABLE public.parcelas OWNER TO postgres;
-
---
--- Name: TABLE parcelas; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON TABLE public.parcelas IS 'Tabela para controle de parcelas dos alunos com 36 colunas (12 para cada tipo: material, matrícula, plano)';
-
-
---
--- Name: COLUMN parcelas.numero_parcelas_material; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.parcelas.numero_parcelas_material IS 'Número de parcelas para material (vem de financeiro_alunos)';
-
-
---
--- Name: COLUMN parcelas.numero_parcelas_matricula; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.parcelas.numero_parcelas_matricula IS 'Número de parcelas para matrícula (vem de financeiro_alunos)';
-
-
---
--- Name: COLUMN parcelas.numero_parcelas_plano; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.parcelas.numero_parcelas_plano IS 'Número de parcelas para plano (vem de financeiro_alunos)';
-
-
---
--- Name: COLUMN parcelas.nome_aluno; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.parcelas.nome_aluno IS 'Nome do aluno (vem da tabela alunos)';
-
-
---
--- Name: COLUMN parcelas.data_criacao; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.parcelas.data_criacao IS 'Data de criação do registro para ordenação cronológica';
-
-
---
--- Name: COLUMN parcelas.forma_pagamento_material_uuid; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.parcelas.forma_pagamento_material_uuid IS 'UUID da forma de pagamento do material (convertido de financeiro_alunos)';
-
-
---
--- Name: COLUMN parcelas.forma_pagamento_matricula_uuid; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.parcelas.forma_pagamento_matricula_uuid IS 'UUID da forma de pagamento da matrícula (convertido de financeiro_alunos)';
-
-
---
--- Name: COLUMN parcelas.forma_pagamento_plano_uuid; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.parcelas.forma_pagamento_plano_uuid IS 'UUID da forma de pagamento do plano (convertido de financeiro_alunos)';
-
 
 --
 -- Name: pesquisas_satisfacao; Type: TABLE; Schema: public; Owner: postgres
@@ -3825,6 +3307,7 @@ CREATE TABLE public.planos (
     valor_total numeric(10,2),
     valor_por_aula numeric(10,2),
     horario_por_aula numeric(4,2),
+    idioma public.idioma DEFAULT 'Inglês'::public.idioma NOT NULL,
     CONSTRAINT frequencia_aulas_valid_values CHECK (((frequencia_aulas ->> ''::text) = ANY (ARRAY['semanal'::text, 'quinzenal'::text, 'mensal'::text, 'intensivo'::text]))),
     CONSTRAINT horario_por_aula_positive CHECK ((horario_por_aula > (0)::numeric))
 );
@@ -3945,6 +3428,13 @@ COMMENT ON COLUMN public.planos.horario_por_aula IS 'Duração de cada aula em h
 
 
 --
+-- Name: COLUMN planos.idioma; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.planos.idioma IS 'Idioma do plano de ensino: Inglês ou Japonês';
+
+
+--
 -- Name: planos_aula; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -3968,7 +3458,7 @@ ALTER TABLE public.planos_aula OWNER TO postgres;
 CREATE TABLE public.presencas (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     aula_id uuid NOT NULL,
-    aluno_id uuid NOT NULL,
+    aluno_id uuid,
     status public.status_presenca DEFAULT 'Presente'::public.status_presenca NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
@@ -4252,24 +3742,6 @@ PARTITION BY RANGE (inserted_at);
 ALTER TABLE realtime.messages OWNER TO supabase_realtime_admin;
 
 --
--- Name: messages_2025_07_01; Type: TABLE; Schema: realtime; Owner: supabase_admin
---
-
-CREATE TABLE realtime.messages_2025_07_01 (
-    topic text NOT NULL,
-    extension text NOT NULL,
-    payload jsonb,
-    event text,
-    private boolean DEFAULT false,
-    updated_at timestamp without time zone DEFAULT now() NOT NULL,
-    inserted_at timestamp without time zone DEFAULT now() NOT NULL,
-    id uuid DEFAULT gen_random_uuid() NOT NULL
-);
-
-
-ALTER TABLE realtime.messages_2025_07_01 OWNER TO supabase_admin;
-
---
 -- Name: messages_2025_07_02; Type: TABLE; Schema: realtime; Owner: supabase_admin
 --
 
@@ -4376,6 +3848,24 @@ CREATE TABLE realtime.messages_2025_07_07 (
 
 
 ALTER TABLE realtime.messages_2025_07_07 OWNER TO supabase_admin;
+
+--
+-- Name: messages_2025_07_08; Type: TABLE; Schema: realtime; Owner: supabase_admin
+--
+
+CREATE TABLE realtime.messages_2025_07_08 (
+    topic text NOT NULL,
+    extension text NOT NULL,
+    payload jsonb,
+    event text,
+    private boolean DEFAULT false,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    inserted_at timestamp without time zone DEFAULT now() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL
+);
+
+
+ALTER TABLE realtime.messages_2025_07_08 OWNER TO supabase_admin;
 
 --
 -- Name: schema_migrations; Type: TABLE; Schema: realtime; Owner: supabase_admin
@@ -4557,13 +4047,6 @@ CREATE TABLE supabase_migrations.seed_files (
 ALTER TABLE supabase_migrations.seed_files OWNER TO postgres;
 
 --
--- Name: messages_2025_07_01; Type: TABLE ATTACH; Schema: realtime; Owner: supabase_admin
---
-
-ALTER TABLE ONLY realtime.messages ATTACH PARTITION realtime.messages_2025_07_01 FOR VALUES FROM ('2025-07-01 00:00:00') TO ('2025-07-02 00:00:00');
-
-
---
 -- Name: messages_2025_07_02; Type: TABLE ATTACH; Schema: realtime; Owner: supabase_admin
 --
 
@@ -4603,6 +4086,13 @@ ALTER TABLE ONLY realtime.messages ATTACH PARTITION realtime.messages_2025_07_06
 --
 
 ALTER TABLE ONLY realtime.messages ATTACH PARTITION realtime.messages_2025_07_07 FOR VALUES FROM ('2025-07-07 00:00:00') TO ('2025-07-08 00:00:00');
+
+
+--
+-- Name: messages_2025_07_08; Type: TABLE ATTACH; Schema: realtime; Owner: supabase_admin
+--
+
+ALTER TABLE ONLY realtime.messages ATTACH PARTITION realtime.messages_2025_07_08 FOR VALUES FROM ('2025-07-08 00:00:00') TO ('2025-07-09 00:00:00');
 
 
 --
@@ -4998,8 +4488,10 @@ b544d96e-264e-4490-a89a-78e5362f5c0e	marcas de sangue	\N	2025-06-06	11:11:00	pen
 -- Data for Name: alunos; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.alunos (id, nome, telefone, email, endereco, status, idioma, turma_id, created_at, updated_at, data_conclusao, data_cancelamento, cpf, responsavel_id, numero_endereco, data_nascimento, excluido, data_exclusao) FROM stdin;
-5329715a-219e-428d-aafe-e3ee0c163685	Kauan Bruno da Silva	(11) 93201-5872	00001122264008sp@al.educacao.sp.gov.br	Avenida Paschoal Thomeu, Vila Nova Bonsucesso, Guarulhos - SP, CEP: 07175-090	Ativo	Inglês	\N	2025-06-24 23:48:08.204321+00	2025-06-24 23:48:08.204321+00	\N	\N	54642506896	5f08fa1e-5e52-4800-939d-cfe4ee76f91c	2502	2007-12-13	f	\N
+COPY public.alunos (id, nome, telefone, email, endereco, status, idioma, turma_id, created_at, updated_at, data_conclusao, data_cancelamento, cpf, responsavel_id, numero_endereco, data_nascimento, data_exclusao) FROM stdin;
+386bf983-f251-40e2-a3a1-87ffbb944814	Alberto elias Barbosa	(11) 94314-4114	Albertofreelancer@gmail.com	Rua Assis Valente, Jardim Pinhal, Guarulhos - SP, CEP: 07120-020	Inativo	Inglês	\N	2025-07-05 01:48:27.890521+00	2025-07-05 01:48:27.890521+00	\N	\N	01001242831	\N	162	1971-10-17	2025-07-05 05:28:10.206
+9f5241d3-5a45-4373-89ef-5ed539e4d9b2	Alice Almeida Alcantara	(11) 95304-8080	alcantaraalice2@gmail.com	Rua Manoel Reis da Silva, Vila Carmela I, Guarulhos - SP, CEP: 07178-450	Inativo	Inglês	\N	2025-07-05 01:51:33.513888+00	2025-07-05 01:51:33.513888+00	\N	\N	51140341898	\N	162	2001-12-29	2025-07-05 15:16:28.687
+4be96d37-d1a2-4450-8c3e-ae3eb53fc1ac	Agata de Oliveira Teixeira 	(11) 95377-4675	agatadeoliveirateixeira@gmail.com	Rua Guirecema, Vila Nova Bonsucesso, Guarulhos - SP, CEP: 07176-321	Inativo	Inglês	\N	2025-07-05 01:46:10.740453+00	2025-07-05 01:46:10.740453+00	\N	\N	55134792810	\N	142	2006-12-15	2025-07-05 05:26:58.782
 \.
 
 
@@ -5051,10 +4543,10 @@ COPY public.configuracoes (id, chave, valor, created_at, updated_at) FROM stdin;
 -- Data for Name: contratos; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.contratos (id, aluno_id, data_inicio, data_fim, valor_mensalidade, status, created_at, updated_at, observacao, plano_id) FROM stdin;
-3233e0ce-6a6b-4fb2-8874-95222f2170bb	5329715a-219e-428d-aafe-e3ee0c163685	2025-07-01	2030-07-01	2000.00	Ativo	2025-07-01 16:53:21.323649+00	2025-07-01 16:53:21.323649+00	Contrato iniciado em 30/06/2025 - Renovado em 01/07/2025 até 30/06/2027 - Renovado em 01/07/2025 (Início: 30/06/2025, Nova data fim: 30/06/2028) - Renovado em 01/07/2025 (Início: 30/06/2025, Nova data fim: 30/06/2029) - Renovado em 01/07/2025 (Início: 30/06/2025, Nova data fim: 30/06/2030)	\N
-c6841b8d-3c0b-4302-9cea-3e5cd48c65ca	5329715a-219e-428d-aafe-e3ee0c163685	2000-03-13	2001-03-12	2000.00	Ativo	2025-07-03 02:39:26.830924+00	2025-07-03 02:39:26.830924+00	\N	\N
-159faa36-e23e-4534-bf4e-2461317e6024	5329715a-219e-428d-aafe-e3ee0c163685	2024-07-10	2025-07-10	200.00	Ativo	2025-07-03 14:04:03.137288+00	2025-07-03 14:04:03.137288+00	\N	\N
+COPY public.contratos (id, aluno_id, data_inicio, data_fim, valor_mensalidade, status_contrato, created_at, updated_at, observacao, plano_id) FROM stdin;
+3233e0ce-6a6b-4fb2-8874-95222f2170bb	\N	2025-07-01	2030-07-01	2000.00	Ativo	2025-07-01 16:53:21.323649+00	2025-07-01 16:53:21.323649+00	Contrato iniciado em 30/06/2025 - Renovado em 01/07/2025 até 30/06/2027 - Renovado em 01/07/2025 (Início: 30/06/2025, Nova data fim: 30/06/2028) - Renovado em 01/07/2025 (Início: 30/06/2025, Nova data fim: 30/06/2029) - Renovado em 01/07/2025 (Início: 30/06/2025, Nova data fim: 30/06/2030)	\N
+c6841b8d-3c0b-4302-9cea-3e5cd48c65ca	\N	2000-03-13	2001-03-12	2000.00	Ativo	2025-07-03 02:39:26.830924+00	2025-07-03 02:39:26.830924+00	\N	\N
+159faa36-e23e-4534-bf4e-2461317e6024	\N	2024-07-10	2025-07-10	200.00	Ativo	2025-07-03 14:04:03.137288+00	2025-07-03 14:04:03.137288+00	\N	\N
 \.
 
 
@@ -5080,10 +4572,6 @@ COPY public.documentos (id, aluno_id, tipo, data, arquivo_link, status, created_
 --
 
 COPY public.financeiro_alunos (id, aluno_id, plano_id, valor_plano, valor_material, valor_matricula, desconto_total, valor_total, status_geral, data_primeiro_vencimento, created_at, updated_at, forma_pagamento_material, numero_parcelas_material, forma_pagamento_matricula, numero_parcelas_matricula, forma_pagamento_plano, numero_parcelas_plano) FROM stdin;
-dd27c0ba-a399-47e8-9d35-2e6f643c86c3	5329715a-219e-428d-aafe-e3ee0c163685	4fed2bb1-ec6d-45cd-a6c8-5ed778cfb035	100.00	50.00	30.00	0.00	180.00	Pendente	2025-02-01	2025-07-03 20:02:23.291088+00	2025-07-03 20:02:23.291088+00	boleto	1	boleto	1	boleto	1
-b10307d9-0315-45d1-b004-6c462e58ebcf	5329715a-219e-428d-aafe-e3ee0c163685	d8f0c674-bae2-4786-9df5-2b9d64502d47	1222.22	100.00	20.00	777.78	564.44	Parcialmente Pago	2025-07-16	2025-07-03 21:01:46.541937+00	2025-07-04 00:02:37.320731+00	boleto	1	boleto	1	boleto	1
-e9cbe22b-781d-4d03-ad5c-c6ff621fb5ba	5329715a-219e-428d-aafe-e3ee0c163685	d8f0c674-bae2-4786-9df5-2b9d64502d47	1222.22	150.00	80.00	777.78	674.44	Pendente	72025-04-14	2025-07-04 00:56:02.755312+00	2025-07-04 00:56:02.755312+00	boleto	1	boleto	1	boleto	2
-b32dda03-4424-4fb7-b59c-8f0c5a9ff154	5329715a-219e-428d-aafe-e3ee0c163685	d8f0c674-bae2-4786-9df5-2b9d64502d47	2000.00	100.00	100.00	0.00	2200.00	Pendente	2025-07-16	2025-07-04 04:00:38.151549+00	2025-07-04 04:00:38.151549+00	boleto	1	boleto	1	boleto	1
 \.
 
 
@@ -5099,7 +4587,7 @@ COPY public.folha_pagamento (id, professor_id, mes, ano, valor, status, created_
 -- Data for Name: historico_pagamentos; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.historico_pagamentos (id, boleto_id, parcela_id, aluno_id, contrato_id, valor_original, valor_pago, juros, multa, desconto, metodo_pagamento, data_pagamento, data_vencimento_original, observacoes, usuario_id, tipo_transacao, status_anterior, status_novo, created_at, updated_at) FROM stdin;
+COPY public.historico_pagamentos (id, boleto_id, aluno_id, contrato_id, valor_original, valor_pago, juros, multa, desconto, metodo_pagamento, data_pagamento, data_vencimento_original, observacoes, usuario_id, tipo_transacao, status_anterior, status_novo, created_at, updated_at) FROM stdin;
 \.
 
 
@@ -5136,14 +4624,6 @@ COPY public.notificacoes (id, tipo, destinatario_id, mensagem, data_envio, statu
 
 
 --
--- Data for Name: parcelas; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.parcelas (id, aluno_id, numero_parcelas_material, numero_parcelas_matricula, numero_parcelas_plano, forma_pagamento_material, forma_pagamento_matricula, forma_pagamento_plano, nome_aluno, "1x_material", "2x_material", "3x_material", "4x_material", "5x_material", "6x_material", "7x_material", "8x_material", "9x_material", "10x_material", "11x_material", "12x_material", "1x_matricula", "2x_matricula", "3x_matricula", "4x_matricula", "5x_matricula", "6x_matricula", "7x_matricula", "8x_matricula", "9x_matricula", "10x_matricula", "11x_matricula", "12x_matricula", "1x_plano", "2x_plano", "3x_plano", "4x_plano", "5x_plano", "6x_plano", "7x_plano", "8x_plano", "9x_plano", "10x_plano", "11x_plano", "12x_plano", data_criacao, material_1x, material_2x, material_3x, material_4x, material_5x, material_6x, material_7x, material_8x, material_9x, material_10x, material_11x, material_12x, matricula_1x, matricula_2x, matricula_3x, matricula_4x, matricula_5x, matricula_6x, matricula_7x, matricula_8x, matricula_9x, matricula_10x, matricula_11x, matricula_12x, plano_1x, plano_2x, plano_3x, plano_4x, plano_5x, plano_6x, plano_7x, plano_8x, plano_9x, plano_10x, plano_11x, plano_12x, forma_pagamento_material_uuid, forma_pagamento_matricula_uuid, forma_pagamento_plano_uuid) FROM stdin;
-\.
-
-
---
 -- Data for Name: pesquisas_satisfacao; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
@@ -5155,10 +4635,10 @@ COPY public.pesquisas_satisfacao (id, aluno_id, turma_id, data, nota, comentario
 -- Data for Name: planos; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.planos (id, nome, descricao, numero_aulas, frequencia_aulas, carga_horaria_total, permite_cancelamento, permite_parcelamento, observacoes, ativo, created_at, updated_at, valor_total, valor_por_aula, horario_por_aula) FROM stdin;
-d8f0c674-bae2-4786-9df5-2b9d64502d47	plano silver	plano de verão	36	"semanal"	72	t	t	\N	t	2025-07-03 00:32:31.991744+00	2025-07-03 13:16:23.195368+00	2000.00	55.56	2.00
-59bd6b36-f93a-4de2-a8b2-4df27a00f6f7	eduardo	srgare	136	"semanal"	272	f	f	frhrt	t	2025-07-03 19:36:57.901098+00	2025-07-03 22:17:51.471338+00	2000.00	55.56	2.00
-4fed2bb1-ec6d-45cd-a6c8-5ed778cfb035	Plano do Kauan 	plano de primavera	22	"semanal"	44	f	f	\N	t	2025-07-03 14:38:36.42385+00	2025-07-04 00:58:14.792322+00	2000.00	55.56	2.00
+COPY public.planos (id, nome, descricao, numero_aulas, frequencia_aulas, carga_horaria_total, permite_cancelamento, permite_parcelamento, observacoes, ativo, created_at, updated_at, valor_total, valor_por_aula, horario_por_aula, idioma) FROM stdin;
+d8f0c674-bae2-4786-9df5-2b9d64502d47	plano silver	plano de verão	36	"semanal"	72	t	t	\N	t	2025-07-03 00:32:31.991744+00	2025-07-03 13:16:23.195368+00	2000.00	55.56	2.00	Inglês
+59bd6b36-f93a-4de2-a8b2-4df27a00f6f7	eduardo	srgare	136	"semanal"	272	f	f	frhrt	t	2025-07-03 19:36:57.901098+00	2025-07-03 22:17:51.471338+00	2000.00	55.56	2.00	Inglês
+4fed2bb1-ec6d-45cd-a6c8-5ed778cfb035	Plano do Kauan 	plano de primavera	22	"semanal"	44	f	f	\N	t	2025-07-03 14:38:36.42385+00	2025-07-05 01:26:12.019732+00	2000.00	55.56	2.00	Japonês
 \.
 
 
@@ -5183,6 +4663,11 @@ COPY public.presencas (id, aula_id, aluno_id, status, created_at, updated_at) FR
 --
 
 COPY public.professores (id, nome, telefone, email, idiomas, salario, created_at, updated_at, cpf, status, excluido, data_exclusao) FROM stdin;
+62d55389-04e7-4f4d-82d7-3ae784e240c5	Teacher Douglas 	\N	tsschool@teacherdouglas.com	Inglês	\N	2025-07-05 01:33:12.512764+00	2025-07-05 01:33:12.512764+00	\N	ativo	f	\N
+296e8adc-dfe1-44b6-b94a-dec9abf959aa	Teacher Daiane 	\N	tsschool@teacherdaiane.com	Inglês	\N	2025-07-05 01:32:04.810305+00	2025-07-05 01:32:04.810305+00	\N	ativo	f	\N
+55a8d110-ef76-43cf-bbcf-af835ef99177	Sensei Jonathan 	\N	tsschool@senseijonathan.com	Japonês	\N	2025-07-05 01:30:55.086026+00	2025-07-05 01:30:55.086026+00	45295090876	ativo	f	\N
+8669e542-0d6b-4638-b8b2-c22669e4c65e	Teacher Gabriel 	\N	tsschool@teachergabriel.com	Inglês	\N	2025-07-05 01:34:36.843295+00	2025-07-05 01:34:36.843295+00	\N	ativo	f	\N
+0a08a181-7fe4-4ba0-b900-fb116ef797e8	Teacher Lincoln 	\N	tsschool@teacherlincoln.com	Inglês	\N	2025-07-05 01:35:49.752763+00	2025-07-05 01:35:49.752763+00	\N	ativo	f	\N
 \.
 
 
@@ -5210,9 +4695,7 @@ COPY public.responsaveis (id, nome, cpf, endereco, telefone, created_at, updated
 1bb8fc99-8d0b-47e2-8300-8faeeb3b158d	Mãe do Kauan	28471574845	Avenida Paschoal Thomeu, Vila Nova Bonsucesso, Guarulhos - SP, CEP: 07175-090	1192328945	2025-06-15 21:09:40.764871+00	2025-06-15 21:09:40.764871+00	2502	ativo
 9326827b-2fc9-4d6b-93b3-b105272df834	pai do joão doido 	11112435567	Rua Santa Izabel do Pará, Jardim do Triunfo, Guarulhos - SP, CEP: 07175-390	(11) 94883-3725	2025-06-19 16:37:15.591993+00	2025-06-19 16:37:15.591993+00	15	ativo
 5f08fa1e-5e52-4800-939d-cfe4ee76f91c	Risoane Souza da Silva	28471574845	Avenida Paschoal Thomeu, Vila Nova Bonsucesso, Guarulhos - SP, CEP: 07175-090	(11) 99232-8945	2025-06-21 17:14:58.285608+00	2025-06-21 17:14:58.285608+00	2502	ativo
-fb3d4068-f150-4f5e-b8e7-a551d52dab40	Alex Sandro da Silva	26547400808	Avenida Paschoal Thomeu, Vila Nova Bonsucesso, Guarulhos - SP, CEP: 07175-090	(11) 99999-9999	2025-06-21 17:15:41.677934+00	2025-06-21 17:15:41.677934+00	2502	ativo
 c75f10c9-1ca2-4641-87b4-904e3f907ba9	mae do eduardo	93847984738	FSDFUS8FA0S9	(31) 31231-221	2025-06-21 17:21:57.5334+00	2025-06-21 17:21:57.5334+00	12231rfsdfsdfsa	ativo
-251269d0-93b5-43f8-93ea-fd61b8ca615f	Risoane Souza da Silva	43294829308	\N	\N	2025-06-21 17:22:10.776053+00	2025-06-21 17:22:10.776053+00	\N	ativo
 \.
 
 
@@ -5255,14 +4738,6 @@ c26c9b7a-5788-4c75-8cee-defd3b547bcf	Usuário Padrão	usuario@exemplo.com	meda1r
 --
 
 COPY public.usuarios_pendentes (id, nome, email, senha, cargo, permissoes, funcao, status, created_at, updated_at, perm_criar_alunos, perm_editar_alunos, perm_remover_alunos, perm_criar_turmas, perm_editar_turmas, perm_remover_turmas, perm_criar_contratos, perm_editar_contratos, perm_remover_contratos, perm_aprovar_contratos, perm_criar_aulas, perm_editar_aulas, perm_remover_aulas, perm_gerenciar_presencas, perm_criar_avaliacoes, perm_editar_avaliacoes, perm_remover_avaliacoes, perm_gerenciar_boletos, perm_gerenciar_despesas, perm_gerenciar_folha, perm_gerenciar_usuarios, perm_visualizar_gerador_contratos, perm_gerenciar_gerador_contratos, perm_visualizar_documentos, perm_gerenciar_documentos) FROM stdin;
-\.
-
-
---
--- Data for Name: messages_2025_07_01; Type: TABLE DATA; Schema: realtime; Owner: supabase_admin
---
-
-COPY realtime.messages_2025_07_01 (topic, extension, payload, event, private, updated_at, inserted_at, id) FROM stdin;
 \.
 
 
@@ -5311,6 +4786,14 @@ COPY realtime.messages_2025_07_06 (topic, extension, payload, event, private, up
 --
 
 COPY realtime.messages_2025_07_07 (topic, extension, payload, event, private, updated_at, inserted_at, id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: messages_2025_07_08; Type: TABLE DATA; Schema: realtime; Owner: supabase_admin
+--
+
+COPY realtime.messages_2025_07_08 (topic, extension, payload, event, private, updated_at, inserted_at, id) FROM stdin;
 \.
 
 
@@ -5463,6 +4946,7 @@ COPY storage.s3_multipart_uploads_parts (id, upload_id, size, part_number, bucke
 --
 
 COPY supabase_migrations.schema_migrations (version, statements, name, created_by, idempotency_key) FROM stdin;
+20250131000000	{"-- Configurar constraints para proteger planos e preservar histórico financeiro\r\n-- Esta migração resolve o problema de exclusão de alunos com planos associados\r\n\r\n-- 1. FINANCEIRO_ALUNOS -> PLANO: RESTRICT (protege o plano)\r\n-- Não permite excluir plano se há registros financeiros\r\nALTER TABLE public.financeiro_alunos \r\nDROP CONSTRAINT IF EXISTS financeiro_alunos_plano_id_fkey","ALTER TABLE public.financeiro_alunos \r\nADD CONSTRAINT financeiro_alunos_plano_id_fkey \r\nFOREIGN KEY (plano_id) REFERENCES public.planos(id) ON DELETE RESTRICT","-- 2. CONTRATOS -> PLANO: RESTRICT (protege o plano)\r\n-- Não permite excluir plano se há contratos ativos\r\nALTER TABLE public.contratos \r\nDROP CONSTRAINT IF EXISTS contratos_plano_id_fkey","ALTER TABLE public.contratos \r\nADD CONSTRAINT contratos_plano_id_fkey \r\nFOREIGN KEY (plano_id) REFERENCES public.planos(id) ON DELETE RESTRICT","-- 3. FINANCEIRO_ALUNOS -> ALUNO: SET NULL (preserva histórico financeiro)\r\n-- Quando aluno é excluído, mantém registros financeiros mas remove referência\r\nALTER TABLE public.financeiro_alunos \r\nDROP CONSTRAINT IF EXISTS financeiro_alunos_aluno_id_fkey","ALTER TABLE public.financeiro_alunos \r\nADD CONSTRAINT financeiro_alunos_aluno_id_fkey \r\nFOREIGN KEY (aluno_id) REFERENCES public.alunos(id) ON DELETE SET NULL","-- 4. CONTRATOS -> ALUNO: SET NULL (preserva histórico de contratos)\r\n-- Quando aluno é excluído, mantém contrato mas remove referência\r\nALTER TABLE public.contratos \r\nDROP CONSTRAINT IF EXISTS contratos_aluno_id_fkey","ALTER TABLE public.contratos \r\nADD CONSTRAINT contratos_aluno_id_fkey \r\nFOREIGN KEY (aluno_id) REFERENCES public.alunos(id) ON DELETE SET NULL","-- 5. PARCELAS -> ALUNO: SET NULL (preserva histórico de parcelas)\r\n-- Quando aluno é excluído, mantém parcelas mas remove referência\r\nALTER TABLE public.parcelas \r\nDROP CONSTRAINT IF EXISTS parcelas_aluno_id_fkey","ALTER TABLE public.parcelas \r\nADD CONSTRAINT parcelas_aluno_id_fkey \r\nFOREIGN KEY (aluno_id) REFERENCES public.alunos(id) ON DELETE SET NULL","-- 6. BOLETOS -> ALUNO: SET NULL (preserva histórico de boletos)\r\n-- Quando aluno é excluído, mantém boletos mas remove referência\r\nALTER TABLE public.boletos \r\nDROP CONSTRAINT IF EXISTS boletos_aluno_id_fkey","ALTER TABLE public.boletos \r\nADD CONSTRAINT boletos_aluno_id_fkey \r\nFOREIGN KEY (aluno_id) REFERENCES public.alunos(id) ON DELETE SET NULL","-- 7. RECIBOS -> ALUNO: SET NULL (preserva histórico de recibos)\r\n-- Quando aluno é excluído, mantém recibos mas remove referência\r\nALTER TABLE public.recibos \r\nDROP CONSTRAINT IF EXISTS recibos_aluno_id_fkey","ALTER TABLE public.recibos \r\nADD CONSTRAINT recibos_aluno_id_fkey \r\nFOREIGN KEY (aluno_id) REFERENCES public.alunos(id) ON DELETE SET NULL","-- 8. HISTORICO_PAGAMENTOS -> ALUNO: SET NULL (preserva histórico de pagamentos)\r\n-- Quando aluno é excluído, mantém histórico mas remove referência\r\nALTER TABLE public.historico_pagamentos \r\nDROP CONSTRAINT IF EXISTS historico_pagamentos_aluno_id_fkey","ALTER TABLE public.historico_pagamentos \r\nADD CONSTRAINT historico_pagamentos_aluno_id_fkey \r\nFOREIGN KEY (aluno_id) REFERENCES public.alunos(id) ON DELETE SET NULL"}	fix_planos_constraints_preserve_financial	\N	\N
 \.
 
 
@@ -5833,14 +5317,6 @@ ALTER TABLE ONLY public.notificacoes
 
 
 --
--- Name: parcelas parcelas_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.parcelas
-    ADD CONSTRAINT parcelas_pkey PRIMARY KEY (id);
-
-
---
 -- Name: pesquisas_satisfacao pesquisas_satisfacao_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -5961,14 +5437,6 @@ ALTER TABLE ONLY realtime.messages
 
 
 --
--- Name: messages_2025_07_01 messages_2025_07_01_pkey; Type: CONSTRAINT; Schema: realtime; Owner: supabase_admin
---
-
-ALTER TABLE ONLY realtime.messages_2025_07_01
-    ADD CONSTRAINT messages_2025_07_01_pkey PRIMARY KEY (id, inserted_at);
-
-
---
 -- Name: messages_2025_07_02 messages_2025_07_02_pkey; Type: CONSTRAINT; Schema: realtime; Owner: supabase_admin
 --
 
@@ -6014,6 +5482,14 @@ ALTER TABLE ONLY realtime.messages_2025_07_06
 
 ALTER TABLE ONLY realtime.messages_2025_07_07
     ADD CONSTRAINT messages_2025_07_07_pkey PRIMARY KEY (id, inserted_at);
+
+
+--
+-- Name: messages_2025_07_08 messages_2025_07_08_pkey; Type: CONSTRAINT; Schema: realtime; Owner: supabase_admin
+--
+
+ALTER TABLE ONLY realtime.messages_2025_07_08
+    ADD CONSTRAINT messages_2025_07_08_pkey PRIMARY KEY (id, inserted_at);
 
 
 --
@@ -6444,7 +5920,7 @@ CREATE INDEX idx_boletos_status ON public.boletos USING btree (status);
 -- Name: idx_contratos_data_fim_status; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_contratos_data_fim_status ON public.contratos USING btree (data_fim, status) WHERE (status = 'Ativo'::public.status_contrato);
+CREATE INDEX idx_contratos_data_fim_status ON public.contratos USING btree (data_fim, status_contrato) WHERE (status_contrato = 'Ativo'::public.status_contrato);
 
 
 --
@@ -6574,13 +6050,6 @@ CREATE INDEX idx_historico_pagamentos_metodo_pagamento ON public.historico_pagam
 
 
 --
--- Name: idx_historico_pagamentos_parcela_id; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_historico_pagamentos_parcela_id ON public.historico_pagamentos USING btree (parcela_id);
-
-
---
 -- Name: idx_historico_pagamentos_tipo_transacao; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -6595,48 +6064,6 @@ CREATE INDEX idx_materiais_status ON public.materiais USING btree (status);
 
 
 --
--- Name: idx_parcelas_aluno_id; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_parcelas_aluno_id ON public.parcelas USING btree (aluno_id);
-
-
---
--- Name: idx_parcelas_data_criacao; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_parcelas_data_criacao ON public.parcelas USING btree (data_criacao);
-
-
---
--- Name: idx_parcelas_forma_pagamento_material; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_parcelas_forma_pagamento_material ON public.parcelas USING btree (forma_pagamento_material_uuid);
-
-
---
--- Name: idx_parcelas_forma_pagamento_matricula; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_parcelas_forma_pagamento_matricula ON public.parcelas USING btree (forma_pagamento_matricula_uuid);
-
-
---
--- Name: idx_parcelas_forma_pagamento_plano; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_parcelas_forma_pagamento_plano ON public.parcelas USING btree (forma_pagamento_plano_uuid);
-
-
---
--- Name: idx_parcelas_nome_aluno; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_parcelas_nome_aluno ON public.parcelas USING btree (nome_aluno);
-
-
---
 -- Name: idx_planos_ativo; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -6648,6 +6075,13 @@ CREATE INDEX idx_planos_ativo ON public.planos USING btree (ativo);
 --
 
 CREATE INDEX idx_planos_created_at ON public.planos USING btree (created_at);
+
+
+--
+-- Name: idx_planos_idioma; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_planos_idioma ON public.planos USING btree (idioma);
 
 
 --
@@ -6770,13 +6204,6 @@ CREATE INDEX name_prefix_search ON storage.objects USING btree (name text_patter
 
 
 --
--- Name: messages_2025_07_01_pkey; Type: INDEX ATTACH; Schema: realtime; Owner: supabase_realtime_admin
---
-
-ALTER INDEX realtime.messages_pkey ATTACH PARTITION realtime.messages_2025_07_01_pkey;
-
-
---
 -- Name: messages_2025_07_02_pkey; Type: INDEX ATTACH; Schema: realtime; Owner: supabase_realtime_admin
 --
 
@@ -6819,6 +6246,13 @@ ALTER INDEX realtime.messages_pkey ATTACH PARTITION realtime.messages_2025_07_07
 
 
 --
+-- Name: messages_2025_07_08_pkey; Type: INDEX ATTACH; Schema: realtime; Owner: supabase_realtime_admin
+--
+
+ALTER INDEX realtime.messages_pkey ATTACH PARTITION realtime.messages_2025_07_08_pkey;
+
+
+--
 -- Name: planos trigger_calculate_valor_por_aula; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -6830,13 +6264,6 @@ CREATE TRIGGER trigger_calculate_valor_por_aula BEFORE INSERT OR UPDATE OF valor
 --
 
 CREATE TRIGGER trigger_registrar_pagamento_historico AFTER UPDATE ON public.boletos FOR EACH ROW EXECUTE FUNCTION public.registrar_pagamento_historico();
-
-
---
--- Name: parcelas trigger_registrar_pagamento_parcela_historico; Type: TRIGGER; Schema: public; Owner: postgres
---
-
-CREATE TRIGGER trigger_registrar_pagamento_parcela_historico AFTER UPDATE ON public.parcelas FOR EACH ROW EXECUTE FUNCTION public.registrar_pagamento_parcela_historico();
 
 
 --
@@ -7086,7 +6513,7 @@ COMMENT ON CONSTRAINT documentos_professor_id_fkey ON public.documentos IS 'SET 
 --
 
 ALTER TABLE ONLY public.financeiro_alunos
-    ADD CONSTRAINT financeiro_alunos_aluno_id_fkey FOREIGN KEY (aluno_id) REFERENCES public.alunos(id) ON DELETE CASCADE;
+    ADD CONSTRAINT financeiro_alunos_aluno_id_fkey FOREIGN KEY (aluno_id) REFERENCES public.alunos(id) ON DELETE SET NULL;
 
 
 --
@@ -7137,14 +6564,6 @@ ALTER TABLE ONLY public.historico_pagamentos
 
 
 --
--- Name: historico_pagamentos historico_pagamentos_parcela_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.historico_pagamentos
-    ADD CONSTRAINT historico_pagamentos_parcela_id_fkey FOREIGN KEY (parcela_id) REFERENCES public.parcelas(id) ON DELETE CASCADE;
-
-
---
 -- Name: historico_pagamentos historico_pagamentos_usuario_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -7182,14 +6601,6 @@ ALTER TABLE ONLY public.materiais_entregues
 
 ALTER TABLE ONLY public.notificacoes
     ADD CONSTRAINT notificacoes_destinatario_id_fkey FOREIGN KEY (destinatario_id) REFERENCES public.alunos(id) ON DELETE CASCADE;
-
-
---
--- Name: parcelas parcelas_aluno_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.parcelas
-    ADD CONSTRAINT parcelas_aluno_id_fkey FOREIGN KEY (aluno_id) REFERENCES public.alunos(id) ON DELETE SET NULL;
 
 
 --
@@ -7537,13 +6948,6 @@ CREATE POLICY "Allow all operations for authenticated users" ON public.notificac
 
 
 --
--- Name: parcelas Allow all operations for authenticated users; Type: POLICY; Schema: public; Owner: postgres
---
-
-CREATE POLICY "Allow all operations for authenticated users" ON public.parcelas USING (true);
-
-
---
 -- Name: pesquisas_satisfacao Allow all operations for authenticated users; Type: POLICY; Schema: public; Owner: postgres
 --
 
@@ -7885,12 +7289,6 @@ ALTER TABLE public.materiais_entregues ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.notificacoes ENABLE ROW LEVEL SECURITY;
-
---
--- Name: parcelas; Type: ROW SECURITY; Schema: public; Owner: postgres
---
-
-ALTER TABLE public.parcelas ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: pesquisas_satisfacao; Type: ROW SECURITY; Schema: public; Owner: postgres
@@ -8644,18 +8042,6 @@ GRANT ALL ON FUNCTION public.check_professor_dependencies(p_professor_id uuid) T
 GRANT ALL ON FUNCTION public.check_professor_dependencies(p_professor_id uuid) TO service_role;
 
 
-
-
-
---
--- Name: FUNCTION hard_delete_professor(p_professor_id uuid, p_delete_financeiro boolean, p_delete_academico boolean); Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT ALL ON FUNCTION public.hard_delete_professor(p_professor_id uuid, p_delete_financeiro boolean, p_delete_academico boolean) TO anon;
-GRANT ALL ON FUNCTION public.hard_delete_professor(p_professor_id uuid, p_delete_financeiro boolean, p_delete_academico boolean) TO authenticated;
-GRANT ALL ON FUNCTION public.hard_delete_professor(p_professor_id uuid, p_delete_financeiro boolean, p_delete_academico boolean) TO service_role;
-
-
 --
 -- Name: FUNCTION obter_permissoes_usuario(usuario_id uuid); Type: ACL; Schema: public; Owner: postgres
 --
@@ -9197,15 +8583,6 @@ GRANT ALL ON TABLE public.notificacoes TO service_role;
 
 
 --
--- Name: TABLE parcelas; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT ALL ON TABLE public.parcelas TO anon;
-GRANT ALL ON TABLE public.parcelas TO authenticated;
-GRANT ALL ON TABLE public.parcelas TO service_role;
-
-
---
 -- Name: TABLE pesquisas_satisfacao; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -9325,14 +8702,6 @@ GRANT SELECT,INSERT,UPDATE ON TABLE realtime.messages TO service_role;
 
 
 --
--- Name: TABLE messages_2025_07_01; Type: ACL; Schema: realtime; Owner: supabase_admin
---
-
-GRANT ALL ON TABLE realtime.messages_2025_07_01 TO postgres;
-GRANT ALL ON TABLE realtime.messages_2025_07_01 TO dashboard_user;
-
-
---
 -- Name: TABLE messages_2025_07_02; Type: ACL; Schema: realtime; Owner: supabase_admin
 --
 
@@ -9378,6 +8747,14 @@ GRANT ALL ON TABLE realtime.messages_2025_07_06 TO dashboard_user;
 
 GRANT ALL ON TABLE realtime.messages_2025_07_07 TO postgres;
 GRANT ALL ON TABLE realtime.messages_2025_07_07 TO dashboard_user;
+
+
+--
+-- Name: TABLE messages_2025_07_08; Type: ACL; Schema: realtime; Owner: supabase_admin
+--
+
+GRANT ALL ON TABLE realtime.messages_2025_07_08 TO postgres;
+GRANT ALL ON TABLE realtime.messages_2025_07_08 TO dashboard_user;
 
 
 --

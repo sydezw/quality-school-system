@@ -137,8 +137,14 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
     const aulasQueAlunoVaiPagar = parseInt(watchedValues.aulas_pagas) || 0;
     const valorMatricula = parseFloat(watchedValues.valor_matricula) || 0;
     const valorMaterial = parseFloat(watchedValues.valor_material) || 0;
-
-    if (!planoSelecionado || aulasQueAlunoVaiPagar <= 0) {
+  
+    // Debug logs
+    console.log('=== DEBUG CÁLCULOS ===');
+    console.log('watchedValues.aulas_pagas:', watchedValues.aulas_pagas);
+    console.log('aulasQueAlunoVaiPagar:', aulasQueAlunoVaiPagar);
+    console.log('planoSelecionado:', planoSelecionado);
+  
+    if (!planoSelecionado) {
       return {
         aulasTotal: 0,
         aulasGratuitas: 0,
@@ -152,30 +158,42 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
         ajuste: 0
       };
     }
-
-    // Nova lógica de cálculo
+  
     const valorTotalPlano = planoSelecionado.valor_total || 0;
     const aulasTotaisNoPlano = planoSelecionado.numero_aulas || 0;
     
-    // 1. precoPorAula = valorTotalPlano ÷ aulasTotaisNoPlano
     const precoPorAula = aulasTotaisNoPlano > 0 ? valorTotalPlano / aulasTotaisNoPlano : 0;
-    
-    // 2. valorAPagar = aulasQueAlunoVaiPagar × precoPorAula
     const valorAPagar = aulasQueAlunoVaiPagar * precoPorAula;
-    
-    // 3. ajuste = valorAPagar − valorTotalPlano
     const ajuste = valorAPagar - valorTotalPlano;
-    
-    // Para compatibilidade com o resto do código
+  
     const aulasTotal = aulasTotaisNoPlano;
-    const aulasGratuitas = Math.max(0, aulasTotal - aulasQueAlunoVaiPagar);
+  
+    // Lógica inteligente para aulas gratuitas
+    let aulasGratuitas = 0;
+    let descontoCalculado = 0;
+  
+    if (aulasQueAlunoVaiPagar <= aulasTotaisNoPlano) {
+      // Caso normal: pagando menos ou igual ao plano
+      aulasGratuitas = aulasTotaisNoPlano - aulasQueAlunoVaiPagar;
+      descontoCalculado = Math.abs(ajuste); // Desconto por pagar menos aulas
+    } else {
+      // Caso especial: pagando mais aulas que o plano oferece
+      aulasGratuitas = 0; // Não há aulas gratuitas
+      descontoCalculado = 0; // Não há desconto, está pagando extra
+    }
+  
     const aulasAPagar = aulasQueAlunoVaiPagar;
     const valorPlano = valorTotalPlano;
-    const descontoCalculado = Math.abs(ajuste < 0 ? ajuste : 0); // Desconto quando ajuste é negativo
-    
     const valorTotal = valorAPagar + valorMatricula + valorMaterial;
     const valorComDesconto = valorTotal - descontoCalculado;
-
+  
+    console.log('Resultados calculados:');
+    console.log('aulasTotal:', aulasTotal);
+    console.log('aulasGratuitas:', aulasGratuitas);
+    console.log('aulasAPagar:', aulasAPagar);
+    console.log('valorAPagar:', valorAPagar);
+    console.log('descontoCalculado:', descontoCalculado);
+  
     return {
       aulasTotal,
       aulasGratuitas,
@@ -355,14 +373,9 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
       <h2 className="text-2xl font-bold mb-4">Criar Plano de Pagamento</h2>
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {/* Seleção de Aluno e Plano */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="aluno_id">Aluno *</Label>
-            {preSelectedStudent && (
-              <p className="text-sm text-blue-600 mb-2">
-                Aluno selecionado: {preSelectedStudent.nome}
-              </p>
-            )}
             <Controller
               name="aluno_id"
               control={control}
@@ -370,48 +383,55 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
               render={({ field }) => {
                 const selectedStudent = students.find(student => student.id === field.value);
                 return (
-                  <Popover open={openStudentSearch} onOpenChange={setOpenStudentSearch}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={openStudentSearch}
-                        className="w-full justify-between"
-                        disabled={!!preSelectedStudent}
-                      >
-                        {selectedStudent ? selectedStudent.nome : "Buscar aluno..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Digite o nome do aluno..." />
-                        <CommandEmpty>Nenhum aluno encontrado.</CommandEmpty>
-                        <CommandGroup>
-                          <CommandList className="max-h-[200px] overflow-y-auto">
-                            {students.map((student) => (
-                              <CommandItem
-                                key={student.id}
-                                value={student.nome}
-                                onSelect={() => {
-                                  field.onChange(student.id);
-                                  setOpenStudentSearch(false);
-                                }}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    field.value === student.id ? "opacity-100" : "opacity-0"
-                                  )}
-                                />
-                                {student.nome}
-                              </CommandItem>
-                            ))}
-                          </CommandList>
-                        </CommandGroup>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                  <div>
+                    <Popover open={openStudentSearch} onOpenChange={setOpenStudentSearch}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={openStudentSearch}
+                          className="w-full justify-between"
+                          disabled={!!preSelectedStudent}
+                        >
+                          {selectedStudent ? selectedStudent.nome : "Buscar aluno..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0">
+                        <Command>
+                          <CommandInput placeholder="Digite o nome do aluno..." />
+                          <CommandEmpty>Nenhum aluno encontrado.</CommandEmpty>
+                          <CommandGroup>
+                            <CommandList className="max-h-[200px] overflow-y-auto">
+                              {students.map((student) => (
+                                <CommandItem
+                                  key={student.id}
+                                  value={student.nome}
+                                  onSelect={() => {
+                                    field.onChange(student.id);
+                                    setOpenStudentSearch(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      field.value === student.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  {student.nome}
+                                </CommandItem>
+                              ))}
+                            </CommandList>
+                          </CommandGroup>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    {preSelectedStudent && (
+                      <p className="text-sm text-gray-600 font-medium mt-1">
+                        Aluno selecionado: {preSelectedStudent.nome}
+                      </p>
+                    )}
+                  </div>
                 );
               }}
             />
@@ -425,31 +445,26 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
               rules={{ required: true }}
               render={({ field }) => {
                 return (
-                  <div className="space-y-4">
-                    {/* Select tradicional para compatibilidade */}
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger className="w-full px-2 py-1 text-sm">
-                        <SelectValue placeholder="Selecione o plano" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {planosGenericos.map((plano) => (
-                          <SelectItem 
-                            key={plano.id}
-                            value={plano.id}
-                            className="cursor-pointer hover:bg-gray-50"
-                          >
-                            {plano.nome} - R$ {(plano.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                  </div>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger className="w-full px-2 py-1 text-sm">
+                      <SelectValue placeholder="Selecione o plano" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {planosGenericos.map((plano) => (
+                        <SelectItem 
+                          key={plano.id}
+                          value={plano.id}
+                          className="cursor-pointer hover:bg-gray-50"
+                        >
+                          {plano.nome} - R$ {(plano.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 );
               }
             }
             />
-
           </div>
         </div>
 
@@ -467,11 +482,72 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
             id="aulas_pagas"
             type="number"
             min="1"
-            max="100"
-            {...register('aulas_pagas', { required: true, min: 1 })}
-            placeholder="Ex: 22"
+            disabled={!watchedValues.plano_id}
+            {...register('aulas_pagas', { 
+              required: "Por favor, informe o número de aulas pagas",
+              min: {
+                value: 1,
+                message: "O número de aulas deve ser pelo menos 1"
+              },
+              validate: {
+                planoSelecionado: (value) => {
+                  if (!watchedValues.plano_id) {
+                    return "Por favor, selecione um plano primeiro";
+                  }
+                  return true;
+                },
+                // Validação suave - só avisa, não bloqueia
+                limiteAulas: (value) => {
+                  if (!watchedValues.plano_id) return true;
+                  
+                  const planoSelecionado = planosGenericos.find(p => p.id === watchedValues.plano_id);
+                  if (!planoSelecionado) return true;
+                  
+                  const maxAulas = planoSelecionado.numero_aulas;
+                  const aulasInformadas = parseInt(value) || 0;
+                  
+                  // Permite digitar qualquer valor, mas avisa se exceder
+                  if (aulasInformadas > maxAulas) {
+                    return `Atenção: O plano tem apenas ${maxAulas} aulas. Você está pagando por ${aulasInformadas - maxAulas} aulas extras.`;
+                  }
+                  
+                  return true;
+                }
+              }
+            })}
+            placeholder={watchedValues.plano_id ? "Ex: 10, 15, 22..." : "Selecione um plano primeiro"}
           />
-          <p className="text-xs text-gray-500 mt-1">Máximo: 100 aulas</p>
+          
+          {/* Mensagem dinâmica baseada no valor digitado */}
+          {watchedValues.plano_id && watchedValues.aulas_pagas && (
+            <div className="text-xs mt-1">
+              {(() => {
+                const planoSelecionado = planosGenericos.find(p => p.id === watchedValues.plano_id);
+                const maxAulas = planoSelecionado?.numero_aulas || 0;
+                const aulasDigitadas = parseInt(watchedValues.aulas_pagas) || 0;
+                
+                if (aulasDigitadas <= maxAulas) {
+                  return (
+                    <p className="text-green-600">
+                      {maxAulas - aulasDigitadas} aulas gratuitas (de {maxAulas} total)
+                    </p>
+                  );
+                } else {
+                  return (
+                    <p className="text-orange-600">
+                      Pagando {aulasDigitadas - maxAulas} aulas extras (plano tem {maxAulas} aulas)
+                    </p>
+                  );
+                }
+              })()} 
+            </div>
+          )}
+          
+          {!watchedValues.plano_id && (
+            <p className="text-xs text-gray-400 mt-1">
+              Selecione um plano para ver os cálculos
+            </p>
+          )}
         </div>
 
 
@@ -483,13 +559,17 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
             
             {/* Coluna Esquerda */}
             <div className="space-y-1 text-left pr-4">
-              <p className="text-black text-sm">Valor a ser pago:</p>
-              <p className="text-green-600 font-semibold text-lg text-left">
-                R$ {formatarDecimalBR(calculatedValues.valorAPagar)}
+              <p className="text-black text-sm">Valor do Plano:</p>
+              <p className="text-black font-semibold text-lg text-left">
+                R$ {formatarDecimalBR(calculatedValues.valorPlano)}
               </p>
-              <p className="text-black text-sm">Desconto calculado:</p>
-              <p className="text-green-600 font-semibold text-lg text-left">
+              <p className="text-black text-sm">Valor com Desconto:</p>
+              <p className="text-green-500 font-semibold text-lg text-left">
                 R$ {formatarDecimalBR(calculatedValues.descontoCalculado)}
+              </p>
+              <p className="text-black text-sm">Valor a ser pago:</p>
+              <p className="text-green-800 font-semibold text-lg text-left">
+                R$ {formatarDecimalBR(calculatedValues.valorAPagar)}
               </p>
             </div>
             

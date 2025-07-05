@@ -7,6 +7,31 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          operationName?: string
+          query?: string
+          variables?: Json
+          extensions?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       agenda: {
@@ -59,6 +84,7 @@ export type Database = {
           created_at: string
           data_cancelamento: string | null
           data_conclusao: string | null
+          data_exclusao: string | null
           data_nascimento: string | null
           email: string | null
           endereco: string | null
@@ -77,6 +103,7 @@ export type Database = {
           created_at?: string
           data_cancelamento?: string | null
           data_conclusao?: string | null
+          data_exclusao?: string | null
           data_nascimento?: string | null
           email?: string | null
           endereco?: string | null
@@ -95,6 +122,7 @@ export type Database = {
           created_at?: string
           data_cancelamento?: string | null
           data_conclusao?: string | null
+          data_exclusao?: string | null
           data_nascimento?: string | null
           email?: string | null
           endereco?: string | null
@@ -261,7 +289,7 @@ export type Database = {
       }
       boletos: {
         Row: {
-          aluno_id: string
+          aluno_id: string | null
           contrato_id: string | null
           created_at: string
           data_pagamento: string | null
@@ -279,7 +307,7 @@ export type Database = {
           valor: number
         }
         Insert: {
-          aluno_id: string
+          aluno_id?: string | null
           contrato_id?: string | null
           created_at?: string
           data_pagamento?: string | null
@@ -297,7 +325,7 @@ export type Database = {
           valor: number
         }
         Update: {
-          aluno_id?: string
+          aluno_id?: string | null
           contrato_id?: string | null
           created_at?: string
           data_pagamento?: string | null
@@ -329,6 +357,13 @@ export type Database = {
             referencedRelation: "contratos"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "boletos_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos_vencendo"
+            referencedColumns: ["id"]
+          },
         ]
       }
       configuracoes: {
@@ -357,58 +392,40 @@ export type Database = {
       }
       contratos: {
         Row: {
-          aluno_id: string
-          aulas_pagas: number | null
+          aluno_id: string | null
           created_at: string
           data_fim: string | null
           data_inicio: string
-          forma_pagamento: string | null
           id: string
-          numero_parcelas: number | null
           observacao: string | null
           plano_id: string | null
-          status: Database["public"]["Enums"]["status_contrato"]
+          status_contrato: Database["public"]["Enums"]["status_contrato"]
           updated_at: string
-          valor_material: number | null
-          valor_matricula: number | null
           valor_mensalidade: number
-          valor_total: number | null
         }
         Insert: {
-          aluno_id: string
-          aulas_pagas?: number | null
+          aluno_id?: string | null
           created_at?: string
           data_fim?: string | null
           data_inicio: string
-          forma_pagamento?: string | null
           id?: string
-          numero_parcelas?: number | null
           observacao?: string | null
           plano_id?: string | null
-          status?: Database["public"]["Enums"]["status_contrato"]
+          status_contrato?: Database["public"]["Enums"]["status_contrato"]
           updated_at?: string
-          valor_material?: number | null
-          valor_matricula?: number | null
           valor_mensalidade: number
-          valor_total?: number | null
         }
         Update: {
-          aluno_id?: string
-          aulas_pagas?: number | null
+          aluno_id?: string | null
           created_at?: string
           data_fim?: string | null
           data_inicio?: string
-          forma_pagamento?: string | null
           id?: string
-          numero_parcelas?: number | null
           observacao?: string | null
           plano_id?: string | null
-          status?: Database["public"]["Enums"]["status_contrato"]
+          status_contrato?: Database["public"]["Enums"]["status_contrato"]
           updated_at?: string
-          valor_material?: number | null
-          valor_matricula?: number | null
           valor_mensalidade?: number
-          valor_total?: number | null
         }
         Relationships: [
           {
@@ -420,84 +437,6 @@ export type Database = {
           },
           {
             foreignKeyName: "contratos_plano_id_fkey"
-            columns: ["plano_id"]
-            isOneToOne: false
-            referencedRelation: "planos"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      financeiro_alunos: {
-        Row: {
-          aluno_id: string
-          created_at: string
-          data_primeiro_vencimento: string
-          desconto_total: number
-          forma_pagamento_matricula: string
-          forma_pagamento_material: string
-          forma_pagamento_plano: string
-          id: string
-          numero_parcelas_matricula: number
-          numero_parcelas_material: number
-          numero_parcelas_plano: number
-          plano_id: string
-          status_geral: string
-          updated_at: string
-          valor_material: number
-          valor_matricula: number
-          valor_plano: number
-          valor_total: number
-        }
-        Insert: {
-          aluno_id: string
-          created_at?: string
-          data_primeiro_vencimento: string
-          desconto_total?: number
-          forma_pagamento_matricula?: string
-          forma_pagamento_material?: string
-          forma_pagamento_plano?: string
-          id?: string
-          numero_parcelas_matricula?: number
-          numero_parcelas_material?: number
-          numero_parcelas_plano?: number
-          plano_id: string
-          status_geral?: string
-          updated_at?: string
-          valor_material?: number
-          valor_matricula?: number
-          valor_plano?: number
-          valor_total: number
-        }
-        Update: {
-          aluno_id?: string
-          created_at?: string
-          data_primeiro_vencimento?: string
-          desconto_total?: number
-          forma_pagamento_matricula?: string
-          forma_pagamento_material?: string
-          forma_pagamento_plano?: string
-          id?: string
-          numero_parcelas_matricula?: number
-          numero_parcelas_material?: number
-          numero_parcelas_plano?: number
-          plano_id?: string
-          status_geral?: string
-          updated_at?: string
-          valor_material?: number
-          valor_matricula?: number
-          valor_plano?: number
-          valor_total?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "financeiro_alunos_aluno_id_fkey"
-            columns: ["aluno_id"]
-            isOneToOne: false
-            referencedRelation: "alunos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "financeiro_alunos_plano_id_fkey"
             columns: ["plano_id"]
             isOneToOne: false
             referencedRelation: "planos"
@@ -541,33 +480,33 @@ export type Database = {
       documentos: {
         Row: {
           aluno_id: string | null
-          professor_id: string | null
           arquivo_link: string | null
           created_at: string
           data: string
           id: string
+          professor_id: string | null
           status: Database["public"]["Enums"]["status_documento"]
           tipo: Database["public"]["Enums"]["tipo_documento"]
           updated_at: string
         }
         Insert: {
           aluno_id?: string | null
-          professor_id?: string | null
           arquivo_link?: string | null
           created_at?: string
           data: string
           id?: string
+          professor_id?: string | null
           status?: Database["public"]["Enums"]["status_documento"]
           tipo: Database["public"]["Enums"]["tipo_documento"]
           updated_at?: string
         }
         Update: {
           aluno_id?: string | null
-          professor_id?: string | null
           arquivo_link?: string | null
           created_at?: string
           data?: string
           id?: string
+          professor_id?: string | null
           status?: Database["public"]["Enums"]["status_documento"]
           tipo?: Database["public"]["Enums"]["tipo_documento"]
           updated_at?: string
@@ -585,6 +524,84 @@ export type Database = {
             columns: ["professor_id"]
             isOneToOne: false
             referencedRelation: "professores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      financeiro_alunos: {
+        Row: {
+          aluno_id: string | null
+          created_at: string | null
+          data_primeiro_vencimento: string
+          desconto_total: number
+          forma_pagamento_material: string | null
+          forma_pagamento_matricula: string | null
+          forma_pagamento_plano: string | null
+          id: string
+          numero_parcelas_material: number | null
+          numero_parcelas_matricula: number | null
+          numero_parcelas_plano: number | null
+          plano_id: string
+          status_geral: string
+          updated_at: string | null
+          valor_material: number
+          valor_matricula: number
+          valor_plano: number
+          valor_total: number
+        }
+        Insert: {
+          aluno_id?: string | null
+          created_at?: string | null
+          data_primeiro_vencimento: string
+          desconto_total?: number
+          forma_pagamento_material?: string | null
+          forma_pagamento_matricula?: string | null
+          forma_pagamento_plano?: string | null
+          id?: string
+          numero_parcelas_material?: number | null
+          numero_parcelas_matricula?: number | null
+          numero_parcelas_plano?: number | null
+          plano_id: string
+          status_geral?: string
+          updated_at?: string | null
+          valor_material?: number
+          valor_matricula?: number
+          valor_plano?: number
+          valor_total: number
+        }
+        Update: {
+          aluno_id?: string | null
+          created_at?: string | null
+          data_primeiro_vencimento?: string
+          desconto_total?: number
+          forma_pagamento_material?: string | null
+          forma_pagamento_matricula?: string | null
+          forma_pagamento_plano?: string | null
+          id?: string
+          numero_parcelas_material?: number | null
+          numero_parcelas_matricula?: number | null
+          numero_parcelas_plano?: number | null
+          plano_id?: string
+          status_geral?: string
+          updated_at?: string | null
+          valor_material?: number
+          valor_matricula?: number
+          valor_plano?: number
+          valor_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financeiro_alunos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "alunos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financeiro_alunos_plano_id_fkey"
+            columns: ["plano_id"]
+            isOneToOne: false
+            referencedRelation: "planos"
             referencedColumns: ["id"]
           },
         ]
@@ -626,6 +643,108 @@ export type Database = {
             columns: ["professor_id"]
             isOneToOne: false
             referencedRelation: "professores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      historico_pagamentos: {
+        Row: {
+          aluno_id: string | null
+          boleto_id: string | null
+          contrato_id: string | null
+          created_at: string
+          data_pagamento: string
+          data_vencimento_original: string
+          desconto: number | null
+          id: string
+          juros: number | null
+          metodo_pagamento: string
+          multa: number | null
+          observacoes: string | null
+          status_anterior: string | null
+          status_novo: string | null
+          tipo_transacao: string
+          updated_at: string
+          usuario_id: string | null
+          valor_original: number
+          valor_pago: number
+        }
+        Insert: {
+          aluno_id?: string | null
+          boleto_id?: string | null
+          contrato_id?: string | null
+          created_at?: string
+          data_pagamento: string
+          data_vencimento_original: string
+          desconto?: number | null
+          id?: string
+          juros?: number | null
+          metodo_pagamento: string
+          multa?: number | null
+          observacoes?: string | null
+          status_anterior?: string | null
+          status_novo?: string | null
+          tipo_transacao: string
+          updated_at?: string
+          usuario_id?: string | null
+          valor_original: number
+          valor_pago: number
+        }
+        Update: {
+          aluno_id?: string | null
+          boleto_id?: string | null
+          contrato_id?: string | null
+          created_at?: string
+          data_pagamento?: string
+          data_vencimento_original?: string
+          desconto?: number | null
+          id?: string
+          juros?: number | null
+          metodo_pagamento?: string
+          multa?: number | null
+          observacoes?: string | null
+          status_anterior?: string | null
+          status_novo?: string | null
+          tipo_transacao?: string
+          updated_at?: string
+          usuario_id?: string | null
+          valor_original?: number
+          valor_pago?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "historico_pagamentos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "alunos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historico_pagamentos_boleto_id_fkey"
+            columns: ["boleto_id"]
+            isOneToOne: false
+            referencedRelation: "boletos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historico_pagamentos_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historico_pagamentos_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos_vencendo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historico_pagamentos_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
             referencedColumns: ["id"]
           },
         ]
@@ -706,7 +825,7 @@ export type Database = {
       }
       materiais_entregues: {
         Row: {
-          aluno_id: string
+          aluno_id: string | null
           created_at: string
           data_entrega: string
           id: string
@@ -714,7 +833,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          aluno_id: string
+          aluno_id?: string | null
           created_at?: string
           data_entrega: string
           id?: string
@@ -722,7 +841,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          aluno_id?: string
+          aluno_id?: string | null
           created_at?: string
           data_entrega?: string
           id?: string
@@ -787,186 +906,6 @@ export type Database = {
           },
         ]
       }
-      parcelas: {
-        Row: {
-          aluno_id: string
-          boleto_link: string | null
-          contrato_id: string | null
-          created_at: string
-          data_pagamento: string | null
-          data_vencimento: string
-          descricao: string
-          id: string
-          juros: number | null
-          metodo_pagamento: string | null
-          multa: number | null
-          numero_parcela: number | null
-          observacao: string | null
-          status: Database["public"]["Enums"]["status_boleto"]
-          updated_at: string
-          valor: number
-          valor_pago: number | null
-        }
-        Insert: {
-          aluno_id: string
-          boleto_link?: string | null
-          contrato_id?: string | null
-          created_at?: string
-          data_pagamento?: string | null
-          data_vencimento: string
-          descricao: string
-          id?: string
-          juros?: number | null
-          metodo_pagamento?: string | null
-          multa?: number | null
-          numero_parcela?: number | null
-          observacao?: string | null
-          status?: Database["public"]["Enums"]["status_boleto"]
-          updated_at?: string
-          valor: number
-          valor_pago?: number | null
-        }
-        Update: {
-          aluno_id?: string
-          boleto_link?: string | null
-          contrato_id?: string | null
-          created_at?: string
-          data_pagamento?: string | null
-          data_vencimento?: string
-          descricao?: string
-          id?: string
-          juros?: number | null
-          metodo_pagamento?: string | null
-          multa?: number | null
-          numero_parcela?: number | null
-          observacao?: string | null
-          status?: Database["public"]["Enums"]["status_boleto"]
-          updated_at?: string
-          valor?: number
-          valor_pago?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "parcelas_aluno_id_fkey"
-            columns: ["aluno_id"]
-            isOneToOne: false
-            referencedRelation: "alunos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "parcelas_contrato_id_fkey"
-            columns: ["contrato_id"]
-            isOneToOne: false
-            referencedRelation: "contratos"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      historico_pagamentos: {
-        Row: {
-          aluno_id: string | null
-          boleto_id: string | null
-          contrato_id: string | null
-          created_at: string
-          data_pagamento: string
-          data_vencimento_original: string
-          desconto: number | null
-          id: string
-          juros: number | null
-          metodo_pagamento: string
-          multa: number | null
-          observacoes: string | null
-          parcela_id: string | null
-          status_anterior: string | null
-          status_novo: string | null
-          tipo_transacao: string
-          updated_at: string
-          usuario_id: string | null
-          valor_original: number
-          valor_pago: number
-        }
-        Insert: {
-          aluno_id?: string | null
-          boleto_id?: string | null
-          contrato_id?: string | null
-          created_at?: string
-          data_pagamento: string
-          data_vencimento_original: string
-          desconto?: number | null
-          id?: string
-          juros?: number | null
-          metodo_pagamento: string
-          multa?: number | null
-          observacoes?: string | null
-          parcela_id?: string | null
-          status_anterior?: string | null
-          status_novo?: string | null
-          tipo_transacao: string
-          updated_at?: string
-          usuario_id?: string | null
-          valor_original: number
-          valor_pago: number
-        }
-        Update: {
-          aluno_id?: string | null
-          boleto_id?: string | null
-          contrato_id?: string | null
-          created_at?: string
-          data_pagamento?: string
-          data_vencimento_original?: string
-          desconto?: number | null
-          id?: string
-          juros?: number | null
-          metodo_pagamento?: string
-          multa?: number | null
-          observacoes?: string | null
-          parcela_id?: string | null
-          status_anterior?: string | null
-          status_novo?: string | null
-          tipo_transacao?: string
-          updated_at?: string
-          usuario_id?: string | null
-          valor_original?: number
-          valor_pago?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "historico_pagamentos_aluno_id_fkey"
-            columns: ["aluno_id"]
-            isOneToOne: false
-            referencedRelation: "alunos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "historico_pagamentos_boleto_id_fkey"
-            columns: ["boleto_id"]
-            isOneToOne: false
-            referencedRelation: "boletos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "historico_pagamentos_contrato_id_fkey"
-            columns: ["contrato_id"]
-            isOneToOne: false
-            referencedRelation: "contratos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "historico_pagamentos_parcela_id_fkey"
-            columns: ["parcela_id"]
-            isOneToOne: false
-            referencedRelation: "parcelas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "historico_pagamentos_usuario_id_fkey"
-            columns: ["usuario_id"]
-            isOneToOne: false
-            referencedRelation: "usuarios"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       pesquisas_satisfacao: {
         Row: {
           aluno_id: string
@@ -1015,6 +954,63 @@ export type Database = {
           },
         ]
       }
+      planos: {
+        Row: {
+          ativo: boolean | null
+          carga_horaria_total: number | null
+          created_at: string
+          descricao: string
+          frequencia_aulas: Json
+          horario_por_aula: number | null
+          id: string
+          idioma: Database["public"]["Enums"]["idioma"]
+          nome: string
+          numero_aulas: number
+          observacoes: string | null
+          permite_cancelamento: boolean | null
+          permite_parcelamento: boolean | null
+          updated_at: string
+          valor_por_aula: number | null
+          valor_total: number | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          carga_horaria_total?: number | null
+          created_at?: string
+          descricao: string
+          frequencia_aulas: Json
+          horario_por_aula?: number | null
+          id?: string
+          idioma?: Database["public"]["Enums"]["idioma"]
+          nome: string
+          numero_aulas: number
+          observacoes?: string | null
+          permite_cancelamento?: boolean | null
+          permite_parcelamento?: boolean | null
+          updated_at?: string
+          valor_por_aula?: number | null
+          valor_total?: number | null
+        }
+        Update: {
+          ativo?: boolean | null
+          carga_horaria_total?: number | null
+          created_at?: string
+          descricao?: string
+          frequencia_aulas?: Json
+          horario_por_aula?: number | null
+          id?: string
+          idioma?: Database["public"]["Enums"]["idioma"]
+          nome?: string
+          numero_aulas?: number
+          observacoes?: string | null
+          permite_cancelamento?: boolean | null
+          permite_parcelamento?: boolean | null
+          updated_at?: string
+          valor_por_aula?: number | null
+          valor_total?: number | null
+        }
+        Relationships: []
+      }
       planos_aula: {
         Row: {
           conteudo: string
@@ -1060,63 +1056,9 @@ export type Database = {
           },
         ]
       }
-      planos: {
-        Row: {
-          id: string
-          nome: string
-          descricao: string
-          numero_aulas: number
-          frequencia_aulas: string
-          carga_horaria_total: number | null
-          valor_total: number | null
-          valor_por_aula: number | null
-          horario_por_aula: number | null
-          permite_cancelamento: boolean
-          permite_parcelamento: boolean
-          observacoes: string | null
-          ativo: boolean
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          nome: string
-          descricao: string
-          numero_aulas: number
-          frequencia_aulas: string
-          carga_horaria_total?: number | null
-          valor_total?: number | null
-          valor_por_aula?: number | null
-          horario_por_aula?: number | null
-          permite_cancelamento?: boolean
-          permite_parcelamento?: boolean
-          observacoes?: string | null
-          ativo?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          nome?: string
-          descricao?: string
-          numero_aulas?: number
-          frequencia_aulas?: string
-          carga_horaria_total?: number | null
-          valor_total?: number | null
-          valor_por_aula?: number | null
-          horario_por_aula?: number | null
-          permite_cancelamento?: boolean
-          permite_parcelamento?: boolean
-          observacoes?: string | null
-          ativo?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       presencas: {
         Row: {
-          aluno_id: string
+          aluno_id: string | null
           aula_id: string
           created_at: string
           id: string
@@ -1124,7 +1066,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          aluno_id: string
+          aluno_id?: string | null
           aula_id: string
           created_at?: string
           id?: string
@@ -1132,7 +1074,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          aluno_id?: string
+          aluno_id?: string | null
           aula_id?: string
           created_at?: string
           id?: string
@@ -1160,33 +1102,42 @@ export type Database = {
         Row: {
           cpf: string | null
           created_at: string
+          data_exclusao: string | null
           email: string | null
+          excluido: boolean | null
           id: string
           idiomas: string
           nome: string
           salario: number | null
+          status: string
           telefone: string | null
           updated_at: string
         }
         Insert: {
           cpf?: string | null
           created_at?: string
+          data_exclusao?: string | null
           email?: string | null
+          excluido?: boolean | null
           id?: string
           idiomas: string
           nome: string
           salario?: number | null
+          status?: string
           telefone?: string | null
           updated_at?: string
         }
         Update: {
           cpf?: string | null
           created_at?: string
+          data_exclusao?: string | null
           email?: string | null
+          excluido?: boolean | null
           id?: string
           idiomas?: string
           nome?: string
           salario?: number | null
+          status?: string
           telefone?: string | null
           updated_at?: string
         }
@@ -1286,6 +1237,7 @@ export type Database = {
           id: string
           nome: string
           numero_endereco: string | null
+          status: string
           telefone: string | null
           updated_at: string
         }
@@ -1296,6 +1248,7 @@ export type Database = {
           id?: string
           nome: string
           numero_endereco?: string | null
+          status?: string
           telefone?: string | null
           updated_at?: string
         }
@@ -1306,6 +1259,7 @@ export type Database = {
           id?: string
           nome?: string
           numero_endereco?: string | null
+          status?: string
           telefone?: string | null
           updated_at?: string
         }
@@ -1317,6 +1271,7 @@ export type Database = {
           created_at: string
           id: string
           nome: string
+          status: string
           tipo: string
           updated_at: string
         }
@@ -1325,6 +1280,7 @@ export type Database = {
           created_at?: string
           id?: string
           nome: string
+          status?: string
           tipo?: string
           updated_at?: string
         }
@@ -1333,6 +1289,7 @@ export type Database = {
           created_at?: string
           id?: string
           nome?: string
+          status?: string
           tipo?: string
           updated_at?: string
         }
@@ -1403,36 +1360,37 @@ export type Database = {
           funcao: string | null
           id: string
           nome: string
-          permissoes: string | null
-          perm_visualizar_alunos: boolean | null
+          perm_gerenciar_agenda: boolean | null
           perm_gerenciar_alunos: boolean | null
-          perm_visualizar_turmas: boolean | null
-          perm_gerenciar_turmas: boolean | null
-          perm_visualizar_aulas: boolean | null
           perm_gerenciar_aulas: boolean | null
-          perm_visualizar_avaliacoes: boolean | null
           perm_gerenciar_avaliacoes: boolean | null
-          perm_visualizar_contratos: boolean | null
           perm_gerenciar_contratos: boolean | null
-          perm_visualizar_financeiro: boolean | null
+          perm_gerenciar_documentos: boolean | null
           perm_gerenciar_financeiro: boolean | null
-          perm_visualizar_professores: boolean | null
-          perm_gerenciar_professores: boolean | null
-          perm_visualizar_salas: boolean | null
-          perm_gerenciar_salas: boolean | null
+          perm_gerenciar_gerador_contratos: boolean | null
+          perm_gerenciar_materiais: boolean | null
+          perm_gerenciar_planos: boolean | null
           perm_gerenciar_presencas: boolean | null
+          perm_gerenciar_professores: boolean | null
+          perm_gerenciar_salas: boolean | null
+          perm_gerenciar_turmas: boolean | null
           perm_gerenciar_usuarios: boolean | null
           perm_visualizar_agenda: boolean | null
-          perm_gerenciar_agenda: boolean | null
-          perm_visualizar_materiais: boolean | null
-          perm_gerenciar_materiais: boolean | null
-          perm_visualizar_gerador_contratos: boolean | null
-          perm_gerenciar_gerador_contratos: boolean | null
+          perm_visualizar_alunos: boolean | null
+          perm_visualizar_aulas: boolean | null
+          perm_visualizar_avaliacoes: boolean | null
+          perm_visualizar_contratos: boolean | null
           perm_visualizar_documentos: boolean | null
-          perm_gerenciar_documentos: boolean | null
+          perm_visualizar_financeiro: boolean | null
+          perm_visualizar_gerador_contratos: boolean | null
+          perm_visualizar_materiais: boolean | null
           perm_visualizar_planos: boolean | null
-          perm_gerenciar_planos: boolean | null
+          perm_visualizar_professores: boolean | null
+          perm_visualizar_salas: boolean | null
+          perm_visualizar_turmas: boolean | null
+          permissoes: string | null
           senha: string
+          status: string
           updated_at: string
         }
         Insert: {
@@ -1442,36 +1400,37 @@ export type Database = {
           funcao?: string | null
           id?: string
           nome: string
-          permissoes?: string | null
-          perm_visualizar_alunos?: boolean | null
+          perm_gerenciar_agenda?: boolean | null
           perm_gerenciar_alunos?: boolean | null
-          perm_visualizar_turmas?: boolean | null
-          perm_gerenciar_turmas?: boolean | null
-          perm_visualizar_aulas?: boolean | null
           perm_gerenciar_aulas?: boolean | null
-          perm_visualizar_avaliacoes?: boolean | null
           perm_gerenciar_avaliacoes?: boolean | null
-          perm_visualizar_contratos?: boolean | null
           perm_gerenciar_contratos?: boolean | null
-          perm_visualizar_financeiro?: boolean | null
+          perm_gerenciar_documentos?: boolean | null
           perm_gerenciar_financeiro?: boolean | null
-          perm_visualizar_professores?: boolean | null
-          perm_gerenciar_professores?: boolean | null
-          perm_visualizar_salas?: boolean | null
-          perm_gerenciar_salas?: boolean | null
+          perm_gerenciar_gerador_contratos?: boolean | null
+          perm_gerenciar_materiais?: boolean | null
+          perm_gerenciar_planos?: boolean | null
           perm_gerenciar_presencas?: boolean | null
+          perm_gerenciar_professores?: boolean | null
+          perm_gerenciar_salas?: boolean | null
+          perm_gerenciar_turmas?: boolean | null
           perm_gerenciar_usuarios?: boolean | null
           perm_visualizar_agenda?: boolean | null
-          perm_gerenciar_agenda?: boolean | null
-          perm_visualizar_materiais?: boolean | null
-          perm_gerenciar_materiais?: boolean | null
-          perm_visualizar_gerador_contratos?: boolean | null
-          perm_gerenciar_gerador_contratos?: boolean | null
+          perm_visualizar_alunos?: boolean | null
+          perm_visualizar_aulas?: boolean | null
+          perm_visualizar_avaliacoes?: boolean | null
+          perm_visualizar_contratos?: boolean | null
           perm_visualizar_documentos?: boolean | null
-          perm_gerenciar_documentos?: boolean | null
+          perm_visualizar_financeiro?: boolean | null
+          perm_visualizar_gerador_contratos?: boolean | null
+          perm_visualizar_materiais?: boolean | null
           perm_visualizar_planos?: boolean | null
-          perm_gerenciar_planos?: boolean | null
+          perm_visualizar_professores?: boolean | null
+          perm_visualizar_salas?: boolean | null
+          perm_visualizar_turmas?: boolean | null
+          permissoes?: string | null
           senha: string
+          status?: string
           updated_at?: string
         }
         Update: {
@@ -1481,36 +1440,37 @@ export type Database = {
           funcao?: string | null
           id?: string
           nome?: string
-          permissoes?: string | null
-          perm_visualizar_alunos?: boolean | null
+          perm_gerenciar_agenda?: boolean | null
           perm_gerenciar_alunos?: boolean | null
-          perm_visualizar_turmas?: boolean | null
-          perm_gerenciar_turmas?: boolean | null
-          perm_visualizar_aulas?: boolean | null
           perm_gerenciar_aulas?: boolean | null
-          perm_visualizar_avaliacoes?: boolean | null
           perm_gerenciar_avaliacoes?: boolean | null
-          perm_visualizar_contratos?: boolean | null
           perm_gerenciar_contratos?: boolean | null
-          perm_visualizar_financeiro?: boolean | null
+          perm_gerenciar_documentos?: boolean | null
           perm_gerenciar_financeiro?: boolean | null
-          perm_visualizar_professores?: boolean | null
-          perm_gerenciar_professores?: boolean | null
-          perm_visualizar_salas?: boolean | null
-          perm_gerenciar_salas?: boolean | null
+          perm_gerenciar_gerador_contratos?: boolean | null
+          perm_gerenciar_materiais?: boolean | null
+          perm_gerenciar_planos?: boolean | null
           perm_gerenciar_presencas?: boolean | null
+          perm_gerenciar_professores?: boolean | null
+          perm_gerenciar_salas?: boolean | null
+          perm_gerenciar_turmas?: boolean | null
           perm_gerenciar_usuarios?: boolean | null
           perm_visualizar_agenda?: boolean | null
-          perm_gerenciar_agenda?: boolean | null
-          perm_visualizar_materiais?: boolean | null
-          perm_gerenciar_materiais?: boolean | null
-          perm_visualizar_gerador_contratos?: boolean | null
-          perm_gerenciar_gerador_contratos?: boolean | null
+          perm_visualizar_alunos?: boolean | null
+          perm_visualizar_aulas?: boolean | null
+          perm_visualizar_avaliacoes?: boolean | null
+          perm_visualizar_contratos?: boolean | null
           perm_visualizar_documentos?: boolean | null
-          perm_gerenciar_documentos?: boolean | null
+          perm_visualizar_financeiro?: boolean | null
+          perm_visualizar_gerador_contratos?: boolean | null
+          perm_visualizar_materiais?: boolean | null
           perm_visualizar_planos?: boolean | null
-          perm_gerenciar_planos?: boolean | null
+          perm_visualizar_professores?: boolean | null
+          perm_visualizar_salas?: boolean | null
+          perm_visualizar_turmas?: boolean | null
+          permissoes?: string | null
           senha?: string
+          status?: string
           updated_at?: string
         }
         Relationships: []
@@ -1520,35 +1480,35 @@ export type Database = {
           cargo: Database["public"]["Enums"]["cargo_usuario"]
           created_at: string
           email: string
+          funcao: string | null
           id: string
           nome: string
-          permissoes: string | null
-          perm_visualizar_alunos: boolean | null
-          perm_gerenciar_alunos: boolean | null
-          perm_visualizar_turmas: boolean | null
-          perm_gerenciar_turmas: boolean | null
-          perm_visualizar_aulas: boolean | null
-          perm_gerenciar_aulas: boolean | null
-          perm_visualizar_avaliacoes: boolean | null
-          perm_gerenciar_avaliacoes: boolean | null
-          perm_visualizar_contratos: boolean | null
-          perm_gerenciar_contratos: boolean | null
-          perm_visualizar_financeiro: boolean | null
-          perm_gerenciar_financeiro: boolean | null
-          perm_visualizar_professores: boolean | null
-          perm_gerenciar_professores: boolean | null
-          perm_visualizar_salas: boolean | null
-          perm_gerenciar_salas: boolean | null
+          perm_aprovar_contratos: boolean | null
+          perm_criar_alunos: boolean | null
+          perm_criar_aulas: boolean | null
+          perm_criar_avaliacoes: boolean | null
+          perm_criar_contratos: boolean | null
+          perm_criar_turmas: boolean | null
+          perm_editar_alunos: boolean | null
+          perm_editar_aulas: boolean | null
+          perm_editar_avaliacoes: boolean | null
+          perm_editar_contratos: boolean | null
+          perm_editar_turmas: boolean | null
+          perm_gerenciar_boletos: boolean | null
+          perm_gerenciar_despesas: boolean | null
+          perm_gerenciar_documentos: boolean | null
+          perm_gerenciar_folha: boolean | null
+          perm_gerenciar_gerador_contratos: boolean | null
           perm_gerenciar_presencas: boolean | null
           perm_gerenciar_usuarios: boolean | null
-          perm_visualizar_agenda: boolean | null
-          perm_gerenciar_agenda: boolean | null
-          perm_visualizar_materiais: boolean | null
-          perm_gerenciar_materiais: boolean | null
-          perm_visualizar_gerador_contratos: boolean | null
-          perm_gerenciar_gerador_contratos: boolean | null
+          perm_remover_alunos: boolean | null
+          perm_remover_aulas: boolean | null
+          perm_remover_avaliacoes: boolean | null
+          perm_remover_contratos: boolean | null
+          perm_remover_turmas: boolean | null
           perm_visualizar_documentos: boolean | null
-          perm_gerenciar_documentos: boolean | null
+          perm_visualizar_gerador_contratos: boolean | null
+          permissoes: string | null
           senha: string
           status: string
           updated_at: string
@@ -1557,35 +1517,35 @@ export type Database = {
           cargo?: Database["public"]["Enums"]["cargo_usuario"]
           created_at?: string
           email: string
+          funcao?: string | null
           id?: string
           nome: string
-          permissoes?: string | null
-          perm_visualizar_alunos?: boolean | null
-          perm_gerenciar_alunos?: boolean | null
-          perm_visualizar_turmas?: boolean | null
-          perm_gerenciar_turmas?: boolean | null
-          perm_visualizar_aulas?: boolean | null
-          perm_gerenciar_aulas?: boolean | null
-          perm_visualizar_avaliacoes?: boolean | null
-          perm_gerenciar_avaliacoes?: boolean | null
-          perm_visualizar_contratos?: boolean | null
-          perm_gerenciar_contratos?: boolean | null
-          perm_visualizar_financeiro?: boolean | null
-          perm_gerenciar_financeiro?: boolean | null
-          perm_visualizar_professores?: boolean | null
-          perm_gerenciar_professores?: boolean | null
-          perm_visualizar_salas?: boolean | null
-          perm_gerenciar_salas?: boolean | null
+          perm_aprovar_contratos?: boolean | null
+          perm_criar_alunos?: boolean | null
+          perm_criar_aulas?: boolean | null
+          perm_criar_avaliacoes?: boolean | null
+          perm_criar_contratos?: boolean | null
+          perm_criar_turmas?: boolean | null
+          perm_editar_alunos?: boolean | null
+          perm_editar_aulas?: boolean | null
+          perm_editar_avaliacoes?: boolean | null
+          perm_editar_contratos?: boolean | null
+          perm_editar_turmas?: boolean | null
+          perm_gerenciar_boletos?: boolean | null
+          perm_gerenciar_despesas?: boolean | null
+          perm_gerenciar_documentos?: boolean | null
+          perm_gerenciar_folha?: boolean | null
+          perm_gerenciar_gerador_contratos?: boolean | null
           perm_gerenciar_presencas?: boolean | null
           perm_gerenciar_usuarios?: boolean | null
-          perm_visualizar_agenda?: boolean | null
-          perm_gerenciar_agenda?: boolean | null
-          perm_visualizar_materiais?: boolean | null
-          perm_gerenciar_materiais?: boolean | null
-          perm_visualizar_gerador_contratos?: boolean | null
-          perm_gerenciar_gerador_contratos?: boolean | null
+          perm_remover_alunos?: boolean | null
+          perm_remover_aulas?: boolean | null
+          perm_remover_avaliacoes?: boolean | null
+          perm_remover_contratos?: boolean | null
+          perm_remover_turmas?: boolean | null
           perm_visualizar_documentos?: boolean | null
-          perm_gerenciar_documentos?: boolean | null
+          perm_visualizar_gerador_contratos?: boolean | null
+          permissoes?: string | null
           senha: string
           status?: string
           updated_at?: string
@@ -1594,35 +1554,35 @@ export type Database = {
           cargo?: Database["public"]["Enums"]["cargo_usuario"]
           created_at?: string
           email?: string
+          funcao?: string | null
           id?: string
           nome?: string
-          permissoes?: string | null
-          perm_visualizar_alunos?: boolean | null
-          perm_gerenciar_alunos?: boolean | null
-          perm_visualizar_turmas?: boolean | null
-          perm_gerenciar_turmas?: boolean | null
-          perm_visualizar_aulas?: boolean | null
-          perm_gerenciar_aulas?: boolean | null
-          perm_visualizar_avaliacoes?: boolean | null
-          perm_gerenciar_avaliacoes?: boolean | null
-          perm_visualizar_contratos?: boolean | null
-          perm_gerenciar_contratos?: boolean | null
-          perm_visualizar_financeiro?: boolean | null
-          perm_gerenciar_financeiro?: boolean | null
-          perm_visualizar_professores?: boolean | null
-          perm_gerenciar_professores?: boolean | null
-          perm_visualizar_salas?: boolean | null
-          perm_gerenciar_salas?: boolean | null
+          perm_aprovar_contratos?: boolean | null
+          perm_criar_alunos?: boolean | null
+          perm_criar_aulas?: boolean | null
+          perm_criar_avaliacoes?: boolean | null
+          perm_criar_contratos?: boolean | null
+          perm_criar_turmas?: boolean | null
+          perm_editar_alunos?: boolean | null
+          perm_editar_aulas?: boolean | null
+          perm_editar_avaliacoes?: boolean | null
+          perm_editar_contratos?: boolean | null
+          perm_editar_turmas?: boolean | null
+          perm_gerenciar_boletos?: boolean | null
+          perm_gerenciar_despesas?: boolean | null
+          perm_gerenciar_documentos?: boolean | null
+          perm_gerenciar_folha?: boolean | null
+          perm_gerenciar_gerador_contratos?: boolean | null
           perm_gerenciar_presencas?: boolean | null
           perm_gerenciar_usuarios?: boolean | null
-          perm_visualizar_agenda?: boolean | null
-          perm_gerenciar_agenda?: boolean | null
-          perm_visualizar_materiais?: boolean | null
-          perm_gerenciar_materiais?: boolean | null
-          perm_visualizar_gerador_contratos?: boolean | null
-          perm_gerenciar_gerador_contratos?: boolean | null
+          perm_remover_alunos?: boolean | null
+          perm_remover_aulas?: boolean | null
+          perm_remover_avaliacoes?: boolean | null
+          perm_remover_contratos?: boolean | null
+          perm_remover_turmas?: boolean | null
           perm_visualizar_documentos?: boolean | null
-          perm_gerenciar_documentos?: boolean | null
+          perm_visualizar_gerador_contratos?: boolean | null
+          permissoes?: string | null
           senha?: string
           status?: string
           updated_at?: string
@@ -1656,31 +1616,24 @@ export type Database = {
           },
         ]
       }
-      view_inadimplencia: {
-        Row: {
-          aluno_id: string | null
-          aluno_nome: string | null
-          boletos_vencidos: number | null
-          dias_atraso_maximo: number | null
-          total_em_atraso: number | null
-          ultimo_pagamento: string | null
-        }
-        Relationships: []
-      }
-      view_resumo_financeiro: {
-        Row: {
-          boletos_pagos_mes: number | null
-          boletos_pendentes: number | null
-          boletos_vencidos: number | null
-          receita_mes_atual: number | null
-          receita_prevista_mes: number | null
-          total_inadimplencia: number | null
-        }
-        Relationships: []
-      }
     }
     Functions: {
-      [_ in never]: never
+      check_aluno_dependencies: {
+        Args: { p_aluno_id: string }
+        Returns: Json
+      }
+      check_professor_dependencies: {
+        Args: { p_professor_id: string }
+        Returns: Json
+      }
+      obter_permissoes_usuario: {
+        Args: { usuario_id: string }
+        Returns: Json
+      }
+      verificar_permissao: {
+        Args: { usuario_id: string; permissao: string }
+        Returns: boolean
+      }
     }
     Enums: {
       cargo_usuario: "Secretária" | "Gerente" | "Admin"
@@ -1698,9 +1651,14 @@ export type Database = {
         | "Book 8"
         | "Book 9"
         | "Book 10"
-      status_aluno: "Ativo" | "Trancado" | "Cancelado"
+      status_aluno: "Ativo" | "Trancado" | "Inativo"
       status_boleto: "Pago" | "Pendente" | "Vencido"
-      status_contrato: "Ativo" | "Trancado" | "Cancelado" | "Encerrado"
+      status_contrato:
+        | "Ativo"
+        | "Agendado"
+        | "Vencendo"
+        | "Vencido"
+        | "Cancelado"
       status_despesa: "Pago" | "Pendente"
       status_documento: "gerado" | "assinado" | "cancelado"
       status_folha: "Pago" | "Pendente"
@@ -1830,6 +1788,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       cargo_usuario: ["Secretária", "Gerente", "Admin"],
@@ -1848,9 +1809,15 @@ export const Constants = {
         "Book 9",
         "Book 10",
       ],
-      status_aluno: ["Ativo", "Trancado", "Cancelado"],
+      status_aluno: ["Ativo", "Trancado", "Inativo"],
       status_boleto: ["Pago", "Pendente", "Vencido"],
-      status_contrato: ["Ativo", "Trancado", "Cancelado", "Encerrado"],
+      status_contrato: [
+        "Ativo",
+        "Agendado",
+        "Vencendo",
+        "Vencido",
+        "Cancelado",
+      ],
       status_despesa: ["Pago", "Pendente"],
       status_documento: ["gerado", "assinado", "cancelado"],
       status_folha: ["Pago", "Pendente"],
@@ -1862,18 +1829,12 @@ export const Constants = {
         "declaracao_matricula",
         "declaracao_frequencia",
         "declaracao_conclusao",
+        "certificado_professor",
+        "diploma_professor",
+        "comprovante_experiencia",
+        "documento_pessoal",
       ],
       tipo_notificacao: ["boleto", "presenca", "lembrete", "geral"],
     },
   },
 } as const
-
-// Export helper types
-export type Student = Database['public']['Tables']['alunos']['Row'] & {
-  turmas?: { nome: string } | null;
-  responsaveis?: { nome: string } | null;
-};
-
-export type Teacher = Database['public']['Tables']['professores']['Row'];
-export type Responsible = Database['public']['Tables']['responsaveis']['Row'];
-export type Room = Database['public']['Tables']['salas']['Row'];

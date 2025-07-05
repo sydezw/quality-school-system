@@ -1,31 +1,43 @@
 
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calendar, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+
+interface Student {
+  id: string;
+  nome: string;
+}
 
 interface NewContractDialogProps {
   onContractCreated: () => void;
 }
 
+// Interface simplificada para o formulário (sem valor_mensalidade)
+interface SimpleContractFormData {
+  aluno_id: string;
+  data_inicio: string;
+  data_fim: string;
+  observacao?: string;
+}
+
 export const NewContractDialog = ({ onContractCreated }: NewContractDialogProps) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [alunos, setAlunos] = useState<Array<{ id: string; nome: string }>>([]);
-  const [formData, setFormData] = useState({
+  const [students, setStudents] = useState<Student[]>([]);
+  const [formData, setFormData] = useState<SimpleContractFormData>({
     aluno_id: '',
     data_inicio: '',
     data_fim: '',
-    valor_mensalidade: '',
     observacao: ''
   });
+  const [calculatedStatus, setCalculatedStatus] = useState<string>('Agendado');
   const { toast } = useToast();
 
   const fetchAlunos = async () => {
@@ -37,7 +49,7 @@ export const NewContractDialog = ({ onContractCreated }: NewContractDialogProps)
         .order('nome');
 
       if (error) throw error;
-      setAlunos(data || []);
+      setStudents(data || []);
     } catch (error) {
       console.error('Erro ao buscar alunos:', error);
       toast({
@@ -58,53 +70,82 @@ export const NewContractDialog = ({ onContractCreated }: NewContractDialogProps)
         aluno_id: '',
         data_inicio: '',
         data_fim: '',
-        valor_mensalidade: '',
         observacao: ''
       });
+      setCalculatedStatus('Agendado');
     }
   };
+
+  // Função para calcular o status baseado nas datas
+  const calculateStatus = (dataInicio: string, dataFim: string) => {
+    if (!dataInicio || !dataFim) return 'Agendado';
+    
+    const hoje = new Date();
+    const inicio = new Date(dataInicio);
+    const fim = new Date(dataFim);
+    
+    if (inicio > hoje) return 'Agendado';
+    if (fim < hoje) return 'Vencido';
+    
+    const diasRestantes = Math.ceil((fim.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+    if (diasRestantes <= 60) return 'Vencendo';
+    
+    return 'Ativo';
+  };
+
+  // Atualizar status quando as datas mudarem
+  useEffect(() => {
+    const status = calculateStatus(formData.data_inicio, formData.data_fim);
+    setCalculatedStatus(status);
+  }, [formData.data_inicio, formData.data_fim]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.aluno_id || !formData.data_inicio || !formData.data_fim || !formData.valor_mensalidade) {
+    if (!formData.aluno_id || !formData.data_inicio || !formData.data_fim) {
       toast({
         title: "Erro",
-        description: "Preencha todos os campos obrigatórios.",
+        description: "Por favor, preencha todos os campos obrigatórios.",
         variant: "destructive",
       });
       return;
     }
 
+    setLoading(true);
+    
     try {
-      setLoading(true);
-
       const { error } = await supabase
         .from('contratos')
         .insert({
           aluno_id: formData.aluno_id,
           data_inicio: formData.data_inicio,
           data_fim: formData.data_fim,
-          valor_mensalidade: parseFloat(formData.valor_mensalidade),
-          status: 'Ativo',
-          observacao: formData.observacao || null
+          observacao: formData.observacao || null,
+          status_contrato: calculatedStatus as any,
+          valor_mensalidade: 0 // Valor padrão temporário
         });
 
       if (error) throw error;
 
       toast({
         title: "Sucesso",
-        description: "Contrato criado com sucesso.",
+        description: "Contrato criado com sucesso!",
       });
 
+      setFormData({
+        aluno_id: '',
+        data_inicio: '',
+        data_fim: '',
+        observacao: ''
+      });
+      setCalculatedStatus('Agendado');
       setOpen(false);
       onContractCreated();
-
     } catch (error) {
       console.error('Erro ao criar contrato:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível criar o contrato.",
+        description: "Erro ao criar contrato. Tente novamente.",
         variant: "destructive",
       });
     } finally {
@@ -115,26 +156,32 @@ export const NewContractDialog = ({ onContractCreated }: NewContractDialogProps)
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button className="bg-brand-red hover:bg-red-700">
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Contrato
-            </Button>
+        <Button className="bg-red-600 hover:bg-red-700">
+          <Plus className="h-4 w-4 mr-2" />
+          Criar Novo Contrato
+        </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Criar Novo Contrato</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Novo Contrato
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="aluno">Aluno *</Label>
-            <Select value={formData.aluno_id} onValueChange={(value) => setFormData(prev => ({ ...prev, aluno_id: value }))}>
+            <Label htmlFor="aluno_id">Aluno *</Label>
+            <Select
+              value={formData.aluno_id}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, aluno_id: value }))}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione um aluno" />
               </SelectTrigger>
               <SelectContent>
-                {alunos.map((aluno) => (
-                  <SelectItem key={aluno.id} value={aluno.id}>
-                    {aluno.nome}
+                {students.map((student) => (
+                  <SelectItem key={student.id} value={student.id}>
+                    {student.nome}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -165,17 +212,18 @@ export const NewContractDialog = ({ onContractCreated }: NewContractDialogProps)
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="valor_mensalidade">Valor da Mensalidade *</Label>
+            <Label htmlFor="status">Status</Label>
             <Input
-              id="valor_mensalidade"
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="0.00"
-              value={formData.valor_mensalidade}
-              onChange={(e) => setFormData(prev => ({ ...prev, valor_mensalidade: e.target.value }))}
-              required
+              id="status"
+              type="text"
+              value={calculatedStatus}
+              disabled
+              className="bg-gray-50 text-gray-600 cursor-not-allowed"
+              placeholder="Status calculado automaticamente"
             />
+            <p className="text-xs text-gray-500">
+              O status é calculado automaticamente com base nas datas do contrato
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -183,17 +231,26 @@ export const NewContractDialog = ({ onContractCreated }: NewContractDialogProps)
             <Textarea
               id="observacao"
               placeholder="Observações sobre o contrato (opcional)"
-              value={formData.observacao}
+              value={formData.observacao || ''}
               onChange={(e) => setFormData(prev => ({ ...prev, observacao: e.target.value }))}
               rows={3}
             />
           </div>
 
           <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+              disabled={loading}
+            >
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button
+              type="submit"
+              disabled={loading}
+              className="bg-red-600 hover:bg-red-700"
+            >
               {loading ? 'Criando...' : 'Criar Contrato'}
             </Button>
           </div>
