@@ -531,6 +531,7 @@ export type Database = {
       financeiro_alunos: {
         Row: {
           aluno_id: string | null
+          ativo_ou_encerrado: Database["public"]["Enums"]["ativo_ou_encerrado"]
           created_at: string | null
           data_primeiro_vencimento: string
           desconto_total: number
@@ -538,6 +539,7 @@ export type Database = {
           forma_pagamento_matricula: string | null
           forma_pagamento_plano: string | null
           id: string
+          idioma_registro: Database["public"]["Enums"]["idioma_registro_financeiro"]
           numero_parcelas_material: number | null
           numero_parcelas_matricula: number | null
           numero_parcelas_plano: number | null
@@ -551,6 +553,7 @@ export type Database = {
         }
         Insert: {
           aluno_id?: string | null
+          ativo_ou_encerrado?: Database["public"]["Enums"]["ativo_ou_encerrado"]
           created_at?: string | null
           data_primeiro_vencimento: string
           desconto_total?: number
@@ -558,6 +561,7 @@ export type Database = {
           forma_pagamento_matricula?: string | null
           forma_pagamento_plano?: string | null
           id?: string
+          idioma_registro?: Database["public"]["Enums"]["idioma_registro_financeiro"]
           numero_parcelas_material?: number | null
           numero_parcelas_matricula?: number | null
           numero_parcelas_plano?: number | null
@@ -571,6 +575,7 @@ export type Database = {
         }
         Update: {
           aluno_id?: string | null
+          ativo_ou_encerrado?: Database["public"]["Enums"]["ativo_ou_encerrado"]
           created_at?: string | null
           data_primeiro_vencimento?: string
           desconto_total?: number
@@ -578,6 +583,7 @@ export type Database = {
           forma_pagamento_matricula?: string | null
           forma_pagamento_plano?: string | null
           id?: string
+          idioma_registro?: Database["public"]["Enums"]["idioma_registro_financeiro"]
           numero_parcelas_material?: number | null
           numero_parcelas_matricula?: number | null
           numero_parcelas_plano?: number | null
@@ -902,6 +908,56 @@ export type Database = {
             columns: ["destinatario_id"]
             isOneToOne: false
             referencedRelation: "alunos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parcelas: {
+        Row: {
+          atualizado_em: string | null
+          comprovante: string | null
+          criado_em: string | null
+          data_vencimento: string
+          id: number
+          idioma_registro: Database["public"]["Enums"]["idioma_registro_financeiro"]
+          numero_parcela: number
+          registro_financeiro_id: string
+          status_pagamento: string
+          tipo_item: string
+          valor: number
+        }
+        Insert: {
+          atualizado_em?: string | null
+          comprovante?: string | null
+          criado_em?: string | null
+          data_vencimento: string
+          id?: number
+          idioma_registro: Database["public"]["Enums"]["idioma_registro_financeiro"]
+          numero_parcela: number
+          registro_financeiro_id: string
+          status_pagamento: string
+          tipo_item: string
+          valor: number
+        }
+        Update: {
+          atualizado_em?: string | null
+          comprovante?: string | null
+          criado_em?: string | null
+          data_vencimento?: string
+          id?: number
+          idioma_registro?: Database["public"]["Enums"]["idioma_registro_financeiro"]
+          numero_parcela?: number
+          registro_financeiro_id?: string
+          status_pagamento?: string
+          tipo_item?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parcelas_registro_financeiro_id_fkey"
+            columns: ["registro_financeiro_id"]
+            isOneToOne: false
+            referencedRelation: "financeiro_alunos"
             referencedColumns: ["id"]
           },
         ]
@@ -1360,34 +1416,6 @@ export type Database = {
           funcao: string | null
           id: string
           nome: string
-          perm_gerenciar_agenda: boolean | null
-          perm_gerenciar_alunos: boolean | null
-          perm_gerenciar_aulas: boolean | null
-          perm_gerenciar_avaliacoes: boolean | null
-          perm_gerenciar_contratos: boolean | null
-          perm_gerenciar_documentos: boolean | null
-          perm_gerenciar_financeiro: boolean | null
-          perm_gerenciar_gerador_contratos: boolean | null
-          perm_gerenciar_materiais: boolean | null
-          perm_gerenciar_planos: boolean | null
-          perm_gerenciar_presencas: boolean | null
-          perm_gerenciar_professores: boolean | null
-          perm_gerenciar_salas: boolean | null
-          perm_gerenciar_turmas: boolean | null
-          perm_gerenciar_usuarios: boolean | null
-          perm_visualizar_agenda: boolean | null
-          perm_visualizar_alunos: boolean | null
-          perm_visualizar_aulas: boolean | null
-          perm_visualizar_avaliacoes: boolean | null
-          perm_visualizar_contratos: boolean | null
-          perm_visualizar_documentos: boolean | null
-          perm_visualizar_financeiro: boolean | null
-          perm_visualizar_gerador_contratos: boolean | null
-          perm_visualizar_materiais: boolean | null
-          perm_visualizar_planos: boolean | null
-          perm_visualizar_professores: boolean | null
-          perm_visualizar_salas: boolean | null
-          perm_visualizar_turmas: boolean | null
           permissoes: string | null
           senha: string
           status: string
@@ -1400,34 +1428,6 @@ export type Database = {
           funcao?: string | null
           id?: string
           nome: string
-          perm_gerenciar_agenda?: boolean | null
-          perm_gerenciar_alunos?: boolean | null
-          perm_gerenciar_aulas?: boolean | null
-          perm_gerenciar_avaliacoes?: boolean | null
-          perm_gerenciar_contratos?: boolean | null
-          perm_gerenciar_documentos?: boolean | null
-          perm_gerenciar_financeiro?: boolean | null
-          perm_gerenciar_gerador_contratos?: boolean | null
-          perm_gerenciar_materiais?: boolean | null
-          perm_gerenciar_planos?: boolean | null
-          perm_gerenciar_presencas?: boolean | null
-          perm_gerenciar_professores?: boolean | null
-          perm_gerenciar_salas?: boolean | null
-          perm_gerenciar_turmas?: boolean | null
-          perm_gerenciar_usuarios?: boolean | null
-          perm_visualizar_agenda?: boolean | null
-          perm_visualizar_alunos?: boolean | null
-          perm_visualizar_aulas?: boolean | null
-          perm_visualizar_avaliacoes?: boolean | null
-          perm_visualizar_contratos?: boolean | null
-          perm_visualizar_documentos?: boolean | null
-          perm_visualizar_financeiro?: boolean | null
-          perm_visualizar_gerador_contratos?: boolean | null
-          perm_visualizar_materiais?: boolean | null
-          perm_visualizar_planos?: boolean | null
-          perm_visualizar_professores?: boolean | null
-          perm_visualizar_salas?: boolean | null
-          perm_visualizar_turmas?: boolean | null
           permissoes?: string | null
           senha: string
           status?: string
@@ -1440,34 +1440,6 @@ export type Database = {
           funcao?: string | null
           id?: string
           nome?: string
-          perm_gerenciar_agenda?: boolean | null
-          perm_gerenciar_alunos?: boolean | null
-          perm_gerenciar_aulas?: boolean | null
-          perm_gerenciar_avaliacoes?: boolean | null
-          perm_gerenciar_contratos?: boolean | null
-          perm_gerenciar_documentos?: boolean | null
-          perm_gerenciar_financeiro?: boolean | null
-          perm_gerenciar_gerador_contratos?: boolean | null
-          perm_gerenciar_materiais?: boolean | null
-          perm_gerenciar_planos?: boolean | null
-          perm_gerenciar_presencas?: boolean | null
-          perm_gerenciar_professores?: boolean | null
-          perm_gerenciar_salas?: boolean | null
-          perm_gerenciar_turmas?: boolean | null
-          perm_gerenciar_usuarios?: boolean | null
-          perm_visualizar_agenda?: boolean | null
-          perm_visualizar_alunos?: boolean | null
-          perm_visualizar_aulas?: boolean | null
-          perm_visualizar_avaliacoes?: boolean | null
-          perm_visualizar_contratos?: boolean | null
-          perm_visualizar_documentos?: boolean | null
-          perm_visualizar_financeiro?: boolean | null
-          perm_visualizar_gerador_contratos?: boolean | null
-          perm_visualizar_materiais?: boolean | null
-          perm_visualizar_planos?: boolean | null
-          perm_visualizar_professores?: boolean | null
-          perm_visualizar_salas?: boolean | null
-          perm_visualizar_turmas?: boolean | null
           permissoes?: string | null
           senha?: string
           status?: string
@@ -1483,31 +1455,6 @@ export type Database = {
           funcao: string | null
           id: string
           nome: string
-          perm_aprovar_contratos: boolean | null
-          perm_criar_alunos: boolean | null
-          perm_criar_aulas: boolean | null
-          perm_criar_avaliacoes: boolean | null
-          perm_criar_contratos: boolean | null
-          perm_criar_turmas: boolean | null
-          perm_editar_alunos: boolean | null
-          perm_editar_aulas: boolean | null
-          perm_editar_avaliacoes: boolean | null
-          perm_editar_contratos: boolean | null
-          perm_editar_turmas: boolean | null
-          perm_gerenciar_boletos: boolean | null
-          perm_gerenciar_despesas: boolean | null
-          perm_gerenciar_documentos: boolean | null
-          perm_gerenciar_folha: boolean | null
-          perm_gerenciar_gerador_contratos: boolean | null
-          perm_gerenciar_presencas: boolean | null
-          perm_gerenciar_usuarios: boolean | null
-          perm_remover_alunos: boolean | null
-          perm_remover_aulas: boolean | null
-          perm_remover_avaliacoes: boolean | null
-          perm_remover_contratos: boolean | null
-          perm_remover_turmas: boolean | null
-          perm_visualizar_documentos: boolean | null
-          perm_visualizar_gerador_contratos: boolean | null
           permissoes: string | null
           senha: string
           status: string
@@ -1520,31 +1467,6 @@ export type Database = {
           funcao?: string | null
           id?: string
           nome: string
-          perm_aprovar_contratos?: boolean | null
-          perm_criar_alunos?: boolean | null
-          perm_criar_aulas?: boolean | null
-          perm_criar_avaliacoes?: boolean | null
-          perm_criar_contratos?: boolean | null
-          perm_criar_turmas?: boolean | null
-          perm_editar_alunos?: boolean | null
-          perm_editar_aulas?: boolean | null
-          perm_editar_avaliacoes?: boolean | null
-          perm_editar_contratos?: boolean | null
-          perm_editar_turmas?: boolean | null
-          perm_gerenciar_boletos?: boolean | null
-          perm_gerenciar_despesas?: boolean | null
-          perm_gerenciar_documentos?: boolean | null
-          perm_gerenciar_folha?: boolean | null
-          perm_gerenciar_gerador_contratos?: boolean | null
-          perm_gerenciar_presencas?: boolean | null
-          perm_gerenciar_usuarios?: boolean | null
-          perm_remover_alunos?: boolean | null
-          perm_remover_aulas?: boolean | null
-          perm_remover_avaliacoes?: boolean | null
-          perm_remover_contratos?: boolean | null
-          perm_remover_turmas?: boolean | null
-          perm_visualizar_documentos?: boolean | null
-          perm_visualizar_gerador_contratos?: boolean | null
           permissoes?: string | null
           senha: string
           status?: string
@@ -1557,31 +1479,6 @@ export type Database = {
           funcao?: string | null
           id?: string
           nome?: string
-          perm_aprovar_contratos?: boolean | null
-          perm_criar_alunos?: boolean | null
-          perm_criar_aulas?: boolean | null
-          perm_criar_avaliacoes?: boolean | null
-          perm_criar_contratos?: boolean | null
-          perm_criar_turmas?: boolean | null
-          perm_editar_alunos?: boolean | null
-          perm_editar_aulas?: boolean | null
-          perm_editar_avaliacoes?: boolean | null
-          perm_editar_contratos?: boolean | null
-          perm_editar_turmas?: boolean | null
-          perm_gerenciar_boletos?: boolean | null
-          perm_gerenciar_despesas?: boolean | null
-          perm_gerenciar_documentos?: boolean | null
-          perm_gerenciar_folha?: boolean | null
-          perm_gerenciar_gerador_contratos?: boolean | null
-          perm_gerenciar_presencas?: boolean | null
-          perm_gerenciar_usuarios?: boolean | null
-          perm_remover_alunos?: boolean | null
-          perm_remover_aulas?: boolean | null
-          perm_remover_avaliacoes?: boolean | null
-          perm_remover_contratos?: boolean | null
-          perm_remover_turmas?: boolean | null
-          perm_visualizar_documentos?: boolean | null
-          perm_visualizar_gerador_contratos?: boolean | null
           permissoes?: string | null
           senha?: string
           status?: string
@@ -1636,10 +1533,12 @@ export type Database = {
       }
     }
     Enums: {
+      ativo_ou_encerrado: "ativo" | "encerrado"
       cargo_usuario: "Secretária" | "Gerente" | "Admin"
       categoria_despesa: "salário" | "aluguel" | "material" | "manutenção"
       competencia: "Listening" | "Speaking" | "Writing" | "Reading"
       idioma: "Inglês" | "Japonês"
+      idioma_registro_financeiro: "Inglês" | "Japonês"
       nivel:
         | "Book 1"
         | "Book 2"
@@ -1793,10 +1692,12 @@ export const Constants = {
   },
   public: {
     Enums: {
+      ativo_ou_encerrado: ["ativo", "encerrado"],
       cargo_usuario: ["Secretária", "Gerente", "Admin"],
       categoria_despesa: ["salário", "aluguel", "material", "manutenção"],
       competencia: ["Listening", "Speaking", "Writing", "Reading"],
       idioma: ["Inglês", "Japonês"],
+      idioma_registro_financeiro: ["Inglês", "Japonês"],
       nivel: [
         "Book 1",
         "Book 2",

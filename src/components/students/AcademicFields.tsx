@@ -31,14 +31,14 @@ const AcademicFields = ({ control, classes, selectedIdioma }: AcademicFieldsProp
   };
 
   // Filtrar turmas baseado no idioma selecionado
-  // Se há idioma selecionado, filtrar por idioma; senão, mostrar todas
-  const filteredClasses = selectedIdioma
+  // Se há idioma selecionado e não é "none", filtrar por idioma; senão, mostrar todas
+  const filteredClasses = selectedIdioma && selectedIdioma !== "none"
     ? classes.filter(turma => {
         const turmaIdioma = normalizeString(turma.idioma || '');
         const selectedIdiomaLower = normalizeString(selectedIdioma);
         return turmaIdioma === selectedIdiomaLower;
       })
-    : classes; // Mostrar todas as turmas quando não há idioma selecionado
+    : classes; // Mostrar todas as turmas quando não há idioma selecionado ou é "none"
   
   console.log('AcademicFields - filteredClasses:', filteredClasses);
 
@@ -53,9 +53,10 @@ const AcademicFields = ({ control, classes, selectedIdioma }: AcademicFieldsProp
         render={({ field }) => (
           <StudentSelectField
             value={field.value}
-            label="Idioma *"
-            placeholder="Selecione o idioma"
+            label="Idioma (Opcional)"
+            placeholder="Selecione o idioma ou deixe em branco"
             options={[
+              { value: "none", label: "Sem idioma específico" },
               { value: "Inglês", label: "Inglês" },
               { value: "Japonês", label: "Japonês" }
             ]}
@@ -71,8 +72,8 @@ const AcademicFields = ({ control, classes, selectedIdioma }: AcademicFieldsProp
           <div>
             <StudentSelectField
               value={field.value || 'none'}
-              label="Turma (Opcional)"
-              placeholder="Selecione a turma ou deixe sem turma"
+              label="Turma"
+              placeholder="Selecione a turma"
               options={[
                 { value: "none", label: "Sem turma" },
                 ...filteredClasses.map((cls) => ({

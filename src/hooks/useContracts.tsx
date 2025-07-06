@@ -9,13 +9,16 @@ export interface Contract {
   aluno_nome?: string;
   data_inicio: string;
   data_fim: string;
-  valor_mensalidade?: number; // Tornado opcional
+  valor_mensalidade?: number;
   observacao?: string;
   status_contrato: 'Ativo' | 'Agendado' | 'Vencendo' | 'Vencido' | 'Cancelado';
   created_at?: string;
   updated_at?: string;
-  situacao?: string; // Campo calculado
-  dias_restantes?: number; // Campo calculado
+  situacao?: string;
+  dias_restantes?: number;
+  plano_id?: string;
+  plano_nome?: string;
+  idioma_contrato?: string; // Adicionar campo idioma_contrato
 }
 
 export interface ContractFormData {
@@ -25,6 +28,7 @@ export interface ContractFormData {
   valor_mensalidade?: number; // Tornado opcional
   observacao?: string;
   plano_id?: string;
+  idioma_contrato?: string; // Adicionar campo idioma_contrato
 }
 
 export interface ContractStats {
@@ -125,8 +129,9 @@ export const useContracts = () => {
     return {
       ...contract,
       aluno_nome: contract.alunos?.nome,
-      status_contrato: calculatedStatus, // Status com primeira letra maiúscula
-      situacao: situacaoInfo, // Informação detalhada de dias
+      plano_nome: contract.planos?.nome,
+      status_contrato: calculatedStatus,
+      situacao: situacaoInfo,
       dias_restantes: diasRestantes
     };
   };
@@ -222,25 +227,31 @@ export const useContracts = () => {
           status_contrato,
           created_at,
           updated_at,
-          alunos!inner(nome)
+          plano_id,
+          idioma_contrato,
+          alunos!inner(nome),
+          planos(nome)
         `)
         .order('data_inicio', { ascending: false });
-
+  
       if (error) {
         console.error('Erro na query:', error);
         throw error;
       }
-
+  
       // Recalcular campos para todos os contratos
-      const contractsWithCalculatedFields = (data as any)?.map(recalculateContractFields) || [];
-
+      const contractsWithCalculatedFields = (data as any)?.map((contract: any) => ({
+        ...recalculateContractFields(contract),
+        plano_nome: contract.planos?.nome
+      })) || [];
+  
       setState(prev => ({
         ...prev,
         contracts: contractsWithCalculatedFields,
         loading: false,
         error: null
       }));
-
+  
       // Recalcular estatísticas
       calculateStats(contractsWithCalculatedFields);
       

@@ -17,21 +17,20 @@ function isMenorIdade(date?: Date | null) {
 
 export const studentFormSchema = z.object({
   nome: z.string().min(1, { message: "Nome é obrigatório." }),
-  cpf: z.string().min(1, { message: "CPF é obrigatório." }).max(14),
-  telefone: z.string().min(8, { message: "Telefone é obrigatório." }),
-  email: z.string()
-    .email({ message: "Email inválido." })
-    .min(3, { message: "Email é obrigatório." }),
-  cep: z.string().min(8, { message: "CEP é obrigatório." }),
-  endereco: z.string().min(3, { message: "Endereço é obrigatório." }),
-  numero_endereco: z.string().min(1, { message: "Número do endereço é obrigatório." }),
-  idioma: z.string().min(1, { message: "Idioma é obrigatório." }),
+  cpf: z.string().optional(),
+  telefone: z.string().optional(),
+  email: z.string().optional().refine((val) => {
+    if (!val || val.trim() === '') return true;
+    return z.string().email().safeParse(val).success;
+  }, "Email deve ser válido (ex: usuario@exemplo.com)"),
+  cep: z.string().optional(),
+  endereco: z.string().optional(),
+  numero_endereco: z.string().optional(),
+  idioma: z.string().optional(),
   turma_id: z.string().optional().nullable().or(z.literal('none')),
   responsavel_id: z.string().optional().nullable().or(z.literal('none')),
-  status: z.string().min(1, { message: "Status é obrigatório." }),
-  data_nascimento: z.date({
-    required_error: "Data de nascimento é obrigatória."
-  }).nullable().refine(val => !!val, { message: "Data de nascimento é obrigatória." }),
+  status: z.string().optional(),
+  data_nascimento: z.date().optional().nullable(),
 });
 
 export type StudentFormValues = z.infer<typeof studentFormSchema>;

@@ -43,8 +43,8 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
       cep: '',
       endereco: '',
       numero_endereco: '',
-      idioma: 'Inglês',
-      turma_id: 'none',
+      idioma: 'none', // Padrão: sem idioma
+      turma_id: 'none', // Padrão: sem turma
       responsavel_id: 'none',
       status: 'Ativo',
       data_nascimento: null,
@@ -96,7 +96,7 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
         cep: '',
         endereco: '',
         numero_endereco: '',
-        idioma: '',
+        idioma: 'none', // Padrão: sem idioma
         turma_id: 'none',
         responsavel_id: 'none',
         status: 'Ativo',
@@ -123,6 +123,7 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
     const submitData = {
       ...rest,
       cpf: data.cpf ? data.cpf.replace(/\D/g, '') : null,
+      idioma: data.idioma === 'none' ? null : data.idioma,
       responsavel_id: data.responsavel_id === 'none' || !data.responsavel_id ? null : data.responsavel_id,
       turma_id: data.turma_id === 'none' || !data.turma_id ? null : data.turma_id,
       data_nascimento: data.data_nascimento ? format(data.data_nascimento, 'yyyy-MM-dd') : null,

@@ -161,52 +161,143 @@ const FinancialRecordsTable = () => {
     setIsEditDialogOpen(true);
   };
 
+  // Adicionar função de sincronização no handleEdit
+  const syncPlanoWithContratos = async (newPlanoId: string, oldPlanoId: string, alunoId: string) => {
+    if (!newPlanoId || newPlanoId === oldPlanoId) return;
+  
+    try {
+      // Buscar contratos ativos do aluno com o plano antigo
+      const { data: contractsData, error: contractsError } = await supabase
+        .from('contratos')
+        .select('id')
+        .eq('aluno_id', alunoId)
+        .eq('plano_id', oldPlanoId)
+        .in('status_contrato', ['Ativo', 'Agendado', 'Vencendo']);
+  
+      if (contractsError) {
+        console.error('Erro ao buscar contratos:', contractsError);
+        return;
+      }
+  
+      // Atualizar contratos encontrados
+      if (contractsData && contractsData.length > 0) {
+        const { error: updateError } = await supabase
+          .from('contratos')
+          .update({ plano_id: newPlanoId })
+          .in('id', contractsData.map(c => c.id));
+  
+        if (updateError) {
+          console.error('Erro ao sincronizar plano nos contratos:', updateError);
+          toast({
+            title: "Aviso",
+            description: "Registro financeiro atualizado, mas houve erro na sincronização com os contratos.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Sincronização",
+            description: "Plano sincronizado automaticamente com os contratos ativos.",
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Erro na sincronização:', error);
+    }
+  };
+  
+  // Modificar a função handleEdit para incluir sincronização
+  // Modificar a função handleEdit para incluir validação de duplicatas
   const handleEdit = async (data: any) => {
     if (!editingRecord) return;
-
+  
     try {
-      // Calcular valor total
-      const valorTotal = (data.valor_plano || 0) + (data.valor_material || 0) + (data.valor_matricula || 0) - (data.desconto_total || 0);
-
+      setLoading(true);
+      const oldPlanoId = editingRecord.plano_id;
+      
+      // NOVA VALIDAÇÃO: Verificar se já existe registro financeiro com o mesmo aluno e plano
+      if (data.plano_id !== oldPlanoId) {
+        const { data: existingFinancial, error: financialError } = await supabase
+          .from('financeiro_alunos')
+          .select('id')
+          .eq('aluno_id', data.aluno_id)
+          .eq('plano_id', data.plano_id)
+          .neq('id', editingRecord.id) // Excluir o registro atual
+          .single();
+  
+        if (financialError && financialError.code !== 'PGRST116') {
+          throw financialError;
+        }
+  
+        if (existingFinancial) {
+          toast({
+            title: "Erro",
+            description: "Já existe um registro financeiro para este aluno com o plano selecionado.",
+            variant: "destructive",
+          });
+          return;
+        }
+  
+        // Verificar se já existe contrato ativo com o mesmo aluno e plano
+        const { data: existingContract, error: contractError } = await supabase
+          .from('contratos')
+          .select('id')
+          .eq('aluno_id', data.aluno_id)
+          .eq('plano_id', data.plano_id)
+          .in('status_contrato', ['Ativo', 'Agendado', 'Vencendo'])
+          .single();
+  
+        if (contractError && contractError.code !== 'PGRST116') {
+          throw contractError;
+        }
+  
+        if (existingContract) {
+          toast({
+            title: "Erro",
+            description: "Já existe um contrato ativo para este aluno com o plano selecionado.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+      
       const { error } = await supabase
         .from('financeiro_alunos')
         .update({
           aluno_id: data.aluno_id,
           plano_id: data.plano_id,
-          valor_plano: parseFloat(data.valor_plano) || 0,
-          valor_material: parseFloat(data.valor_material) || 0,
-          valor_matricula: parseFloat(data.valor_matricula) || 0,
-          desconto_total: parseFloat(data.desconto_total) || 0,
-          valor_total: valorTotal,
+          valor_plano: parseFloat(data.valor_plano),
+          valor_material: parseFloat(data.valor_material),
+          valor_matricula: parseFloat(data.valor_matricula),
+          desconto_total: parseFloat(data.desconto_total),
           status_geral: data.status_geral,
-          data_primeiro_vencimento: data.data_primeiro_vencimento,
-          forma_pagamento_plano: data.forma_pagamento_plano,
-          forma_pagamento_material: data.forma_pagamento_material,
-          forma_pagamento_matricula: data.forma_pagamento_matricula,
-          numero_parcelas_plano: parseInt(data.numero_parcelas_plano) || 1,
-          numero_parcelas_material: parseInt(data.numero_parcelas_material) || 1,
-          numero_parcelas_matricula: parseInt(data.numero_parcelas_matricula) || 1,
+          data_primeiro_vencimento: data.data_primeiro_vencimento
         })
         .eq('id', editingRecord.id);
-
+  
       if (error) throw error;
-
+  
+      // Sincronizar com contratos se o plano mudou
+      if (data.plano_id !== oldPlanoId) {
+        await syncPlanoWithContratos(data.plano_id, oldPlanoId, data.aluno_id);
+      }
+  
       toast({
         title: "Sucesso",
-        description: "Registro atualizado com sucesso!",
+        description: "Registro financeiro atualizado com sucesso!",
       });
-
+  
       setIsEditDialogOpen(false);
       setEditingRecord(null);
-      reset();
       fetchRegistros();
     } catch (error) {
       console.error('Erro ao atualizar registro:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível atualizar o registro.",
+        description: "Erro ao atualizar registro financeiro.",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 

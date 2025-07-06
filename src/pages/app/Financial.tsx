@@ -13,7 +13,8 @@ import { useFinancial } from '@/hooks/useFinancial';
 import FinancialDialogs from '@/components/financial/FinancialDialogs';
 import FinancialPlanDialog from '@/components/financial/FinancialPlanDialog';
 import RenewalAlertsTable from '@/components/financial/RenewalAlertsTable';
-import FinancialRecordsTable from '@/components/Financial/FinancialRecordsTable';
+import FinancialRecordsTable from '@/components/financial/FinancialRecordsTable';
+import StudentGroupingView from '@/components/financial/StudentGroupingView';
 import { StatusAluno } from '@/types/financial';
 
 
@@ -162,17 +163,21 @@ const Financial = () => {
       <Tabs defaultValue="registros" className="space-y-4">
         <TabsList>
           <TabsTrigger value="registros">Registros</TabsTrigger>
+          <TabsTrigger value="agrupamento">Agrupamento</TabsTrigger>
           <TabsTrigger value="operacional">Financeiro Operacional</TabsTrigger>
           <TabsTrigger value="renovacao">Renovações</TabsTrigger>
           <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
         </TabsList>
 
+        <TabsContent value="registros" className="space-y-4">
+          <FinancialRecordsTable />
+        </TabsContent>
 
+        <TabsContent value="agrupamento" className="space-y-4">
+          <StudentGroupingView />
+        </TabsContent>
 
-
-
-
-
+        {/* ... existing TabsContent for operacional, renovacao, relatorios ... */}
         <TabsContent value="operacional" className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Controle Financeiro da Escola</h2>
@@ -281,10 +286,6 @@ const Financial = () => {
             </CardContent>
           </Card>
 
-        </TabsContent>
-
-        <TabsContent value="registros" className="space-y-4">
-          <FinancialRecordsTable />
         </TabsContent>
 
         <TabsContent value="relatorios" className="space-y-4">

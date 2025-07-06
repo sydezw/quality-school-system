@@ -12,8 +12,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Contract } from '@/hooks/useContracts';
 
-
-
 interface EditContractDialogProps {
   contract: Contract;
   onContractUpdated: () => void;
@@ -23,13 +21,15 @@ export const EditContractDialog = ({ contract, onContractUpdated }: EditContract
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [alunos, setAlunos] = useState<Array<{ id: string; nome: string }>>([]);
+  const [planos, setPlanos] = useState<Array<{ id: string; nome: string; valor_total: number }>>([]);
   const [formData, setFormData] = useState({
     aluno_id: contract.aluno_id,
     data_inicio: contract.data_inicio,
     data_fim: contract.data_fim,
     valor_mensalidade: contract.valor_mensalidade.toString(),
-    status: contract.status_contrato as 'Ativo' | 'Agendado' | 'Vencendo' | 'Vencido' | 'Cancelado', // ✅ Usar status_contrato
-    observacao: contract.observacao || ''
+    status: contract.status_contrato as 'Ativo' | 'Agendado' | 'Vencendo' | 'Vencido' | 'Cancelado',
+    observacao: contract.observacao || '',
+    plano_id: contract.plano_id || ''
   });
   const { toast } = useToast();
 
@@ -53,18 +53,84 @@ export const EditContractDialog = ({ contract, onContractUpdated }: EditContract
     }
   };
 
+  const fetchPlanos = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('planos')
+        .select('id, nome, valor_total')
+        .eq('ativo', true)
+        .order('nome');
+
+      if (error) throw error;
+      setPlanos(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar planos:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar a lista de planos.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Função para sincronizar mudança de plano com o financeiro
+  const syncPlanoWithFinanceiro = async (newPlanoId: string, oldPlanoId: string) => {
+    if (!newPlanoId || newPlanoId === oldPlanoId) return;
+
+    try {
+      // Buscar registro financeiro existente do aluno
+      const { data: financeiroData, error: financeiroError } = await supabase
+        .from('financeiro_alunos')
+        .select('id')
+        .eq('aluno_id', formData.aluno_id)
+        .eq('plano_id', oldPlanoId)
+        .eq('ativo_ou_encerrado', 'ativo')
+        .single();
+
+      if (financeiroError && financeiroError.code !== 'PGRST116') {
+        console.error('Erro ao buscar registro financeiro:', financeiroError);
+        return;
+      }
+
+      // Se existe registro financeiro, atualizar o plano
+      if (financeiroData) {
+        const { error: updateError } = await supabase
+          .from('financeiro_alunos')
+          .update({ plano_id: newPlanoId })
+          .eq('id', financeiroData.id);
+
+        if (updateError) {
+          console.error('Erro ao sincronizar plano no financeiro:', updateError);
+          toast({
+            title: "Aviso",
+            description: "Contrato atualizado, mas houve erro na sincronização com o financeiro.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Sincronização",
+            description: "Plano sincronizado automaticamente com o registro financeiro.",
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Erro na sincronização:', error);
+    }
+  };
+
   const handleOpenChange = (newOpen: boolean) => {
     setOpen(newOpen);
     if (newOpen) {
       fetchAlunos();
-      // Reset form with current contract data
+      fetchPlanos();
       setFormData({
         aluno_id: contract.aluno_id,
         data_inicio: contract.data_inicio,
         data_fim: contract.data_fim,
         valor_mensalidade: contract.valor_mensalidade.toString(),
-        status: contract.status_contrato as 'Ativo' | 'Agendado' | 'Vencendo' | 'Vencido' | 'Cancelado', // ✅ Usar status_contrato
-        observacao: contract.observacao || ''
+        status: contract.status_contrato as 'Ativo' | 'Agendado' | 'Vencendo' | 'Vencido' | 'Cancelado',
+        observacao: contract.observacao || '',
+        plano_id: contract.plano_id || ''
       });
     }
   };
@@ -83,6 +149,7 @@ export const EditContractDialog = ({ contract, onContractUpdated }: EditContract
 
     try {
       setLoading(true);
+      const oldPlanoId = contract.plano_id;
 
       const { error } = await supabase
         .from('contratos')
@@ -92,11 +159,17 @@ export const EditContractDialog = ({ contract, onContractUpdated }: EditContract
           data_fim: formData.data_fim,
           valor_mensalidade: parseFloat(formData.valor_mensalidade),
           status_contrato: formData.status,
-          observacao: formData.observacao || null
+          observacao: formData.observacao || null,
+          plano_id: formData.plano_id || null
         })
         .eq('id', contract.id);
 
       if (error) throw error;
+
+      // Sincronizar com financeiro se o plano mudou
+      if (formData.plano_id !== oldPlanoId) {
+        await syncPlanoWithFinanceiro(formData.plano_id, oldPlanoId || '');
+      }
 
       toast({
         title: "Sucesso",
@@ -122,11 +195,11 @@ export const EditContractDialog = ({ contract, onContractUpdated }: EditContract
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button size="sm" variant="outline">
-                <Edit className="h-4 w-4" />
-                Editar
-              </Button>
+          <Edit className="h-4 w-4" />
+          Editar
+        </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Editar Contrato</DialogTitle>
         </DialogHeader>
@@ -141,6 +214,23 @@ export const EditContractDialog = ({ contract, onContractUpdated }: EditContract
                 {alunos.map((aluno) => (
                   <SelectItem key={aluno.id} value={aluno.id}>
                     {aluno.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* NOVO CAMPO PLANO */}
+          <div className="space-y-2">
+            <Label htmlFor="plano">Plano</Label>
+            <Select value={formData.plano_id} onValueChange={(value) => setFormData(prev => ({ ...prev, plano_id: value }))}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um plano" />
+              </SelectTrigger>
+              <SelectContent>
+                {planos.map((plano) => (
+                  <SelectItem key={plano.id} value={plano.id}>
+                    {plano.nome} - R$ {plano.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -224,6 +314,3 @@ export const EditContractDialog = ({ contract, onContractUpdated }: EditContract
     </Dialog>
   );
 };
-
-// Remove a interface Contract local (linha 14-22)
-// E use a importada do useContracts

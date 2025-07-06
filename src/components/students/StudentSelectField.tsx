@@ -46,7 +46,13 @@ const StudentSelectField = ({
   return (
     <FormItem>
       <FormLabel>{label}</FormLabel>
-      <Select onValueChange={onChange} value={value || ""} open={isOpen} onOpenChange={setIsOpen} disabled={disabled}>
+      <Select 
+        onValueChange={onChange} 
+        value={value || undefined} 
+        open={isOpen} 
+        onOpenChange={setIsOpen} 
+        disabled={disabled}
+      >
         <FormControl>
           <SelectTrigger>
             <SelectValue placeholder={placeholder || "Selecione"} />

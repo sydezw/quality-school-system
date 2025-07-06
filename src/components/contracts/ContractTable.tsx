@@ -78,12 +78,14 @@ export const ContractTable = ({
           <TableHeader>
             <TableRow>
               <TableHead>Aluno</TableHead>
+              <TableHead>Plano</TableHead>
+              <TableHead>Idioma</TableHead>
               <TableHead>Data Início</TableHead>
               <TableHead>Data Fim</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Situação</TableHead>
               <TableHead>Observações</TableHead>
-              <TableHead>Ações</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -94,6 +96,16 @@ export const ContractTable = ({
                     <User className="h-4 w-4" />
                     {contract.aluno_nome || 'N/A'}
                   </div>
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm text-muted-foreground">
+                    {contract.plano_nome || '-'}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm text-muted-foreground">
+                    {contract.idioma_contrato || '-'}
+                  </span>
                 </TableCell>
                 <TableCell>
                   {new Date(contract.data_inicio).toLocaleDateString('pt-BR')}
@@ -112,7 +124,7 @@ export const ContractTable = ({
                     {contract.observacao || '-'}
                   </span>
                 </TableCell>
-                <TableCell>
+                <TableCell className="text-right">
                   <ContractActions
                     contract={contract}
                     onEdit={onEdit}
@@ -125,7 +137,7 @@ export const ContractTable = ({
             ))}
             {contracts.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   Nenhum contrato encontrado para este filtro.
                 </TableCell>
               </TableRow>

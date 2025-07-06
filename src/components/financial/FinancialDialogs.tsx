@@ -41,12 +41,6 @@ const FinancialDialogs: React.FC<FinancialDialogsProps> = ({
       <Dialog open={dialogState.isBoletoDialogOpen} onOpenChange={(open) => 
         setDialogState(prev => ({ ...prev, isBoletoDialogOpen: open }))
       }>
-        <DialogTrigger asChild>
-          <Button className="bg-brand-red hover:bg-red-700">
-            <Plus className="w-4 h-4 mr-2" />
-            Novo Boleto
-          </Button>
-        </DialogTrigger>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
@@ -150,12 +144,6 @@ const FinancialDialogs: React.FC<FinancialDialogsProps> = ({
       <Dialog open={dialogState.isDespesaDialogOpen} onOpenChange={(open) => 
         setDialogState(prev => ({ ...prev, isDespesaDialogOpen: open }))
       }>
-        <DialogTrigger asChild>
-          <Button variant="outline">
-            <Plus className="w-4 h-4 mr-2" />
-            Nova Despesa
-          </Button>
-        </DialogTrigger>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
