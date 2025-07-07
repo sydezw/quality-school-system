@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronDown, ChevronRight, Search, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search, Plus, Edit, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -45,6 +45,8 @@ const StudentGroupingView = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedStudents, setExpandedStudents] = useState<Set<string>>(new Set());
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editandoParcela, setEditandoParcela] = useState<Parcela | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [novaParcela, setNovaParcela] = useState<NovaParcelaForm>({
     tipo: '',
     numero: 1,
@@ -207,6 +209,11 @@ const StudentGroupingView = () => {
     setIsDialogOpen(true);
   };
 
+  const abrirModalEditarParcela = (parcela: Parcela) => {
+    setEditandoParcela(parcela);
+    setIsEditModalOpen(true);
+  };
+
   const criarParcela = async () => {
     try {
       if (!novaParcela.tipo || !novaParcela.vencimento || !novaParcela.aluno_id) {
@@ -218,8 +225,6 @@ const StudentGroupingView = () => {
         return;
       }
 
-      // Aqui você pode implementar a lógica para salvar a parcela no banco
-      // Por enquanto, vamos apenas simular a criação
       const novaParcela_: Parcela = {
         id: `custom-${Date.now()}`,
         numero: novaParcela.numero,
@@ -254,7 +259,6 @@ const StudentGroupingView = () => {
         description: "Parcela criada com sucesso!",
       });
 
-      // Resetar formulário e fechar modal
       setNovaParcela({
         tipo: '',
         numero: 1,
@@ -269,6 +273,64 @@ const StudentGroupingView = () => {
       toast({
         title: "Erro",
         description: "Não foi possível criar a parcela.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const salvarEdicaoParcela = async () => {
+    if (!editandoParcela) return;
+
+    try {
+      console.log('Salvando parcela editada:', editandoParcela);
+
+      setAlunos(prev => prev.map(aluno => ({
+        ...aluno,
+        parcelas: aluno.parcelas.map(p => 
+          p.id === editandoParcela.id ? editandoParcela : p
+        )
+      })));
+
+      toast({
+        title: "Sucesso",
+        description: "Parcela editada com sucesso!",
+      });
+
+      setIsEditModalOpen(false);
+      setEditandoParcela(null);
+    } catch (error) {
+      console.error('Erro ao editar parcela:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível editar a parcela.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const excluirParcela = async (parcelaId: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta parcela?')) return;
+
+    try {
+      console.log('Excluindo parcela:', parcelaId);
+
+      setAlunos(prev => prev.map(aluno => ({
+        ...aluno,
+        parcelas: aluno.parcelas.filter(p => p.id !== parcelaId),
+        totalGeral: aluno.totalGeral - (aluno.parcelas.find(p => p.id === parcelaId)?.valor || 0),
+        totalPago: aluno.totalPago - (aluno.parcelas.find(p => p.id === parcelaId && p.status === 'Pago')?.valor || 0),
+        totalPendente: aluno.totalPendente - (aluno.parcelas.find(p => p.id === parcelaId && p.status !== 'Pago')?.valor || 0)
+      })));
+
+      toast({
+        title: "Sucesso",
+        description: "Parcela excluída com sucesso!",
+      });
+    } catch (error) {
+      console.error('Erro ao excluir parcela:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir a parcela.",
         variant: "destructive",
       });
     }
@@ -448,6 +510,98 @@ const StudentGroupingView = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Modal de edição de parcela */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Editar Parcela</DialogTitle>
+          </DialogHeader>
+          {editandoParcela && (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit-tipo">Tipo</Label>
+                <Select 
+                  value={editandoParcela.tipo} 
+                  onValueChange={(value) => setEditandoParcela(prev => prev ? {...prev, tipo: value} : null)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Plano">Plano</SelectItem>
+                    <SelectItem value="Material">Material</SelectItem>
+                    <SelectItem value="Matrícula">Matrícula</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="edit-numero">Número da Parcela</Label>
+                <Input
+                  id="edit-numero"
+                  type="number"
+                  value={editandoParcela.numero}
+                  onChange={(e) => setEditandoParcela(prev => prev ? {...prev, numero: parseInt(e.target.value) || 1} : null)}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="edit-valor">Valor</Label>
+                <Input
+                  id="edit-valor"
+                  type="number"
+                  step="0.01"
+                  value={editandoParcela.valor}
+                  onChange={(e) => setEditandoParcela(prev => prev ? {...prev, valor: parseFloat(e.target.value) || 0} : null)}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="edit-vencimento">Data de Vencimento</Label>
+                <Input
+                  id="edit-vencimento"
+                  type="date"
+                  value={editandoParcela.vencimento}
+                  onChange={(e) => setEditandoParcela(prev => prev ? {...prev, vencimento: e.target.value} : null)}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="edit-status">Status</Label>
+                <Select 
+                  value={editandoParcela.status} 
+                  onValueChange={(value: 'Pago' | 'Pendente' | 'Vencido') => setEditandoParcela(prev => prev ? {...prev, status: value} : null)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Pendente">Pendente</SelectItem>
+                    <SelectItem value="Pago">Pago</SelectItem>
+                    <SelectItem value="Vencido">Vencido</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex justify-end gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsEditModalOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={salvarEdicaoParcela}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  Salvar Alterações
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Tabela principal */}
       <Card>
         <CardHeader>
@@ -523,28 +677,50 @@ const StudentGroupingView = () => {
                             <Table>
                               <TableHeader>
                                 <TableRow>
-                                  // ... existing code ...
-                                  <TableCell>
-                                    <div className="flex gap-2">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => abrirModalEditarParcela(parcela)}
-                                        className="h-8 w-8 p-0"
-                                      >
-                                        <Edit className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => excluirParcela(parcela.id)}
-                                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  </TableCell>
+                                  <TableHead>Tipo</TableHead>
+                                  <TableHead>Parcela</TableHead>
+                                  <TableHead>Valor</TableHead>
+                                  <TableHead>Vencimento</TableHead>
+                                  <TableHead>Status</TableHead>
+                                  <TableHead>Ações</TableHead>
                                 </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {aluno.parcelas
+                                  .sort((a, b) => new Date(a.vencimento).getTime() - new Date(b.vencimento).getTime())
+                                  .map((parcela) => (
+                                    <TableRow key={parcela.id}>
+                                      <TableCell>{parcela.tipo}</TableCell>
+                                      <TableCell>{parcela.numero}</TableCell>
+                                      <TableCell>{formatCurrency(parcela.valor)}</TableCell>
+                                      <TableCell>{formatDate(parcela.vencimento)}</TableCell>
+                                      <TableCell>
+                                        <Badge className={getStatusColor(parcela.status)}>
+                                          {parcela.status}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="flex gap-2">
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => abrirModalEditarParcela(parcela)}
+                                            className="h-8 w-8 p-0"
+                                          >
+                                            <Edit className="h-4 w-4" />
+                                          </Button>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => excluirParcela(parcela.id)}
+                                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
                               </TableBody>
                             </Table>
                           </div>
@@ -569,214 +745,3 @@ const StudentGroupingView = () => {
 };
 
 export default StudentGroupingView;
-
-// Adicionar estado para modal de edição
-const [editandoParcela, setEditandoParcela] = useState<Parcela | null>(null);
-const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-
-// Função para abrir modal de edição
-const abrirModalEditarParcela = (parcela: Parcela) => {
-  setEditandoParcela(parcela);
-  setIsEditModalOpen(true);
-};
-
-// Função para salvar edição da parcela
-const salvarEdicaoParcela = async () => {
-  if (!editandoParcela) return;
-
-  try {
-    // Aqui você implementaria a lógica para salvar no banco
-    console.log('Salvando parcela editada:', editandoParcela);
-
-    // Atualizar estado local
-    setAlunos(prev => prev.map(aluno => ({
-      ...aluno,
-      parcelas: aluno.parcelas.map(p => 
-        p.id === editandoParcela.id ? editandoParcela : p
-      )
-    })));
-
-    toast({
-      title: "Sucesso",
-      description: "Parcela editada com sucesso!",
-    });
-
-    setIsEditModalOpen(false);
-    setEditandoParcela(null);
-  } catch (error) {
-    console.error('Erro ao editar parcela:', error);
-    toast({
-      title: "Erro",
-      description: "Não foi possível editar a parcela.",
-      variant: "destructive",
-    });
-  }
-};
-
-// Função para excluir parcela
-const excluirParcela = async (parcelaId: string) => {
-  if (!confirm('Tem certeza que deseja excluir esta parcela?')) return;
-
-  try {
-    // Aqui você implementaria a lógica para excluir do banco
-    console.log('Excluindo parcela:', parcelaId);
-
-    // Atualizar estado local
-    setAlunos(prev => prev.map(aluno => ({
-      ...aluno,
-      parcelas: aluno.parcelas.filter(p => p.id !== parcelaId),
-      totalGeral: aluno.totalGeral - (aluno.parcelas.find(p => p.id === parcelaId)?.valor || 0),
-      totalPago: aluno.totalPago - (aluno.parcelas.find(p => p.id === parcelaId && p.status === 'Pago')?.valor || 0),
-      totalPendente: aluno.totalPendente - (aluno.parcelas.find(p => p.id === parcelaId && p.status !== 'Pago')?.valor || 0)
-    })));
-
-    toast({
-      title: "Sucesso",
-      description: "Parcela excluída com sucesso!",
-    });
-  } catch (error) {
-    console.error('Erro ao excluir parcela:', error);
-    toast({
-      title: "Erro",
-      description: "Não foi possível excluir a parcela.",
-      variant: "destructive",
-    });
-  }
-};
-
-{/* Adicionar coluna de Ações na tabela de parcelas */}
-<TableHead>Tipo</TableHead>
-<TableHead>Parcela</TableHead>
-<TableHead>Valor</TableHead>
-<TableHead>Vencimento</TableHead>
-<TableHead>Status</TableHead>
-<TableHead>Ações</TableHead>
-
-{/* Adicionar células de ações para cada parcela */}
-{aluno.parcelas
-  .sort((a, b) => new Date(a.vencimento).getTime() - new Date(b.vencimento).getTime())
-  .map((parcela) => (
-    <TableRow key={parcela.id}>
-      <TableCell>{parcela.tipo}</TableCell>
-      <TableCell>{parcela.numero}</TableCell>
-      <TableCell>{formatCurrency(parcela.valor)}</TableCell>
-      <TableCell>{formatDate(parcela.vencimento)}</TableCell>
-      <TableCell>
-        <Badge className={getStatusColor(parcela.status)}>
-          {parcela.status}
-        </Badge>
-      </TableCell>
-      <TableCell>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => abrirModalEditarParcela(parcela)}
-            className="h-8 w-8 p-0"
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => excluirParcela(parcela.id)}
-            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      </TableCell>
-    </TableRow>
-  ))}
-
-{/* Modal de edição de parcela */}
-<Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-  <DialogContent className="sm:max-w-[425px]">
-    <DialogHeader>
-      <DialogTitle>Editar Parcela</DialogTitle>
-    </DialogHeader>
-    {editandoParcela && (
-      <div className="space-y-4">
-        <div>
-          <Label htmlFor="edit-tipo">Tipo</Label>
-          <Select 
-            value={editandoParcela.tipo} 
-            onValueChange={(value) => setEditandoParcela(prev => prev ? {...prev, tipo: value} : null)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Plano">Plano</SelectItem>
-              <SelectItem value="Material">Material</SelectItem>
-              <SelectItem value="Matrícula">Matrícula</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        
-        <div>
-          <Label htmlFor="edit-numero">Número da Parcela</Label>
-          <Input
-            id="edit-numero"
-            type="number"
-            value={editandoParcela.numero}
-            onChange={(e) => setEditandoParcela(prev => prev ? {...prev, numero: parseInt(e.target.value) || 1} : null)}
-          />
-        </div>
-        
-        <div>
-          <Label htmlFor="edit-valor">Valor</Label>
-          <Input
-            id="edit-valor"
-            type="number"
-            step="0.01"
-            value={editandoParcela.valor}
-            onChange={(e) => setEditandoParcela(prev => prev ? {...prev, valor: parseFloat(e.target.value) || 0} : null)}
-          />
-        </div>
-        
-        <div>
-          <Label htmlFor="edit-vencimento">Data de Vencimento</Label>
-          <Input
-            id="edit-vencimento"
-            type="date"
-            value={editandoParcela.vencimento}
-            onChange={(e) => setEditandoParcela(prev => prev ? {...prev, vencimento: e.target.value} : null)}
-          />
-        </div>
-        
-        <div>
-          <Label htmlFor="edit-status">Status</Label>
-          <Select 
-            value={editandoParcela.status} 
-            onValueChange={(value: 'Pago' | 'Pendente' | 'Vencido') => setEditandoParcela(prev => prev ? {...prev, status: value} : null)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Pendente">Pendente</SelectItem>
-              <SelectItem value="Pago">Pago</SelectItem>
-              <SelectItem value="Vencido">Vencido</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        
-        <div className="flex justify-end gap-2">
-          <Button 
-            variant="outline" 
-            onClick={() => setIsEditModalOpen(false)}
-          >
-            Cancelar
-          </Button>
-          <Button 
-            onClick={salvarEdicaoParcela}
-            className="bg-red-600 hover:bg-red-700"
-          >
-            Salvar Alterações
-          </Button>
-        </div>
-      </div>
-    )}
-  </DialogContent>
-</Dialog>

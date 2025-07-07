@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Student } from '@/integrations/supabase/types';
+import { Database } from '@/integrations/supabase/types';
 import { Edit, Trash2, DollarSign } from 'lucide-react';
 import {
   Table,
@@ -13,6 +13,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import AdvancedStudentDeleteDialog from './AdvancedStudentDeleteDialog';
+import { formatCPF } from '@/utils/formatters';
+
+// Definir o tipo Student baseado na tabela alunos do banco
+type Student = Database['public']['Tables']['alunos']['Row'] & {
+  turmas?: { nome: string } | null;
+  responsaveis?: { nome: string } | null;
+};
 
 interface StudentTableProps {
   students: Student[];
@@ -81,7 +88,7 @@ const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, isDel
           {students.map((student) => (
             <TableRow key={student.id}>
               <TableCell className="font-medium">{student.nome}</TableCell>
-              <TableCell>{student.cpf || 'Não informado'}</TableCell>
+              <TableCell>{student.cpf ? formatCPF(student.cpf) : 'Não informado'}</TableCell>
               <TableCell>{student.idioma}</TableCell>
               <TableCell>{student.turmas?.nome || 'Sem turma'}</TableCell>
               <TableCell>{student.responsaveis?.nome || 'Sem responsável'}</TableCell>

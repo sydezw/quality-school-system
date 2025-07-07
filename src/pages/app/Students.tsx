@@ -3,10 +3,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import StudentDialog from '@/components/students/StudentDialog';
 import StudentTable from '@/components/students/StudentTable';
 import FinancialPlanDialog from '@/components/financial/FinancialPlanDialog';
+import { StudentFilters } from '@/components/students/StudentFilters';
 import { useStudents } from '@/hooks/useStudents';
+import { Database } from '@/integrations/supabase/types';
+import { Plus, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 
-import { Student } from '@/integrations/supabase/types';
-import { Plus } from 'lucide-react';
+// Definir o tipo Student baseado na tabela alunos do banco
+type Student = Database['public']['Tables']['alunos']['Row'] & {
+  turmas?: { nome: string } | null;
+  responsaveis?: { nome: string } | null;
+};
 
 const Students = () => {
   const { students, classes, loading, isDeleting, saveStudent, deleteStudentWithPlan } = useStudents();
@@ -14,6 +21,7 @@ const Students = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [query, setQuery] = useState('');
+  const [filters, setFilters] = useState<StudentFilters>({});
   const [isFinancialDialogOpen, setIsFinancialDialogOpen] = useState(false);
   const [selectedStudentForPlan, setSelectedStudentForPlan] = useState<Student | null>(null);
 
@@ -45,19 +53,41 @@ const Students = () => {
   };
 
   const handleFinancialPlanSuccess = () => {
-    // Pode adicionar lógica adicional aqui se necessário
     console.log('Plano financeiro criado com sucesso!');
   };
 
+  const handleFilterChange = (newFilters: StudentFilters) => {
+    setFilters(newFilters);
+  };
 
-
-  // Filtra alunos pelo nome (insensitive)
+  // Filtra alunos pelo nome e pelos filtros selecionados
   const filteredStudents = useMemo(() => {
-    if (!query) return students;
-    return students.filter(student =>
-      student.nome.toLowerCase().includes(query.toLowerCase())
-    );
-  }, [students, query]);
+    let result = students;
+
+    // Filtro por nome
+    if (query) {
+      result = result.filter(student =>
+        student.nome.toLowerCase().includes(query.toLowerCase())
+      );
+    }
+
+    // Filtro por status
+    if (filters.status) {
+      result = result.filter(student => student.status === filters.status);
+    }
+
+    // Filtro por idioma
+    if (filters.idioma) {
+      result = result.filter(student => student.idioma === filters.idioma);
+    }
+
+    // Filtro por turma
+    if (filters.turma_id) {
+      result = result.filter(student => student.turma_id === filters.turma_id);
+    }
+
+    return result;
+  }, [students, query, filters]);
 
   if (loading) {
     return (
@@ -75,22 +105,32 @@ const Students = () => {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold tracking-tight">Alunos</h1>
-          <div className="flex gap-2">
-            <input
-              type="text"
+          <button 
+            className="bg-brand-red text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors flex items-center gap-2"
+            onClick={handleCreate}
+          >
+            <Plus size={16} />
+            Novo Aluno
+          </button>
+        </div>
+
+        {/* Barra de busca e filtros */}
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <Input
               placeholder="Buscar alunos..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-transparent"
+              className="max-w-sm"
             />
-            <button 
-              className="bg-brand-red text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors flex items-center gap-2"
-              onClick={handleCreate}
-            >
-              <Plus size={16} />
-              Novo Aluno
-            </button>
           </div>
+          
+          {/* Componente de Filtros */}
+          <StudentFilters
+            filters={filters}
+            onFilterChange={handleFilterChange}
+          />
         </div>
 
         <StudentDialog
