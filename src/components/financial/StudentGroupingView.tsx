@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronDown, ChevronRight, Search, Plus, Edit, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search, Plus, Edit, Trash2, Users, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -55,23 +55,53 @@ const StudentGroupingView = () => {
     status: 'Pendente',
     aluno_id: ''
   });
+  const [savedScrollPosition, setSavedScrollPosition] = useState<number>(0);
   const { toast } = useToast();
-  
-  // Add this line to fix the containerRef error
   const containerRef = useRef<HTMLDivElement>(null);
-  
-  // Add this function to handle button clicks and prevent event propagation
-  const handleButtonClick = useCallback((action: () => void, event: React.MouseEvent) => {
-    event.preventDefault();
+
+  // Função para gerar parcelas a partir de um registro financeiro
+  const gerarParcelas = (registro: any): Parcela[] => {
+    const parcelas: Parcela[] = [];
+    
+    // Se o registro tem informações de parcelas, gerar baseado nisso
+    if (registro.numero_parcelas && registro.numero_parcelas > 0) {
+      const valorParcela = registro.valor_total / registro.numero_parcelas;
+      
+      for (let i = 1; i <= registro.numero_parcelas; i++) {
+        parcelas.push({
+          id: `${registro.id}-${i}`,
+          numero: i,
+          valor: valorParcela,
+          vencimento: registro.data_vencimento || new Date().toISOString().split('T')[0],
+          status: registro.status_pagamento || 'Pendente',
+          tipo: registro.tipo || 'Plano',
+          registro_id: registro.id
+        });
+      }
+    } else {
+      // Caso não tenha parcelas definidas, criar uma única parcela
+      parcelas.push({
+        id: `${registro.id}-1`,
+        numero: 1,
+        valor: registro.valor_total || 0,
+        vencimento: registro.data_vencimento || new Date().toISOString().split('T')[0],
+        status: registro.status_pagamento || 'Pendente',
+        tipo: registro.tipo || 'Plano',
+        registro_id: registro.id
+      });
+    }
+    
+    return parcelas;
+  };
+
+  // Função para lidar com cliques em botões (evita propagação de eventos)
+  const handleButtonClick = useCallback((callback: () => void, event: React.MouseEvent) => {
     event.stopPropagation();
-    action();
+    callback();
   }, []);
 
-  useEffect(() => {
-    fetchAlunos();
-  }, []);
-
-  const fetchAlunos = async () => {
+  // CORREÇÃO: Usar useCallback para evitar re-criação da função
+  const fetchAlunos = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -101,16 +131,14 @@ const StudentGroupingView = () => {
             parcelas: []
           });
         }
-        
+
         const aluno = alunosMap.get(alunoId)!;
-        
-        // Gerar parcelas para este registro
         const parcelas = gerarParcelas(registro);
-        aluno.parcelas.push(...parcelas);
         
-        // Calcular totais
+        aluno.parcelas.push(...parcelas);
         aluno.totalGeral += registro.valor_total || 0;
         
+        // Calcular totais baseado no status das parcelas
         parcelas.forEach(parcela => {
           if (parcela.status === 'Pago') {
             aluno.totalPago += parcela.valor;
@@ -119,112 +147,73 @@ const StudentGroupingView = () => {
           }
         });
       });
-      
+
       setAlunos(Array.from(alunosMap.values()));
     } catch (error) {
-      console.error('Erro ao buscar dados:', error);
+      console.error('Erro ao buscar alunos financeiros:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível carregar os dados dos alunos.",
+        description: "Erro ao carregar dados financeiros dos alunos.",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]); // CORREÇÃO: Incluir toast nas dependências
 
-  const gerarParcelas = (registro: any): Parcela[] => {
-    const parcelas: Parcela[] = [];
-    const dataBase = new Date(registro.data_primeiro_vencimento || new Date());
+  // CORREÇÃO: useEffect otimizado - só executa uma vez na montagem
+  useEffect(() => {
+    fetchAlunos();
+  }, [fetchAlunos]); // Incluir fetchAlunos nas dependências
+
+  // CORREÇÃO: Memoizar funções que são passadas como callbacks
+  // Função para salvar a posição do scroll
+  const saveScrollPosition = useCallback(() => {
+    const scrollContainer = containerRef.current;
+    if (scrollContainer) {
+      setSavedScrollPosition(scrollContainer.scrollTop);
+    }
+  }, []);
+  
+  // Função para restaurar a posição do scroll com múltiplas tentativas
+  const restoreScrollPosition = useCallback(() => {
+    const scrollContainer = containerRef.current;
+    if (!scrollContainer) return;
     
-    // Parcelas do plano
-    if (registro.valor_plano > 0) {
-      const numParcelas = registro.numero_parcelas_plano || 1;
-      const valorParcela = registro.valor_plano / numParcelas;
-      
-      for (let i = 1; i <= numParcelas; i++) {
-        const vencimento = new Date(dataBase);
-        vencimento.setMonth(vencimento.getMonth() + i - 1);
-        
-        parcelas.push({
-          id: `plano-${registro.id}-${i}`,
-          numero: i,
-          valor: valorParcela,
-          vencimento: vencimento.toISOString().split('T')[0],
-          status: determinarStatus(vencimento, i),
-          tipo: 'Plano',
-          registro_id: registro.id
-        });
+    // Primeira tentativa imediata
+    scrollContainer.scrollTop = savedScrollPosition;
+    
+    // Segunda tentativa após um curto delay
+    setTimeout(() => {
+      if (scrollContainer) {
+        scrollContainer.scrollTop = savedScrollPosition;
       }
-    }
+    }, 0);
     
-    // Parcelas do material
-    if (registro.valor_material > 0) {
-      const numParcelas = registro.numero_parcelas_material || 1;
-      const valorParcela = registro.valor_material / numParcelas;
-      
-      for (let i = 1; i <= numParcelas; i++) {
-        const vencimento = new Date(dataBase);
-        vencimento.setMonth(vencimento.getMonth() + i - 1);
-        
-        parcelas.push({
-          id: `material-${registro.id}-${i}`,
-          numero: i,
-          valor: valorParcela,
-          vencimento: vencimento.toISOString().split('T')[0],
-          status: determinarStatus(vencimento, i),
-          tipo: 'Material',
-          registro_id: registro.id
-        });
+    // Terceira tentativa com requestAnimationFrame para garantir que o DOM foi atualizado
+    requestAnimationFrame(() => {
+      if (scrollContainer) {
+        scrollContainer.scrollTop = savedScrollPosition;
       }
-    }
-    
-    // Parcela da matrícula
-    if (registro.valor_matricula > 0) {
-      parcelas.push({
-        id: `matricula-${registro.id}-1`,
-        numero: 1,
-        valor: registro.valor_matricula,
-        vencimento: dataBase.toISOString().split('T')[0],
-        status: 'Pago',
-        tipo: 'Matrícula',
-        registro_id: registro.id
-      });
-    }
-    
-    return parcelas;
-  };
-
-  const determinarStatus = (vencimento: Date, numeroParcela: number): 'Pago' | 'Pendente' | 'Vencido' => {
-    const hoje = new Date();
-    
-    // Simular algumas parcelas pagas
-    if (numeroParcela <= 2) return 'Pago';
-    
-    // Se venceu, marcar como vencido
-    if (vencimento < hoje) return 'Vencido';
-    
-    return 'Pendente';
-  };
-
-  const abrirModalCriarParcela = (alunoId: string, alunoNome: string) => {
-    setNovaParcela({
-      tipo: '',
-      numero: 1,
-      valor: 0,
-      vencimento: '',
-      status: 'Pendente',
-      aluno_id: alunoId
+      
+      // Quarta tentativa após um delay maior
+      setTimeout(() => {
+        if (scrollContainer) {
+          scrollContainer.scrollTop = savedScrollPosition;
+        }
+      }, 100);
+      
+      // Quinta tentativa após um delay ainda maior
+      setTimeout(() => {
+        if (scrollContainer) {
+          scrollContainer.scrollTop = savedScrollPosition;
+        }
+      }, 300);
     });
-    setIsDialogOpen(true);
-  };
+  }, [savedScrollPosition]);
 
-  const abrirModalEditarParcela = (parcela: Parcela) => {
-    setEditandoParcela(parcela);
-    setIsEditModalOpen(true);
-  };
-
-  const criarParcela = async () => {
+  // Modificar a função criarParcela para usar uma abordagem mais controlada ao fechar o modal
+  const criarParcela = useCallback(async () => {
     try {
       if (!novaParcela.tipo || !novaParcela.vencimento || !novaParcela.aluno_id) {
         toast({
@@ -234,7 +223,7 @@ const StudentGroupingView = () => {
         });
         return;
       }
-
+  
       const novaParcela_: Parcela = {
         id: `custom-${Date.now()}`,
         numero: novaParcela.numero,
@@ -244,31 +233,31 @@ const StudentGroupingView = () => {
         tipo: novaParcela.tipo,
         registro_id: 'custom'
       };
-
-      // Atualizar o estado local
-      setAlunos(prev => prev.map(aluno => {
-        if (aluno.id === novaParcela.aluno_id) {
-          const novasParcelas = [...aluno.parcelas, novaParcela_];
-          const novoTotal = aluno.totalGeral + novaParcela.valor;
-          const novoPago = novaParcela.status === 'Pago' ? aluno.totalPago + novaParcela.valor : aluno.totalPago;
-          const novoPendente = novaParcela.status !== 'Pago' ? aluno.totalPendente + novaParcela.valor : aluno.totalPendente;
-          
-          return {
-            ...aluno,
-            parcelas: novasParcelas,
-            totalGeral: novoTotal,
-            totalPago: novoPago,
-            totalPendente: novoPendente
-          };
-        }
-        return aluno;
-      }));
-
+  
+      // Salvar a posição atual do scroll
+      saveScrollPosition();
+  
+      setAlunos(prev => prev.map(aluno => 
+        aluno.id === novaParcela.aluno_id 
+          ? { 
+              ...aluno, 
+              parcelas: [...aluno.parcelas, novaParcela_],
+              totalGeral: aluno.totalGeral + novaParcela.valor,
+              totalPendente: aluno.totalPendente + (novaParcela.status === 'Pendente' ? novaParcela.valor : 0),
+              totalPago: aluno.totalPago + (novaParcela.status === 'Pago' ? novaParcela.valor : 0)
+            }
+          : aluno
+      ));
+  
       toast({
         title: "Sucesso",
         description: "Parcela criada com sucesso!",
       });
-
+  
+      // Fechar o modal de forma controlada
+      setIsDialogOpen(false);
+      
+      // Resetar o formulário
       setNovaParcela({
         tipo: '',
         numero: 1,
@@ -277,48 +266,73 @@ const StudentGroupingView = () => {
         status: 'Pendente',
         aluno_id: ''
       });
-      setIsDialogOpen(false);
+  
+      // Restaurar a posição do scroll
+      restoreScrollPosition();
     } catch (error) {
       console.error('Erro ao criar parcela:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível criar a parcela.",
+        description: "Erro ao criar parcela.",
         variant: "destructive",
       });
     }
-  };
-
-  const salvarEdicaoParcela = async () => {
+  }, [novaParcela, toast, saveScrollPosition, restoreScrollPosition]);
+  
+  // Modificar a função salvarEdicaoParcela de forma similar
+  const salvarEdicaoParcela = useCallback(async () => {
     if (!editandoParcela) return;
-
+  
     try {
-      console.log('Salvando parcela editada:', editandoParcela);
-
+      // Salvar a posição atual do scroll
+      saveScrollPosition();
+  
       setAlunos(prev => prev.map(aluno => ({
         ...aluno,
         parcelas: aluno.parcelas.map(p => 
           p.id === editandoParcela.id ? editandoParcela : p
         )
       })));
-
+  
       toast({
         title: "Sucesso",
         description: "Parcela editada com sucesso!",
       });
-
+  
+      // Fechar o modal de forma controlada
       setIsEditModalOpen(false);
       setEditandoParcela(null);
+  
+      // Restaurar a posição do scroll
+      restoreScrollPosition();
     } catch (error) {
-      console.error('Erro ao editar parcela:', error);
+      console.error('Erro ao salvar parcela:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível editar a parcela.",
+        description: "Erro ao salvar parcela.",
         variant: "destructive",
       });
     }
-  };
+  }, [editandoParcela, toast, saveScrollPosition, restoreScrollPosition]);
 
-  const excluirParcela = async (parcelaId: string) => {
+  const abrirModalCriarParcela = useCallback((alunoId: string, alunoNome: string) => {
+    setNovaParcela({
+      tipo: '',
+      numero: 1,
+      valor: 0,
+      vencimento: '',
+      status: 'Pendente',
+      aluno_id: alunoId
+    });
+    setIsDialogOpen(true);
+  }, []);
+
+  const abrirModalEditarParcela = useCallback((parcela: Parcela) => {
+    setEditandoParcela(parcela);
+    setIsEditModalOpen(true);
+  }, []);
+
+  const excluirParcela = useCallback(async (parcelaId: string) => {
     if (!confirm('Tem certeza que deseja excluir esta parcela?')) return;
 
     try {
@@ -344,19 +358,35 @@ const StudentGroupingView = () => {
         variant: "destructive",
       });
     }
-  };
+  }, [toast]);
 
-  const toggleStudentExpansion = (studentId: string) => {
+  const toggleStudentExpansion = useCallback((studentId: string) => {
+    // Salvar a posição atual do scroll antes da mudança
+    const scrollContainer = containerRef.current;
+    const currentScrollTop = scrollContainer?.scrollTop || 0;
+    
+    // Salvar no estado global também
+    setSavedScrollPosition(currentScrollTop);
+    
     const newExpanded = new Set(expandedStudents);
-    if (newExpanded.has(studentId)) {
+    const wasExpanded = newExpanded.has(studentId);
+    
+    if (wasExpanded) {
       newExpanded.delete(studentId);
     } else {
       newExpanded.add(studentId);
     }
+    
     setExpandedStudents(newExpanded);
-  };
+    
+    // Usar um timeout para garantir que o DOM foi completamente atualizado
+    if (wasExpanded && scrollContainer) {
+      // Usar a função de restauração robusta
+      setTimeout(restoreScrollPosition, 50);
+    }
+  }, [expandedStudents, restoreScrollPosition]);
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = useCallback((status: string) => {
     switch (status) {
       case 'Pago':
         return 'bg-green-100 text-green-800';
@@ -367,21 +397,23 @@ const StudentGroupingView = () => {
       default:
         return 'bg-gray-100 text-gray-800';
     }
-  };
+  }, []);
 
-  const formatDate = (dateString: string) => {
+  const formatDate = useCallback((dateString: string) => {
     return new Date(dateString).toLocaleDateString('pt-BR');
-  };
+  }, []);
 
-  const formatCurrency = (value: number) => {
+  const formatCurrency = useCallback((value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
     }).format(value);
-  };
+  }, []);
 
-  const filteredAlunos = alunos.filter(aluno =>
-    aluno.nome.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredAlunos = useMemo(() => 
+    alunos.filter(aluno =>
+      aluno.nome.toLowerCase().includes(searchTerm.toLowerCase())
+    ), [alunos, searchTerm]
   );
 
   if (loading) {
@@ -413,7 +445,20 @@ const StudentGroupingView = () => {
       </div>
 
       {/* Modal de criar parcela */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog 
+        open={isDialogOpen} 
+        onOpenChange={(open) => {
+          if (!open) {
+            // Salvar a posição do scroll antes de fechar o modal
+            saveScrollPosition();
+            setIsDialogOpen(false);
+            // Restaurar a posição do scroll após fechar o modal
+            restoreScrollPosition();
+          } else {
+            setIsDialogOpen(true);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Criar Nova Parcela</DialogTitle>
@@ -510,7 +555,16 @@ const StudentGroupingView = () => {
           </div>
           
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                // Salvar a posição do scroll antes de fechar o modal
+                saveScrollPosition();
+                setIsDialogOpen(false);
+                // Restaurar a posição do scroll após fechar o modal
+                restoreScrollPosition();
+              }}
+            >
               Cancelar
             </Button>
             <Button onClick={criarParcela} className="bg-red-600 hover:bg-red-700">
@@ -521,7 +575,20 @@ const StudentGroupingView = () => {
       </Dialog>
 
       {/* Modal de edição de parcela */}
-      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+      <Dialog 
+        open={isEditModalOpen} 
+        onOpenChange={(open) => {
+          if (!open) {
+            // Salvar a posição do scroll antes de fechar o modal
+            saveScrollPosition();
+            setIsEditModalOpen(false);
+            // Restaurar a posição do scroll após fechar o modal
+            restoreScrollPosition();
+          } else {
+            setIsEditModalOpen(true);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Editar Parcela</DialogTitle>
@@ -596,7 +663,13 @@ const StudentGroupingView = () => {
               <div className="flex justify-end gap-2">
                 <Button 
                   variant="outline" 
-                  onClick={() => setIsEditModalOpen(false)}
+                  onClick={() => {
+                    // Salvar a posição do scroll antes de fechar o modal
+                    saveScrollPosition();
+                    setIsEditModalOpen(false);
+                    // Restaurar a posição do scroll após fechar o modal
+                    restoreScrollPosition();
+                  }}
                 >
                   Cancelar
                 </Button>
@@ -637,7 +710,7 @@ const StudentGroupingView = () => {
                   <React.Fragment key={aluno.id}>
                     <TableRow 
                       className="cursor-pointer hover:bg-gray-50 transition-colors duration-200"
-                      onClick={(e) => toggleStudentExpansion(aluno.id, )}
+                      onClick={(e) => toggleStudentExpansion(aluno.id)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
@@ -708,45 +781,94 @@ const StudentGroupingView = () => {
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                  {aluno.parcelas
-                                    .sort((a, b) => new Date(a.vencimento).getTime() - new Date(b.vencimento).getTime())
-                                    .map((parcela, index) => (
-                                      <TableRow 
-                                        key={parcela.id}
-                                        className="hover:bg-gray-50 transition-colors duration-200 animate-slideInUp"
-                                        style={{ animationDelay: `${index * 50}ms` }}
-                                      >
-                                        <TableCell className="font-medium">{parcela.tipo}</TableCell>
-                                        <TableCell>{parcela.numero}</TableCell>
-                                        <TableCell className="font-semibold">{formatCurrency(parcela.valor)}</TableCell>
-                                        <TableCell>{formatDate(parcela.vencimento)}</TableCell>
-                                        <TableCell>
-                                          <Badge className={`${getStatusColor(parcela.status)} transition-all duration-200`}>
-                                            {parcela.status}
-                                          </Badge>
-                                        </TableCell>
-                                        <TableCell>
-                                          <div className="flex gap-2">
-                                            <Button
-                                              variant="outline"
-                                              size="sm"
-                                              onClick={(e) => handleButtonClick(() => abrirModalEditarParcela(parcela), e)}
-                                              className="h-8 w-8 p-0 hover:scale-110 transition-transform duration-200"
-                                            >
-                                              <Edit className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                              variant="outline"
-                                              size="sm"
-                                              onClick={(e) => handleButtonClick(() => excluirParcela(parcela.id), e)}
-                                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:scale-110 transition-all duration-200"
-                                            >
-                                              <Trash2 className="h-4 w-4" />
-                                            </Button>
+                                  {aluno.parcelas.length > 0 ? (
+                                    aluno.parcelas
+                                      .sort((a, b) => new Date(a.vencimento).getTime() - new Date(b.vencimento).getTime())
+                                      .map((parcela, index) => (
+                                        <TableRow 
+                                          key={parcela.id}
+                                          className="hover:bg-gray-50 transition-colors duration-200 animate-slideInUp"
+                                          style={{ animationDelay: `${index * 50}ms` }}
+                                        >
+                                          <TableCell className="font-medium py-4">{parcela.tipo}</TableCell>
+                                          <TableCell className="py-4">{parcela.numero}</TableCell>
+                                          <TableCell className="font-semibold py-4">{formatCurrency(parcela.valor)}</TableCell>
+                                          <TableCell className="py-4">{formatDate(parcela.vencimento)}</TableCell>
+                                          <TableCell className="py-4">
+                                            <Badge className={`${getStatusColor(parcela.status)} transition-all duration-200`}>
+                                              {parcela.status}
+                                            </Badge>
+                                          </TableCell>
+                                          <TableCell className="py-4">
+                                            <div className="flex gap-2">
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={(e) => handleButtonClick(() => abrirModalEditarParcela(parcela), e)}
+                                                className="h-8 w-8 p-0 hover:scale-110 transition-transform duration-200"
+                                              >
+                                                <Edit className="h-4 w-4" />
+                                              </Button>
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={(e) => handleButtonClick(() => excluirParcela(parcela.id), e)}
+                                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:scale-110 transition-all duration-200"
+                                              >
+                                                <Trash2 className="h-4 w-4" />
+                                              </Button>
+                                            </div>
+                                          </TableCell>
+                                        </TableRow>
+                                      ))
+                                  ) : (
+                                    <>
+                                      {/* Área de mensagem quando não há parcelas */}
+                                      <TableRow>
+                                        <TableCell colSpan={6} className="py-12">
+                                          <div className="flex flex-col items-center justify-center space-y-4 border-2 border-dashed border-gray-300 rounded-lg p-8 bg-gray-50">
+                                            <AlertCircle className="h-12 w-12 text-gray-400" />
+                                            <div className="text-center">
+                                              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                                Nenhum registro financeiro encontrado
+                                              </h3>
+                                              <p className="text-gray-500 mb-4">
+                                                Este aluno ainda não possui parcelas ou registros financeiros cadastrados.
+                                              </p>
+                                              <p className="text-sm text-gray-400">
+                                                Clique no botão "Criar Parcela" acima para adicionar o primeiro registro.
+                                              </p>
+                                            </div>
                                           </div>
                                         </TableCell>
                                       </TableRow>
-                                    ))}
+                                      {/* Linhas de espaçamento extra */}
+                                      {[1, 2, 3].map((i) => (
+                                        <TableRow key={`spacing-${i}`}>
+                                          <TableCell colSpan={6} className="py-3 border-b border-gray-100">
+                                            <div className="flex justify-center">
+                                              <div className="w-2 h-2 bg-gray-200 rounded-full mx-1"></div>
+                                              <div className="w-2 h-2 bg-gray-200 rounded-full mx-1"></div>
+                                              <div className="w-2 h-2 bg-gray-200 rounded-full mx-1"></div>
+                                            </div>
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </>
+                                  )}
+                                  
+                                  {/* Linha de espaçamento final para melhor visualização */}
+                                  {aluno.parcelas.length > 0 && (
+                                    <TableRow>
+                                      <TableCell colSpan={6} className="py-4 bg-gray-25 border-t-2 border-gray-200">
+                                        <div className="flex justify-center items-center space-x-2 text-sm text-gray-500">
+                                          <span>•</span>
+                                          <span>Total de {aluno.parcelas.length} parcela{aluno.parcelas.length !== 1 ? 's' : ''}</span>
+                                          <span>•</span>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  )}
                                 </TableBody>
                               </Table>
                             </div>
@@ -761,8 +883,47 @@ const StudentGroupingView = () => {
           </Table>
           
           {filteredAlunos.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              Nenhum aluno encontrado.
+            <div className="flex flex-col items-center justify-center py-16 space-y-6">
+              <div className="relative">
+                <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center">
+                  <Users className="h-12 w-12 text-gray-400" />
+                </div>
+                <div className="absolute -top-2 -right-2 w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                  <Search className="h-4 w-4 text-red-500" />
+                </div>
+              </div>
+              
+              <div className="text-center space-y-2">
+                <h3 className="text-xl font-semibold text-gray-900">
+                  {searchTerm ? 'Nenhum aluno encontrado' : 'Nenhum aluno cadastrado'}
+                </h3>
+                <p className="text-gray-500 max-w-md">
+                  {searchTerm 
+                    ? `Não encontramos alunos que correspondam à busca "${searchTerm}". Tente ajustar os termos da pesquisa.`
+                    : 'Ainda não há alunos com registros financeiros cadastrados no sistema.'
+                  }
+                </p>
+                {searchTerm && (
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setSearchTerm('')}
+                    className="mt-4"
+                  >
+                    Limpar busca
+                  </Button>
+                )}
+              </div>
+              
+              {/* Linhas decorativas de espaçamento */}
+              <div className="w-full max-w-md space-y-3 pt-8">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="flex justify-center space-x-2">
+                    <div className="w-2 h-2 bg-gray-200 rounded-full"></div>
+                    <div className="w-2 h-2 bg-gray-200 rounded-full"></div>
+                    <div className="w-2 h-2 bg-gray-200 rounded-full"></div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </CardContent>

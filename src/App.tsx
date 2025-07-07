@@ -3,11 +3,11 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Outlet, Navigate } from "react-router-dom";
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/authcontext';
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import AppLayout from "./components/layout/AppLayout";
-import ProtectedRoute from "./components/guards/ProtectedRoute";
+import ProtectedRoute from "./components/guards/protectedroute"; // ← Mudança aqui: ProtectedRoute → protectedroute
 import Dashboard from "./pages/app/Dashboard";
 import Reports from "./pages/app/Reports";
 import Students from "./pages/app/Students";
