@@ -75,7 +75,8 @@ export const useStudents = () => {
       const submitData = {
         ...data,
         turma_id: data.turma_id === 'none' ? null : data.turma_id,
-        responsavel_id: data.responsavel_id === 'none' ? null : data.responsavel_id
+        responsavel_id: data.responsavel_id === 'none' ? null : data.responsavel_id,
+        idioma: (!data.idioma || data.idioma === 'none' || data.idioma === '') ? null : data.idioma
       };
 
       if (editingStudent) {

@@ -18,6 +18,7 @@ interface Class {
   id: string;
   nome: string;
   idioma: string;
+  nivel: string; // Adicionar este campo
   dias_da_semana: string;
   horario: string;
   professor_id: string | null;
@@ -63,6 +64,7 @@ const Classes = () => {
     defaultValues: {
       nome: '',
       idioma: '',
+      nivel: '',
       dias_da_semana: '',
       horario: '',
       professor_id: 'none',
@@ -151,7 +153,7 @@ const Classes = () => {
   const onSubmit = async (data: any) => {
     try {
       // Validar campos obrigatórios
-      if (!data.nome || !data.idioma || !data.dias_da_semana || !data.horario) {
+      if (!data.nome || !data.idioma || !data.nivel || !data.dias_da_semana || !data.horario) {
         toast({
           title: "Erro",
           description: "Por favor, preencha todos os campos obrigatórios.",
@@ -164,11 +166,12 @@ const Classes = () => {
       const submitData = {
         nome: data.nome,
         idioma: data.idioma,
+        nivel: data.nivel, // Adicionar este campo
         dias_da_semana: data.dias_da_semana,
         horario: data.horario,
         professor_id: data.professor_id === 'none' ? null : data.professor_id,
         sala_id: data.sala_id === 'none' ? null : data.sala_id,
-        materiais_ids: selectedMaterials // Adicionar esta linha
+        materiais_ids: selectedMaterials
       };
 
       if (editingClass) {
@@ -313,6 +316,7 @@ const Classes = () => {
     reset({
       nome: classItem.nome,
       idioma: classItem.idioma,
+      nivel: classItem.nivel,
       dias_da_semana: classItem.dias_da_semana,
       horario: classItem.horario,
       professor_id: classItem.professor_id || 'none',
@@ -329,6 +333,7 @@ const Classes = () => {
     reset({
       nome: '',
       idioma: '',
+      nivel: '',
       dias_da_semana: '',
       horario: '',
       professor_id: 'none',
@@ -370,21 +375,20 @@ const Classes = () => {
   }
 
   return (
-    <div>
-      <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold">Turmas</h1>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button 
-                  className="bg-brand-red hover:bg-brand-red/90"
-                  onClick={openCreateDialog}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nova Turma
-                </Button>
-              </DialogTrigger>
-               <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Turmas</h1>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button 
+              className="bg-brand-red hover:bg-brand-red/90"
+              onClick={openCreateDialog}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Turma
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-xl font-semibold flex items-center gap-2">
                 <BookCopy className="h-5 w-5 text-brand-red" />
@@ -396,7 +400,7 @@ const Classes = () => {
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Informações Básicas</h3>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="nome" className="text-sm font-medium text-gray-700">
                       Nome da Turma *
@@ -451,6 +455,38 @@ const Classes = () => {
                       <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
                         <span className="text-red-500">⚠</span>
                         {errors.idioma.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="nivel" className="text-sm font-medium text-gray-700">
+                      Nível *
+                    </Label>
+                    <Select 
+                      onValueChange={(value) => setValue('nivel', value)} 
+                      value={watch('nivel')}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Selecione o nível" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Book 1">Book 1</SelectItem>
+                        <SelectItem value="Book 2">Book 2</SelectItem>
+                        <SelectItem value="Book 3">Book 3</SelectItem>
+                        <SelectItem value="Book 4">Book 4</SelectItem>
+                        <SelectItem value="Book 5">Book 5</SelectItem>
+                        <SelectItem value="Book 6">Book 6</SelectItem>
+                        <SelectItem value="Book 7">Book 7</SelectItem>
+                        <SelectItem value="Book 8">Book 8</SelectItem>
+                        <SelectItem value="Book 9">Book 9</SelectItem>
+                        <SelectItem value="Book 10">Book 10</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {errors.nivel && (
+                      <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
+                        <span className="text-red-500">⚠</span>
+                        {errors.nivel.message}
                       </p>
                     )}
                   </div>
@@ -796,85 +832,90 @@ const Classes = () => {
               </div>
             </form>
           </DialogContent>
-            </Dialog>
-          </div>
+        </Dialog>
+      </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BookCopy className="h-5 w-5" />
-                Lista de Turmas ({classes.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Idioma</TableHead>
-                    <TableHead>Materiais</TableHead>
-                    <TableHead>Horário</TableHead>
-                    <TableHead>Professor</TableHead>
-                    <TableHead>Sala</TableHead>
-                    <TableHead>Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {classes.map((classItem) => (
-                    <TableRow key={classItem.id}>
-                      <TableCell className="font-medium">{classItem.nome}</TableCell>
-                      <TableCell>
-                        <Badge className={getIdiomaColor(classItem.idioma)}>
-                          {classItem.idioma}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-600">
-                          {(classItem.materiais_ids?.length) || 0} materiais
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{classItem.horario}</div>
-                          <div className="text-sm text-gray-500">{classItem.dias_da_semana}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {classItem.professores?.nome || (
-                          <span className="text-gray-400 italic">Sem professor</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {classItem.salas?.nome || (
-                          <span className="text-gray-400 italic">Sem sala</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openEditDialog(classItem)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => deleteClass(classItem.id)}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BookCopy className="h-5 w-5" />
+            Lista de Turmas ({classes.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>Idioma</TableHead>
+                <TableHead>Nível</TableHead>
+                <TableHead>Materiais</TableHead>
+                <TableHead>Horário</TableHead>
+                <TableHead>Professor</TableHead>
+                <TableHead>Sala</TableHead>
+                <TableHead>Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {classes.map((classItem) => (
+                <TableRow key={classItem.id}>
+                  <TableCell className="font-medium">{classItem.nome}</TableCell>
+                  <TableCell>
+                    <Badge className={getIdiomaColor(classItem.idioma)}>
+                      {classItem.idioma}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">
+                      {classItem.nivel}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-gray-600">
+                      {(classItem.materiais_ids?.length) || 0} materiais
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <div className="font-medium">{classItem.horario}</div>
+                      <div className="text-sm text-gray-500">{classItem.dias_da_semana}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {classItem.professores?.nome || (
+                      <span className="text-gray-400 italic">Sem professor</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {classItem.salas?.nome || (
+                      <span className="text-gray-400 italic">Sem sala</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openEditDialog(classItem)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => deleteClass(classItem.id)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 };

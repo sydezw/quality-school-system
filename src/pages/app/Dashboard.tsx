@@ -3,7 +3,7 @@ import ContractAlerts from '@/components/dashboard/ContractAlerts';
 import DashboardStats from '@/components/dashboard/DashboardStats';
 import RevenueExpenseChart from '@/components/dashboard/RevenueExpenseChart';
 import StudentsLanguageChart from '@/components/dashboard/StudentsLanguageChart';
-import PlanRenewalAlerts from '@/components/dashboard/PlanRenewalAlerts';
+// import PlanRenewalAlerts from '@/components/dashboard/PlanRenewalAlerts'; // Removido
 import { useDashboardData } from '@/hooks/useDashboardData';
 
 const Dashboard = () => {
@@ -24,12 +24,12 @@ const Dashboard = () => {
     <div className="space-y-6">
       <DashboardStats data={dashboardData} />
 
-      {/* Alertas de Contratos e Renovações */}
+      {/* Alertas de Contratos */}
       <div>
         <h2 className="text-lg font-semibold mb-4">Alertas e Notificações</h2>
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           <ContractAlerts />
-          <PlanRenewalAlerts />
+          {/* <PlanRenewalAlerts /> Removido */}
         </div>
       </div>
 

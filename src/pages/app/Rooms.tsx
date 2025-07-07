@@ -11,12 +11,14 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Building2, BarChart3 } from 'lucide-react';
+import { Plus, Edit, Trash2, Building2, BarChart3, RefreshCw } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import RoomOccupancyReport from '@/components/rooms/RoomOccupancyReport';
 
 import { DeleteRoomDialog } from '@/components/rooms/DeleteRoomDialog';
-import { Room } from '@/integrations/supabase/types';
+import { Database } from '@/integrations/supabase/types';
+
+type Room = Database['public']['Tables']['salas']['Row'];
 
 const Rooms = () => {
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -26,9 +28,10 @@ const Rooms = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [roomToDelete, setRoomToDelete] = useState<Room | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
 
-  const { register, handleSubmit, reset, setValue } = useForm();
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm();
 
   useEffect(() => {
     fetchRooms();
@@ -36,20 +39,36 @@ const Rooms = () => {
 
   const fetchRooms = async () => {
     try {
+      setLoading(true);
+      console.log('Buscando salas...');
+      
       const { data, error } = await supabase
         .from('salas')
         .select('*')
         .order('nome');
 
-      if (error) throw error;
-      // Filtra apenas salas com nome, capacidade e tipo válidos
-      const validRooms = (data || []).filter(room => room.nome && room.capacidade && room.tipo);
+      if (error) {
+        console.error('Erro na consulta:', error);
+        throw error;
+      }
+      
+      console.log('Dados recebidos:', data);
+      
+      // Aceita todas as salas, apenas filtra as que não têm ID
+      const validRooms = (data || []).filter(room => room.id);
+      
+      console.log('Salas válidas:', validRooms);
       setRooms(validRooms);
-    } catch (error) {
+      
+      toast({
+        title: "Sucesso",
+        description: `${validRooms.length} salas carregadas com sucesso!`,
+      });
+    } catch (error: any) {
       console.error('Erro ao buscar salas:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível carregar as salas.",
+        description: `Erro ao carregar salas: ${error.message || 'Erro desconhecido'}`,
         variant: "destructive",
       });
     } finally {
@@ -57,12 +76,40 @@ const Rooms = () => {
     }
   };
 
+  const refreshRooms = async () => {
+    setRefreshing(true);
+    await fetchRooms();
+    setRefreshing(false);
+  };
+
   const onSubmit = async (data: any) => {
     try {
+      // Validação básica
+      if (!data.nome?.trim()) {
+        toast({
+          title: "Erro de validação",
+          description: "O nome da sala é obrigatório.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const submitData = {
-        ...data,
-        capacidade: parseInt(data.capacidade)
+        nome: data.nome.trim(),
+        capacidade: data.capacidade ? parseInt(data.capacidade) : null,
+        tipo: data.tipo || 'Física',
+        status: data.status || 'ativo'
       };
+
+      // Validar capacidade se fornecida
+      if (submitData.capacidade && (isNaN(submitData.capacidade) || submitData.capacidade <= 0)) {
+        toast({
+          title: "Erro de validação",
+          description: "A capacidade deve ser um número maior que zero.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       if (editingRoom) {
         const { error } = await supabase
@@ -71,6 +118,7 @@ const Rooms = () => {
           .eq('id', editingRoom.id);
 
         if (error) throw error;
+        
         toast({
           title: "Sucesso",
           description: "Sala atualizada com sucesso!",
@@ -81,6 +129,7 @@ const Rooms = () => {
           .insert([submitData]);
 
         if (error) throw error;
+        
         toast({
           title: "Sucesso",
           description: "Sala criada com sucesso!",
@@ -90,15 +139,43 @@ const Rooms = () => {
       setIsDialogOpen(false);
       setEditingRoom(null);
       reset();
-      fetchRooms();
-    } catch (error) {
+      await fetchRooms();
+    } catch (error: any) {
       console.error('Erro ao salvar sala:', error);
+      
+      let errorMessage = "Não foi possível salvar a sala.";
+      
+      if (error?.code === '42501') {
+        errorMessage = "Você não tem permissão para realizar esta operação.";
+      } else if (error?.code === '23505') {
+        errorMessage = "Já existe uma sala com este nome.";
+      } else if (error?.code === '23502') {
+        errorMessage = "Todos os campos obrigatórios devem ser preenchidos.";
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Erro",
-        description: "Não foi possível salvar a sala.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
+  };
+
+  const openEditDialog = (room: Room) => {
+    setEditingRoom(room);
+    setValue('nome', room.nome);
+    setValue('capacidade', room.capacidade);
+    setValue('tipo', room.tipo);
+    setValue('status', room.status || 'ativo');
+    setIsDialogOpen(true);
+  };
+
+  const openNewDialog = () => {
+    setEditingRoom(null);
+    reset();
+    setIsDialogOpen(true);
   };
 
   const handleDeleteClick = (room: Room) => {
@@ -120,30 +197,8 @@ const Rooms = () => {
     setIsDeleting(false);
   };
 
-  const handleDeleteCancel = () => {
-    setDeleteDialogOpen(false);
-    setRoomToDelete(null);
-  };
-
   const deleteRoom = async (id: string): Promise<boolean> => {
     try {
-      // Primeiro, verificar se a sala existe
-      const { data: roomExists, error: checkError } = await supabase
-        .from('salas')
-        .select('id, nome')
-        .eq('id', id)
-        .single();
-
-      if (checkError || !roomExists) {
-        toast({
-          title: "Sala não encontrada",
-          description: "A sala que você está tentando excluir não existe mais.",
-          variant: "destructive",
-        });
-        await fetchRooms();
-        return false;
-      }
-
       // Verificar se há turmas associadas
       const { data: classes } = await supabase
         .from('turmas')
@@ -152,155 +207,154 @@ const Rooms = () => {
 
       if (classes && classes.length > 0) {
         toast({
-          title: "Não é possível excluir esta sala",
-          description: "Esta sala possui turmas associadas. Remova essas vinculações antes de excluir.",
+          title: "Não é possível excluir",
+          description: "Esta sala possui turmas associadas. Remova as turmas primeiro.",
           variant: "destructive",
         });
         return false;
       }
 
-      // Executar a exclusão
-      const { error: deleteError } = await supabase
+      const { error } = await supabase
         .from('salas')
         .delete()
         .eq('id', id);
 
-      if (deleteError) {
-        // Tratar diferentes tipos de erro
-        if (deleteError.code === 'PGRST116') {
-          toast({
-            title: "Sala não encontrada",
-            description: "A sala que você está tentando excluir não existe mais.",
-            variant: "destructive",
-          });
-          await fetchRooms();
-          return false;
-        } else if (deleteError.code === '23503') {
-          toast({
-            title: "Não é possível excluir esta sala",
-            description: "Esta sala está vinculada a turmas ou outros registros. Remova essas vinculações antes de excluir.",
-            variant: "destructive",
-          });
-          return false;
-        } else {
-          throw deleteError;
-        }
-      }
-      
+      if (error) throw error;
+
       toast({
-        title: "Sala excluída com sucesso!",
-        description: `A sala "${roomExists.nome}" foi removida do sistema.`,
+        title: "Sucesso",
+        description: "Sala excluída com sucesso!",
       });
-      
-      // Atualizar a lista de salas
+
       await fetchRooms();
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao excluir sala:', error);
       toast({
-        title: "Erro ao excluir sala",
-        description: "Ocorreu um erro inesperado. Tente novamente.",
+        title: "Erro",
+        description: `Não foi possível excluir a sala: ${error.message}`,
         variant: "destructive",
       });
       return false;
     }
   };
 
-  const openEditDialog = (room: Room) => {
-    setEditingRoom(room);
-    setValue('nome', room.nome);
-    setValue('capacidade', room.capacidade);
-    setValue('tipo', room.tipo);
-    setIsDialogOpen(true);
+  const getTipoColor = (tipo: string | null) => {
+    switch (tipo) {
+      case 'Virtual':
+        return 'bg-blue-100 text-blue-800';
+      case 'Física':
+        return 'bg-green-100 text-green-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
   };
 
-  const openCreateDialog = () => {
-    setEditingRoom(null);
-    reset();
-    setIsDialogOpen(true);
-  };
-
-  const getTipoColor = (tipo: string) => {
-    return tipo === 'Física' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800';
+  const formatCapacidade = (capacidade: number | null) => {
+    if (!capacidade) return 'Não definida';
+    return `${capacidade} alunos`;
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-red border-t-transparent mx-auto"></div>
-          <p className="mt-2 text-gray-600">Carregando salas...</p>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-red"></div>
+        <span className="ml-2">Carregando salas...</span>
       </div>
     );
   }
 
   return (
-    <div>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Salas</h1>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Salas</h1>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={refreshRooms}
+            disabled={refreshing}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Atualizar
+          </Button>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button 
-                className="bg-brand-red hover:bg-brand-red/90"
-                onClick={openCreateDialog}
-              >
+              <Button onClick={openNewDialog} className="bg-brand-red hover:bg-brand-red/90">
                 <Plus className="h-4 w-4 mr-2" />
                 Nova Sala
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>
-                {editingRoom ? 'Editar Sala' : 'Nova Sala'}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <div>
-                <Label htmlFor="nome">Nome da Sala *</Label>
-                <Input
-                  id="nome"
-                  {...register('nome', { required: true })}
-                  placeholder="Ex: Sala 1"
-                />
-              </div>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  {editingRoom ? 'Editar Sala' : 'Nova Sala'}
+                </DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                <div>
+                  <Label htmlFor="nome">Nome da Sala *</Label>
+                  <Input
+                    id="nome"
+                    {...register('nome', { required: 'Nome é obrigatório' })}
+                    placeholder="Ex: Sala 1"
+                    className={errors.nome ? 'border-red-500' : ''}
+                  />
+                  {errors.nome && (
+                    <p className="text-red-500 text-sm mt-1">{errors.nome.message as string}</p>
+                  )}
+                </div>
 
-              <div>
-                <Label htmlFor="capacidade">Capacidade *</Label>
-                <Input
-                  id="capacidade"
-                  type="number"
-                  min="1"
-                  {...register('capacidade', { required: true })}
-                  placeholder="Ex: 12"
-                />
-              </div>
+                <div>
+                  <Label htmlFor="capacidade">Capacidade</Label>
+                  <Input
+                    id="capacidade"
+                    type="number"
+                    min="1"
+                    {...register('capacidade')}
+                    placeholder="Ex: 12"
+                  />
+                </div>
 
-              <div>
-                <Label htmlFor="tipo">Tipo *</Label>
-                <Select onValueChange={(value) => setValue('tipo', value)} defaultValue={editingRoom?.tipo}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Física">Física</SelectItem>
-                    <SelectItem value="Virtual">Virtual</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                <div>
+                  <Label htmlFor="tipo">Tipo</Label>
+                  <Select onValueChange={(value) => setValue('tipo', value)} defaultValue={editingRoom?.tipo || 'Física'}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Física">Física</SelectItem>
+                      <SelectItem value="Virtual">Virtual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div className="flex gap-2 pt-4">
-                <Button type="submit" className="flex-1 bg-brand-red hover:bg-brand-red/90">
-                  {editingRoom ? 'Atualizar' : 'Criar'}
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancelar
-                </Button>
-              </div>
-            </form>
+                <div>
+                  <Label htmlFor="status">Status</Label>
+                  <Select onValueChange={(value) => setValue('status', value)} defaultValue={editingRoom?.status || 'ativo'}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ativo">Ativo</SelectItem>
+                      <SelectItem value="inativo">Inativo</SelectItem>
+                      <SelectItem value="manutencao">Manutenção</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex gap-2 pt-4">
+                  <Button type="submit" className="flex-1 bg-brand-red hover:bg-brand-red/90">
+                    {editingRoom ? 'Atualizar' : 'Criar'}
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                </div>
+              </form>
             </DialogContent>
           </Dialog>
+        </div>
       </div>
 
       <Tabs defaultValue="list" className="w-full">
@@ -325,58 +379,73 @@ const Rooms = () => {
             </CardHeader>
             <CardContent>
               {rooms.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-500">Nenhuma sala cadastrada ainda.</p>
-                  <p className="text-sm text-gray-400">Clique no botão "Nova Sala" para começar.</p>
+                <div className="text-center py-12">
+                  <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500 text-lg mb-2">Nenhuma sala encontrada</p>
+                  <p className="text-sm text-gray-400 mb-4">Clique no botão "Nova Sala" para começar ou "Atualizar" para recarregar.</p>
+                  <Button onClick={openNewDialog} className="bg-brand-red hover:bg-brand-red/90">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Criar Primeira Sala
+                  </Button>
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nome</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Capacidade</TableHead>
-                      <TableHead>Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rooms.map((room) => (
-                      <TableRow key={room.id}>
-                        <TableCell className="font-medium">{room.nome}</TableCell>
-                        <TableCell>
-                          <Badge className={getTipoColor(room.tipo)}>
-                            {room.tipo}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{room.capacidade} alunos</TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openEditDialog(room)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDeleteClick(room)}
-                              className="text-red-600 hover:text-red-700"
-                              disabled={isDeleting && roomToDelete?.id === room.id}
-                            >
-                              {isDeleting && roomToDelete?.id === room.id ? (
-                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                              ) : (
-                                <Trash2 className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </div>
-                        </TableCell>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Capacidade</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {rooms.map((room) => (
+                        <TableRow key={room.id}>
+                          <TableCell className="font-medium">
+                            {room.nome || 'Sem nome'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={getTipoColor(room.tipo)}>
+                              {room.tipo || 'Não definido'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{formatCapacidade(room.capacidade)}</TableCell>
+                          <TableCell>
+                            <Badge className={room.status === 'ativo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                              {room.status || 'ativo'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex gap-2 justify-end">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openEditDialog(room)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDeleteClick(room)}
+                                className="text-red-600 hover:text-red-700"
+                                disabled={isDeleting && roomToDelete?.id === room.id}
+                              >
+                                {isDeleting && roomToDelete?.id === room.id ? (
+                                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -388,13 +457,12 @@ const Rooms = () => {
       </Tabs>
 
       <DeleteRoomDialog
-         isOpen={deleteDialogOpen}
-         room={roomToDelete}
-         onOpenChange={setDeleteDialogOpen}
-         onConfirm={handleDeleteConfirm}
-         isDeleting={isDeleting}
-       />
-    </div>
+        isOpen={deleteDialogOpen}
+        room={roomToDelete}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteConfirm}
+        isDeleting={isDeleting}
+      />
     </div>
   );
 };

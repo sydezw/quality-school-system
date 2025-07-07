@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,6 +56,16 @@ const StudentGroupingView = () => {
     aluno_id: ''
   });
   const { toast } = useToast();
+  
+  // Add this line to fix the containerRef error
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Add this function to handle button clicks and prevent event propagation
+  const handleButtonClick = useCallback((action: () => void, event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    action();
+  }, []);
 
   useEffect(() => {
     fetchAlunos();
@@ -386,7 +396,7 @@ const StudentGroupingView = () => {
   }
 
   return (
-    <div className="space-y-4">
+    <div ref={containerRef} className="space-y-4 overflow-auto">
       {/* Header com busca */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">Registros Financeiros por Aluno</h2>
@@ -626,15 +636,27 @@ const StudentGroupingView = () => {
                 return (
                   <React.Fragment key={aluno.id}>
                     <TableRow 
-                      className="cursor-pointer hover:bg-gray-50"
-                      onClick={() => toggleStudentExpansion(aluno.id)}
+                      className="cursor-pointer hover:bg-gray-50 transition-colors duration-200"
+                      onClick={(e) => toggleStudentExpansion(aluno.id, )}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          toggleStudentExpansion(aluno.id);
+                        }
+                      }}
+                      tabIndex={0}
+                      role="button"
+                      aria-expanded={isExpanded}
+                      aria-label={`${isExpanded ? 'Recolher' : 'Expandir'} detalhes de ${aluno.nome}`}
                     >
                       <TableCell>
-                        {isExpanded ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
+                        <div className="transition-transform duration-300 ease-in-out">
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="font-medium">{aluno.nome}</TableCell>
                       <TableCell>{formatCurrency(aluno.totalGeral)}</TableCell>
@@ -655,74 +677,79 @@ const StudentGroupingView = () => {
                       </TableCell>
                     </TableRow>
                     
-                    {/* Linha expandida com todas as parcelas */}
+                    {/* Linha expandida com animação otimizada */}
                     {isExpanded && (
-                      <TableRow>
+                      <TableRow className="transition-all duration-500 ease-in-out">
                         <TableCell colSpan={6} className="p-0">
-                          <div className="bg-gray-50 p-4">
+                          <div className="bg-gray-50 p-4 border-l-4 border-blue-500 animate-fadeIn">
                             <div className="flex justify-between items-center mb-3">
-                              <h4 className="font-semibold">Todas as Parcelas de {aluno.nome}</h4>
+                              <h4 className="font-semibold text-lg text-gray-800">
+                                Todas as Parcelas de {aluno.nome}
+                              </h4>
                               <Button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  abrirModalCriarParcela(aluno.id, aluno.nome);
-                                }}
-                                className="bg-red-600 hover:bg-red-700 text-white"
+                                onClick={(e) => handleButtonClick(() => abrirModalCriarParcela(aluno.id, aluno.nome), e)}
+                                className="bg-red-600 hover:bg-red-700 text-white transition-all duration-200 hover:scale-105"
                                 size="sm"
                               >
                                 <Plus className="h-4 w-4 mr-2" />
                                 Criar Parcela
                               </Button>
                             </div>
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Tipo</TableHead>
-                                  <TableHead>Parcela</TableHead>
-                                  <TableHead>Valor</TableHead>
-                                  <TableHead>Vencimento</TableHead>
-                                  <TableHead>Status</TableHead>
-                                  <TableHead>Ações</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {aluno.parcelas
-                                  .sort((a, b) => new Date(a.vencimento).getTime() - new Date(b.vencimento).getTime())
-                                  .map((parcela) => (
-                                    <TableRow key={parcela.id}>
-                                      <TableCell>{parcela.tipo}</TableCell>
-                                      <TableCell>{parcela.numero}</TableCell>
-                                      <TableCell>{formatCurrency(parcela.valor)}</TableCell>
-                                      <TableCell>{formatDate(parcela.vencimento)}</TableCell>
-                                      <TableCell>
-                                        <Badge className={getStatusColor(parcela.status)}>
-                                          {parcela.status}
-                                        </Badge>
-                                      </TableCell>
-                                      <TableCell>
-                                        <div className="flex gap-2">
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => abrirModalEditarParcela(parcela)}
-                                            className="h-8 w-8 p-0"
-                                          >
-                                            <Edit className="h-4 w-4" />
-                                          </Button>
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => excluirParcela(parcela.id)}
-                                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                                          >
-                                            <Trash2 className="h-4 w-4" />
-                                          </Button>
-                                        </div>
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
-                              </TableBody>
-                            </Table>
+                            <div className="rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow className="bg-gray-100">
+                                    <TableHead>Tipo</TableHead>
+                                    <TableHead>Parcela</TableHead>
+                                    <TableHead>Valor</TableHead>
+                                    <TableHead>Vencimento</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Ações</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {aluno.parcelas
+                                    .sort((a, b) => new Date(a.vencimento).getTime() - new Date(b.vencimento).getTime())
+                                    .map((parcela, index) => (
+                                      <TableRow 
+                                        key={parcela.id}
+                                        className="hover:bg-gray-50 transition-colors duration-200 animate-slideInUp"
+                                        style={{ animationDelay: `${index * 50}ms` }}
+                                      >
+                                        <TableCell className="font-medium">{parcela.tipo}</TableCell>
+                                        <TableCell>{parcela.numero}</TableCell>
+                                        <TableCell className="font-semibold">{formatCurrency(parcela.valor)}</TableCell>
+                                        <TableCell>{formatDate(parcela.vencimento)}</TableCell>
+                                        <TableCell>
+                                          <Badge className={`${getStatusColor(parcela.status)} transition-all duration-200`}>
+                                            {parcela.status}
+                                          </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                          <div className="flex gap-2">
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={(e) => handleButtonClick(() => abrirModalEditarParcela(parcela), e)}
+                                              className="h-8 w-8 p-0 hover:scale-110 transition-transform duration-200"
+                                            >
+                                              <Edit className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={(e) => handleButtonClick(() => excluirParcela(parcela.id), e)}
+                                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:scale-110 transition-all duration-200"
+                                            >
+                                              <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                          </div>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                </TableBody>
+                              </Table>
+                            </div>
                           </div>
                         </TableCell>
                       </TableRow>
