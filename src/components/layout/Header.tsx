@@ -3,7 +3,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { LogOut, User } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/authcontext';
 
 const Header = () => {
   const { user, signOut } = useAuth();
