@@ -25,7 +25,7 @@ const renderSituacao = (contract: Contract) => {
     return (
       <div className="flex items-center gap-2">
         <AlertTriangle className="h-4 w-4 text-red-500" />
-        <span className="text-sm font-medium text-red-600">
+        <span className="text-base font-medium text-red-600">
           {contract.situacao}
         </span>
       </div>
@@ -33,7 +33,7 @@ const renderSituacao = (contract: Contract) => {
   }
   
   return (
-    <span className="text-sm text-muted-foreground">
+    <span className="text-base text-muted-foreground">
       {contract.situacao || '-'}
     </span>
   );
@@ -91,26 +91,26 @@ export const ContractTable = ({
           <TableBody>
             {contracts.map((contract) => (
               <TableRow key={contract.id}>
-                <TableCell className="font-medium">
+                <TableCell className="font-medium text-base">
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4" />
                     {contract.aluno_nome || 'N/A'}
                   </div>
                 </TableCell>
                 <TableCell>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-base text-muted-foreground">
                     {contract.plano_nome || '-'}
                   </span>
                 </TableCell>
                 <TableCell>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-base text-muted-foreground">
                     {contract.idioma_contrato || '-'}
                   </span>
                 </TableCell>
-                <TableCell>
+                <TableCell className="text-base">
                   {new Date(contract.data_inicio).toLocaleDateString('pt-BR')}
                 </TableCell>
-                <TableCell>
+                <TableCell className="text-base">
                   {new Date(contract.data_fim).toLocaleDateString('pt-BR')}
                 </TableCell>
                 <TableCell>
@@ -120,7 +120,7 @@ export const ContractTable = ({
                   {renderSituacao(contract)}
                 </TableCell>
                 <TableCell>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-base text-muted-foreground">
                     {contract.observacao || '-'}
                   </span>
                 </TableCell>

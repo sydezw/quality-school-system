@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useForm } from 'react-hook-form';
 import {
   Boleto,
   Despesa,
@@ -30,7 +29,7 @@ export const useFinancial = () => {
     contratos: [],
     loading: true,
     filtroStatus: 'todos',
-    viewMode: 'ggrupauoado',
+    viewMode: 'agrupado', // Corrigido de 'ggrupauoado'
     expandedAlunos: new Set<string>(),
     expandedToggles: {}
   });
@@ -45,8 +44,6 @@ export const useFinancial = () => {
     editingDespesa: null,
     alunoSelecionadoParcela: null
   });
-
-  // Forms removidos conforme solicitado
 
   // Funções de fetch
   const fetchBoletos = async () => {
@@ -138,12 +135,27 @@ export const useFinancial = () => {
     try {
       const { data, error } = await supabase
         .from('contratos')
-        .select('*')
-        .eq('status', 'Ativo')
+        .select(`
+          *,
+          planos(nome)
+        `)
+        .eq('status_contrato', 'Ativo')
         .order('data_inicio', { ascending: false });
-
+  
       if (error) throw error;
-      setState(prev => ({ ...prev, contratos: data || [] }));
+      
+      // Mapear os dados para o tipo ContratoAluno
+      const contratosFormatados = data?.map(contrato => ({
+        id: contrato.id,
+        aluno_id: contrato.aluno_id,
+        valor_mensalidade: contrato.valor_mensalidade,
+        data_inicio: contrato.data_inicio,
+        data_fim: contrato.data_fim,
+        status: contrato.status_contrato,
+        plano_nome: contrato.planos?.nome || 'Plano não definido'
+      })) || [];
+      
+      setState(prev => ({ ...prev, contratos: contratosFormatados }));
     } catch (error) {
       console.error('Erro ao buscar contratos:', error);
       setState(prev => ({ ...prev, contratos: [] }));
@@ -277,9 +289,14 @@ export const useFinancial = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'pago': 
       case 'Pago': return 'bg-green-100 text-green-800';
+      case 'pendente':
       case 'Pendente': return 'bg-yellow-100 text-yellow-800';
+      case 'vencido':
       case 'Vencido': return 'bg-red-100 text-red-800';
+      case 'cancelado':
+      case 'Cancelado': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -295,14 +312,14 @@ export const useFinancial = () => {
 
       if (registroError) throw registroError;
 
-      const dataAtual = new Date().toISOString().split('T')[0];
+      const dataAtual = new Date().toISOString().split('T')[0]; // Formato date
 
       const { error: updateError } = await supabase
         .from('financeiro_alunos')
         .update({
-          status: 'Pago',
+          status_geral: 'Pago', // Campo correto da tabela
           data_pagamento: dataAtual,
-          metodo_pagamento: metodo
+          forma_pagamento_plano: metodo // Campo correto da tabela
         })
         .eq('id', boletoId);
 

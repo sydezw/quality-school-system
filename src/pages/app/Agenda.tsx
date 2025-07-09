@@ -6,12 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Calendar, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { Plus, Trash2, Calendar, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { useForm } from 'react-hook-form';
+import CalendarTemplate from '@/components/shared/CalendarTemplate';
 
 
 interface AgendaItem {
@@ -31,7 +31,6 @@ const Agenda = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<AgendaItem | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const { toast } = useToast();
   const { register, handleSubmit, reset, setValue } = useForm();
@@ -118,7 +117,7 @@ const Agenda = () => {
         descricao: data.descricao || null,
         data: selectedDate || data.data,
         hora: data.hora,
-        status: 'pendente', // Campo obrigatório na tabela
+        status: data.status || 'pendente',
         criado_por: currentUserId
       };
 
@@ -164,7 +163,6 @@ const Agenda = () => {
     if (!confirm('Tem certeza que deseja excluir este evento?')) return;
 
     try {
-      // Primeiro, verificar se o evento existe
       const { data: eventExists, error: checkError } = await supabase
         .from('agenda')
         .select('id, titulo')
@@ -175,18 +173,16 @@ const Agenda = () => {
         throw new Error('Evento não encontrado.');
       }
 
-      // Executar a exclusão
       const { error: deleteError } = await supabase
         .from('agenda')
         .delete()
         .eq('id', id);
 
       if (deleteError) {
-        // Tratar diferentes tipos de erro
         if (deleteError.code === 'PGRST116') {
           throw new Error('Evento não encontrado.');
         } else if (deleteError.code === '23503') {
-          throw new Error('Não é possível excluir este evento pois existem registros relacionados. Para resolver este problema, execute as migrações do banco de dados ou entre em contato com o administrador do sistema.');
+          throw new Error('Não é possível excluir este evento pois existem registros relacionados.');
         } else {
           throw new Error(`Erro no banco de dados: ${deleteError.message}`);
         }
@@ -198,7 +194,6 @@ const Agenda = () => {
         duration: 5000,
       });
       
-      // Atualizar a lista de eventos
       await fetchAgendaItems();
     } catch (error) {
       console.error('Erro ao excluir evento:', error);
@@ -230,127 +225,6 @@ const Agenda = () => {
     setIsDialogOpen(true);
   };
 
-  // Funções do calendário
-  const getDaysInMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  };
-
-  const getFirstDayOfMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-  };
-
-  const formatDateForCalendar = (year: number, month: number, day: number) => {
-    return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-  };
-
-  const getEventsForDate = (dateStr: string) => {
-    return agendaItems.filter(item => item.data === dateStr);
-  };
-
-  const getCategoryColor = (status: string) => {
-    const colors = {
-      'pendente': 'bg-yellow-500',
-      'concluido': 'bg-green-500',
-      'cancelado': 'bg-red-500'
-    };
-    return colors[status as keyof typeof colors] || 'bg-blue-500';
-  };
-
-  const getCategoryBadgeColor = (status: string) => {
-    const colors = {
-      'pendente': 'bg-yellow-100 text-yellow-800',
-      'concluido': 'bg-green-100 text-green-800',
-      'cancelado': 'bg-red-100 text-red-800'
-    };
-    return colors[status as keyof typeof colors] || 'bg-blue-100 text-blue-800';
-  };
-
-  const navigateMonth = (direction: 'prev' | 'next') => {
-    setCurrentDate(prev => {
-      const newDate = new Date(prev);
-      if (direction === 'prev') {
-        newDate.setMonth(prev.getMonth() - 1);
-      } else {
-        newDate.setMonth(prev.getMonth() + 1);
-      }
-      return newDate;
-    });
-  };
-
-  const renderCalendar = () => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const daysInMonth = getDaysInMonth(currentDate);
-    const firstDay = getFirstDayOfMonth(currentDate);
-    const days = [];
-
-    // Dias vazios no início
-    for (let i = 0; i < firstDay; i++) {
-      days.push(<div key={`empty-${i}`} className="h-24 border border-gray-200"></div>);
-    }
-
-    // Dias do mês
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = formatDateForCalendar(year, month, day);
-      const events = getEventsForDate(dateStr);
-      const isToday = new Date().toDateString() === new Date(year, month, day).toDateString();
-
-      days.push(
-        <div
-          key={day}
-          className={`h-24 border border-gray-200 p-1 cursor-pointer hover:bg-gray-50 transition-colors ${
-            isToday ? 'bg-blue-50 border-blue-300' : ''
-          }`}
-          onClick={() => openCreateDialog(dateStr)}
-        >
-          <div className={`text-sm font-medium mb-1 ${
-            isToday ? 'text-blue-600' : 'text-gray-900'
-          }`}>
-            {day}
-          </div>
-          <div className="space-y-1">
-            {events.slice(0, 2).map((event, index) => (
-              <div
-                key={event.id}
-                className={`text-xs px-1 py-0.5 rounded text-white truncate ${
-                  getCategoryColor(event.status)
-                }`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openEditDialog(event);
-                }}
-                title={`${event.titulo} - ${event.hora}`}
-              >
-                {event.titulo}
-              </div>
-            ))}
-            {events.length > 2 && (
-              <div className="text-xs text-gray-500 px-1">
-                +{events.length - 2} mais
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    return days;
-  };
-
-  const getUpcomingEvents = () => {
-    const today = new Date().toISOString().split('T')[0];
-    return agendaItems
-      .filter(item => item.data >= today)
-      .slice(0, 5);
-  };
-
-  const monthNames = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-  ];
-
-  const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -359,128 +233,34 @@ const Agenda = () => {
     );
   }
 
+  // Converter eventos para o formato do CalendarTemplate
+  const calendarEvents = agendaItems.map(event => ({
+    id: event.id,
+    title: event.titulo,
+    date: event.data,
+    time: event.hora,
+    type: 'event' as const,
+    description: event.descricao,
+    priority: 'medium' as const
+  }));
+
   return (
-    <div>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">📅 Agenda Escolar</h1>
-          <Button
-            onClick={() => openCreateDialog()}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Adicionar Evento
-          </Button>
-        </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Calendário Principal */}
-        <div className="lg:col-span-3">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-                </CardTitle>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigateMonth('prev')}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentDate(new Date())}
-                  >
-                    Hoje
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigateMonth('next')}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {/* Cabeçalho dos dias da semana */}
-              <div className="grid grid-cols-7 gap-0 mb-2">
-                {dayNames.map(day => (
-                  <div key={day} className="p-2 text-center text-sm font-medium text-gray-500 border-b">
-                    {day}
-                  </div>
-                ))}
-              </div>
-              
-              {/* Grade do calendário */}
-              <div className="grid grid-cols-7 gap-0">
-                {renderCalendar()}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Sidebar com próximos eventos e legenda */}
-        <div className="space-y-6">
-          {/* Próximos Eventos */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Próximos Eventos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {getUpcomingEvents().length === 0 ? (
-                <p className="text-gray-500 text-sm">Nenhum evento próximo</p>
-              ) : (
-                <div className="space-y-3">
-                  {getUpcomingEvents().map(event => (
-                     <div key={event.id} className="border-l-4 pl-3 py-2" style={{
-                       borderLeftColor: getCategoryColor(event.status).replace('bg-', '#')
-                     }}>
-                      <div className="font-medium text-sm">{event.titulo}</div>
-                      <div className="text-xs text-gray-500 flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {new Date(event.data).toLocaleDateString('pt-BR')}
-                      </div>
-                      <div className="text-xs text-gray-500 flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {event.hora}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Legenda de Cores */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Legenda</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                 <div className="flex items-center gap-2">
-                   <div className="w-4 h-4 bg-yellow-500 rounded"></div>
-                   <span className="text-sm">Pendente</span>
-                 </div>
-                 <div className="flex items-center gap-2">
-                   <div className="w-4 h-4 bg-green-500 rounded"></div>
-                   <span className="text-sm">Concluído</span>
-                 </div>
-                 <div className="flex items-center gap-2">
-                   <div className="w-4 h-4 bg-red-500 rounded"></div>
-                   <span className="text-sm">Cancelado</span>
-                 </div>
-               </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <CalendarTemplate
+        title="Agenda de Eventos"
+        events={calendarEvents}
+        onEventClick={(event) => {
+          const originalEvent = agendaItems.find(e => e.id === event.id);
+          if (originalEvent) {
+            openEditDialog(originalEvent);
+          }
+        }}
+        onAddEvent={(date) => {
+          openCreateDialog(date);
+        }}
+        showFilters={true}
+        showSearch={true}
+      />
 
       {/* Dialog para adicionar/editar eventos */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -574,8 +354,7 @@ const Agenda = () => {
             </div>
           </form>
         </DialogContent>
-        </Dialog>
-      </div>
+      </Dialog>
     </div>
   );
 };

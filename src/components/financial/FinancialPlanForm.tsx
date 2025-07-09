@@ -13,6 +13,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Check, ChevronsUpDown } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { cn } from '@/lib/utils';
+import DatePicker from '@/components/shared/DatePicker';
+import { format } from 'date-fns';
 
 // HELPER FUNCTION: Formatação de valores decimais para padrão brasileiro
 const formatarDecimalBR = (valor: number): string => {
@@ -27,7 +29,7 @@ interface PlanoGenerico {
   numero_aulas: number;
   descricao?: string;
   carga_horaria_total?: number;
-  frequencia_aulas?: string;
+  frequencia_aulas?: string | number; // Mudança aqui para aceitar Json
 }
 
 interface Student {
@@ -123,7 +125,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
         .order('nome');
 
       if (error) throw error;
-      setPlanosGenericos(data || []);
+      setPlanosGenericos(data || []); // Corrigir 'datae' para 'data'
     } catch (error) {
       console.error('Erro ao buscar planos:', error);
       setPlanosGenericos([]);
@@ -833,11 +835,17 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
 
         {/* Data de Vencimento */}
         <div>
-          <Label htmlFor="data_vencimento_primeira">Data de Vencimento da 1ª Parcela *</Label>
-          <Input
-            id="data_vencimento_primeira"
-            type="date"
-            {...register('data_vencimento_primeira', { required: true })}
+          <Label htmlFor="data_vencimento_primeira">Data do Primeiro Vencimento *</Label>
+          <DatePicker
+            value={dataVencimentoPrimeira}
+            onChange={(date) => {
+              setDataVencimentoPrimeira(date);
+              setFormData(prev => ({
+                ...prev,
+                data_vencimento_primeira: date ? format(date, 'yyyy-MM-dd') : ''
+              }));
+            }}
+            placeholder="Selecione a data do primeiro vencimento"
           />
         </div>
 

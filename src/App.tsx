@@ -7,7 +7,7 @@ import { AuthProvider } from './contexts/authcontext';
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import AppLayout from "./components/layout/AppLayout";
-import ProtectedRoute from "./components/guards/protectedroute"; // ← Mudança aqui: ProtectedRoute → protectedroute
+import ProtectedRoute from "./components/guards/ProtectedRoute";
 import Dashboard from "./pages/app/Dashboard";
 import Reports from "./pages/app/Reports";
 import Students from "./pages/app/Students";

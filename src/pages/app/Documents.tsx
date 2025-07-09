@@ -367,11 +367,11 @@ const Documents = () => {
               <TableBody>
                 {documents.map((doc) => (
                   <TableRow key={doc.id}>
-                    <TableCell className="font-medium">
+                    <TableCell className="font-medium text-base">
                       {doc.alunos?.nome || doc.professores?.nome}
                     </TableCell>
-                    <TableCell>{getTipoLabel(doc.tipo)}</TableCell>
-                    <TableCell>{formatDate(doc.data)}</TableCell>
+                    <TableCell className="text-base">{getTipoLabel(doc.tipo)}</TableCell>
+                    <TableCell className="text-base">{formatDate(doc.data)}</TableCell>
                     <TableCell>
                         <Select
                           value={doc.status}

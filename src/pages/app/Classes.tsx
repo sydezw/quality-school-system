@@ -859,34 +859,34 @@ const Classes = () => {
             <TableBody>
               {classes.map((classItem) => (
                 <TableRow key={classItem.id}>
-                  <TableCell className="font-medium">{classItem.nome}</TableCell>
+                  <TableCell className="font-medium text-base">{classItem.nome}</TableCell>
                   <TableCell>
-                    <Badge className={getIdiomaColor(classItem.idioma)}>
+                    <Badge className={`text-sm ${getIdiomaColor(classItem.idioma)}`}>
                       {classItem.idioma}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">
+                    <Badge variant="outline" className="text-sm">
                       {classItem.nivel}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm text-gray-600">
+                    <span className="text-base text-gray-600">
                       {(classItem.materiais_ids?.length) || 0} materiais
                     </span>
                   </TableCell>
                   <TableCell>
                     <div>
-                      <div className="font-medium">{classItem.horario}</div>
-                      <div className="text-sm text-gray-500">{classItem.dias_da_semana}</div>
+                      <div className="font-medium text-base">{classItem.horario}</div>
+                      <div className="text-base text-gray-500">{classItem.dias_da_semana}</div>
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-base">
                     {classItem.professores?.nome || (
                       <span className="text-gray-400 italic">Sem professor</span>
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-base">
                     {classItem.salas?.nome || (
                       <span className="text-gray-400 italic">Sem sala</span>
                     )}

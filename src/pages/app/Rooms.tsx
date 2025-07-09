@@ -403,17 +403,17 @@ const Rooms = () => {
                     <TableBody>
                       {rooms.map((room) => (
                         <TableRow key={room.id}>
-                          <TableCell className="font-medium">
+                          <TableCell className="font-medium text-base">
                             {room.nome || 'Sem nome'}
                           </TableCell>
                           <TableCell>
-                            <Badge className={getTipoColor(room.tipo)}>
+                            <Badge className={`text-sm ${getTipoColor(room.tipo)}`}>
                               {room.tipo || 'Não definido'}
                             </Badge>
                           </TableCell>
-                          <TableCell>{formatCapacidade(room.capacidade)}</TableCell>
+                          <TableCell className="text-base">{formatCapacidade(room.capacidade)}</TableCell>
                           <TableCell>
-                            <Badge className={room.status === 'ativo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                            <Badge className={`text-sm ${room.status === 'ativo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                               {room.status || 'ativo'}
                             </Badge>
                           </TableCell>

@@ -183,13 +183,13 @@ const RoomOccupancyReport = () => {
                             <TableBody>
                               {turma.aulas.map((aula) => (
                                 <TableRow key={aula.id}>
-                                  <TableCell className="w-[150px]">
+                                  <TableCell className="w-[150px] text-base">
                                     <div className="flex items-center gap-2">
                                       <CalendarDays className="h-4 w-4 text-gray-500" />
                                       {new Date(aula.data + 'T00:00:00').toLocaleDateString('pt-BR')}
                                     </div>
                                   </TableCell>
-                                  <TableCell>{aula.conteudo || <span className="text-gray-400">Conteúdo não informado</span>}</TableCell>
+                                  <TableCell className="text-base">{aula.conteudo || <span className="text-gray-400">Conteúdo não informado</span>}</TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>

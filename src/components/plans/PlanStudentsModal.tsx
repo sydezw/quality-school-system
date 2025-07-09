@@ -180,26 +180,26 @@ const PlanStudentsModal = ({ planId, planName, isOpen, onClose }: PlanStudentsMo
                   <TableBody>
                     {filteredStudents.map((student) => (
                       <TableRow key={student.id}>
-                        <TableCell className="font-medium">
+                        <TableCell className="font-medium text-base">
                           {student.nome}
                         </TableCell>
                         <TableCell>
                           <div className="space-y-1">
                             {student.email && (
-                              <div className="flex items-center gap-1 text-sm">
+                              <div className="flex items-center gap-1 text-base">
                                 <Mail className="w-3 h-3 text-gray-400" />
                                 <span>{student.email}</span>
                               </div>
                             )}
                             {student.telefone && (
-                              <div className="flex items-center gap-1 text-sm">
+                              <div className="flex items-center gap-1 text-base">
                                 <Phone className="w-3 h-3 text-gray-400" />
                                 <span>{formatPhone(student.telefone)}</span>
                               </div>
                             )}
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-base">
                           <div className="flex items-center gap-1">
                             <Calendar className="w-3 h-3 text-gray-400" />
                             {formatDate(student.data_nascimento)}
@@ -208,7 +208,7 @@ const PlanStudentsModal = ({ planId, planName, isOpen, onClose }: PlanStudentsMo
                         <TableCell>
                           {getStatusBadge(student.status)}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-base">
                           {formatDate(student.created_at)}
                         </TableCell>
                       </TableRow>

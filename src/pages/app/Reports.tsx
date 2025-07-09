@@ -293,11 +293,11 @@ const Reports = () => {
                     const taxa = total > 0 ? ((item.presentes / total) * 100).toFixed(1) : '0';
                     return (
                       <TableRow key={index}>
-                        <TableCell className="font-medium">{item.turma}</TableCell>
-                        <TableCell className="text-green-600">{item.presentes}</TableCell>
-                        <TableCell className="text-red-600">{item.faltas}</TableCell>
-                        <TableCell>{taxa}%</TableCell>
-                      </TableRow>
+                      <TableCell className="font-medium text-base">{item.turma}</TableCell>
+                      <TableCell className="text-green-600 text-base">{item.presentes}</TableCell>
+                      <TableCell className="text-red-600 text-base">{item.faltas}</TableCell>
+                      <TableCell className="text-base">{taxa}%</TableCell>
+                    </TableRow>
                     );
                   })}
                 </TableBody>
@@ -324,9 +324,9 @@ const Reports = () => {
                 <TableBody>
                   {reportData.avaliacoesPorTurma.map((item, index) => (
                     <TableRow key={index}>
-                      <TableCell className="font-medium">{item.turma}</TableCell>
-                      <TableCell>{item.media}</TableCell>
-                      <TableCell>{item.total}</TableCell>
+                      <TableCell className="font-medium text-base">{item.turma}</TableCell>
+                      <TableCell className="text-base">{item.media}</TableCell>
+                      <TableCell className="text-base">{item.total}</TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 rounded-full text-xs ${
                           item.media >= 7 ? 'bg-green-100 text-green-800' :

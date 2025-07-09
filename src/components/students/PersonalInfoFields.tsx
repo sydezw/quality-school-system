@@ -3,6 +3,7 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/comp
 import { Input } from "@/components/ui/input";
 import { formatCPF, formatPhone } from "@/utils/formatters";
 import BirthDateInput from "./BirthDateInput";
+import DatePicker from "@/components/shared/DatePicker";
 import { Control } from "react-hook-form";
 import { StudentFormValues } from "@/lib/validators/student";
 
@@ -31,12 +32,15 @@ const PersonalInfoFields = ({ control }: PersonalInfoFieldsProps) => {
         name="data_nascimento"
         render={({ field, fieldState }) => (
           <FormItem>
-            <FormLabel>Data de Nascimento</FormLabel>
-            <BirthDateInput
-              value={field.value}
-              onChange={field.onChange}
-              error={fieldState.error?.message}
-            />
+            <FormLabel>Data de Nascimento *</FormLabel>
+            <FormControl>
+              <DatePicker
+                value={field.value}
+                onChange={field.onChange}
+                placeholder="Selecione a data de nascimento"
+                error={fieldState.error?.message}
+              />
+            </FormControl>
             <FormMessage />
           </FormItem>
         )}

@@ -227,7 +227,7 @@ const RenewalAlertsTable: React.FC = () => {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       <User className="h-4 w-4 text-gray-600" />
-                      <span className="font-semibold">{alert.nome_aluno}</span>
+                      <span className="font-semibold text-base">{alert.nome_aluno}</span>
                       <Badge className={getTipoColor(alert.tipo)}>
                         {getTipoLabel(alert.tipo)}
                       </Badge>
@@ -236,19 +236,19 @@ const RenewalAlertsTable: React.FC = () => {
                       </Badge>
                     </div>
                     
-                    <div className="text-sm text-gray-600 space-y-1">
+                    <div className="text-base text-gray-600 space-y-1">
                       <div className="flex items-center gap-2">
                         <CreditCard className="h-4 w-4" />
-                        <span>Última parcela: {alert.ultima_parcela}x</span>
+                        <span className="text-base">Última parcela: {alert.ultima_parcela}x</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4" />
-                        <span>Data de renovação: {new Date(alert.data_renovacao).toLocaleDateString('pt-BR')}</span>
+                        <span className="text-base">Data de renovação: {new Date(alert.data_renovacao).toLocaleDateString('pt-BR')}</span>
                       </div>
                     </div>
                     
                     <div className="mt-3 p-3 bg-orange-100 rounded-lg">
-                      <p className="text-sm font-medium text-orange-800">
+                      <p className="text-base font-medium text-orange-800">
                         ⚠️ Esta é a última parcela! Por favor, criar novo plano de pagamento em {new Date(alert.data_renovacao).toLocaleDateString('pt-BR')}
                       </p>
                     </div>

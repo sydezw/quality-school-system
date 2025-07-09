@@ -1,19 +1,32 @@
-
 import React from 'react';
-import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
-import { Save, X, Loader2 } from 'lucide-react';
-import { Student } from '@/integrations/supabase/types';
+import { Button } from '@/components/ui/button';
+import { Save, X } from 'lucide-react';
 
 interface FormActionsProps {
-  editingStudent: Student | null;
-  isSubmitting: boolean;
   onCancel: () => void;
+  isSubmitting: boolean;
+  submitText?: string;
+  cancelText?: string;
+  submitIcon?: React.ReactNode;
+  cancelIcon?: React.ReactNode;
 }
 
-const FormActions = ({ editingStudent, isSubmitting, onCancel }: FormActionsProps) => {
+const FormActions = ({ 
+  onCancel, 
+  isSubmitting, 
+  submitText = "Salvar",
+  cancelText = "Cancelar",
+  submitIcon = <Save className="h-4 w-4 mr-2" />,
+  cancelIcon = <X className="h-4 w-4 mr-2" />
+}: FormActionsProps) => {
   return (
-    <div className="flex justify-end gap-4 pt-6 border-t border-gray-200">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.4, duration: 0.3 }}
+      className="flex justify-end gap-3 pt-6 border-t border-gray-200"
+    >
       <motion.div
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
@@ -26,8 +39,8 @@ const FormActions = ({ editingStudent, isSubmitting, onCancel }: FormActionsProp
           disabled={isSubmitting}
           className="px-6 py-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-200"
         >
-          <X className="h-4 w-4 mr-2" />
-          Cancelar
+          {cancelIcon}
+          {cancelText}
         </Button>
       </motion.div>
       
@@ -43,18 +56,22 @@ const FormActions = ({ editingStudent, isSubmitting, onCancel }: FormActionsProp
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                className="h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full"
+              />
               Salvando...
             </>
           ) : (
             <>
-              <Save className="h-4 w-4 mr-2" />
-              {editingStudent ? 'Atualizar' : 'Salvar'} Aluno
+              {submitIcon}
+              {submitText}
             </>
           )}
         </Button>
       </motion.div>
-    </div>
+    </motion.div>
   );
 };
 

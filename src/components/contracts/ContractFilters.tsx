@@ -5,6 +5,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Search, Filter, Calendar, DollarSign } from 'lucide-react';
 import { ContractFilters as ContractFiltersType, ContractStats } from '@/hooks/useContracts';
+import DatePicker from '@/components/shared/DatePicker';
+import { format, parse } from 'date-fns';
 
 interface ContractFiltersProps {
   filters: ContractFiltersType;
@@ -42,6 +44,13 @@ export const ContractFilters = ({ filters, stats, onFilterChange }: ContractFilt
     setSearchTerm('');
     onFilterChange({ status: 'all' });
   };
+
+  const [dataInicio, setDataInicio] = useState<Date | null>(
+    filters.data_inicio ? parse(filters.data_inicio, 'yyyy-MM-dd', new Date()) : null
+  );
+  const [dataFim, setDataFim] = useState<Date | null>(
+    filters.data_fim ? parse(filters.data_fim, 'yyyy-MM-dd', new Date()) : null
+  );
 
   return (
     <div className="space-y-4">
@@ -203,11 +212,13 @@ export const ContractFilters = ({ filters, stats, onFilterChange }: ContractFilt
                   <Calendar className="h-3 w-3" />
                   Data Início (a partir de)
                 </Label>
-                <Input
-                  id="data_inicio"
-                  type="date"
-                  value={filters.data_inicio || ''}
-                  onChange={(e) => handleDateFilter('data_inicio', e.target.value)}
+                <DatePicker
+                  value={dataInicio}
+                  onChange={(date) => {
+                    setDataInicio(date);
+                    handleDateFilter('data_inicio', date ? format(date, 'yyyy-MM-dd') : '');
+                  }}
+                  placeholder="Selecione a data de início"
                 />
               </div>
               <div>
@@ -215,11 +226,13 @@ export const ContractFilters = ({ filters, stats, onFilterChange }: ContractFilt
                   <Calendar className="h-3 w-3" />
                   Data Fim (até)
                 </Label>
-                <Input
-                  id="data_fim"
-                  type="date"
-                  value={filters.data_fim || ''}
-                  onChange={(e) => handleDateFilter('data_fim', e.target.value)}
+                <DatePicker
+                  value={dataFim}
+                  onChange={(date) => {
+                    setDataFim(date);
+                    handleDateFilter('data_fim', date ? format(date, 'yyyy-MM-dd') : '');
+                  }}
+                  placeholder="Selecione a data de fim"
                 />
               </div>
             </div>

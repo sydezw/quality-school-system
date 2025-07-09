@@ -314,9 +314,9 @@ const Materials = () => {
                   <TableRow key={material.id}>
                     <TableCell>
                       <div>
-                        <div className="font-medium">{material.nome}</div>
+                        <div className="font-medium text-base">{material.nome}</div>
                         {material.descricao && (
-                          <div className="text-sm text-gray-500">{material.descricao}</div>
+                          <div className="text-base text-gray-500">{material.descricao}</div>
                         )}
                       </div>
                     </TableCell>
@@ -325,7 +325,7 @@ const Materials = () => {
                         {material.idioma}
                       </Badge>
                     </TableCell>
-                    <TableCell>{material.nivel}</TableCell>
+                    <TableCell className="text-base">{material.nivel}</TableCell>
                     <TableCell>
                       <Badge className={getStatusColor(material.status)}>
                         {material.status === 'disponivel' ? 'Disponível' : 'Indisponível'}

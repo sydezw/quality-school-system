@@ -1,11 +1,9 @@
 
 import React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Student } from '@/integrations/supabase/types';
-// Remover esta linha:
-// import { DeletionPlan } from '@/components/shared/AdvancedDeleteDialog';
+import { Student, StudentWithRelations } from '@/types/shared';
 
 interface Class {
   id: string;
@@ -15,49 +13,100 @@ interface Class {
 }
 
 export const useStudents = () => {
-  const [students, setStudents] = useState<Student[]>([]);
+  const [students, setStudents] = useState<StudentWithRelations[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
 
-  const fetchStudents = async (includeArchived = false) => {
+  // Memoizar a função de busca para evitar re-criações
+  const fetchStudents = useCallback(async (includeArchived = false) => {
     try {
       setLoading(true);
       
+      // Query otimizada com apenas campos que existem na tabela
       let query = supabase
         .from('alunos')
         .select(`
-          *,
-          turmas(nome, idioma, nivel),
+          id,
+          nome,
+          cpf,
+          telefone,
+          email,
+          idioma,
+          status,
+          turma_id,
+          responsavel_id,
+          created_at,
+          updated_at,
+          data_nascimento,
+          endereco,
+          numero_endereco,
+          data_cancelamento,
+          data_conclusao,
+          data_exclusao,
+          turmas(nome, idioma),
           responsaveis(nome, telefone)
         `);
       
       if (!includeArchived) {
-        // Mostrar apenas alunos ativos e trancados (não inativos)
         query = query.in('status', ['Ativo', 'Trancado']);
       }
       
       const { data, error } = await query.order('nome');
       
       if (error) throw error;
-      setStudents(data || []);
+      
+      // Transformar os dados para o tipo correto
+      const transformedData: StudentWithRelations[] = (data || []).map(item => ({
+        id: item.id,
+        nome: item.nome,
+        cpf: item.cpf,
+        telefone: item.telefone,
+        email: item.email,
+        idioma: item.idioma,
+        status: item.status,
+        turma_id: item.turma_id,
+        responsavel_id: item.responsavel_id,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        data_nascimento: item.data_nascimento,
+        endereco: item.endereco,
+        numero_endereco: item.numero_endereco,
+        data_cancelamento: item.data_cancelamento,
+        data_conclusao: item.data_conclusao,
+        data_exclusao: item.data_exclusao,
+        turmas: item.turmas ? {
+          nome: item.turmas.nome,
+          idioma: item.turmas.idioma || ''
+        } : undefined,
+        responsaveis: item.responsaveis ? {
+          nome: item.responsaveis.nome,
+          telefone: item.responsaveis.telefone || ''
+        } : undefined
+      }));
+      
+      setStudents(transformedData);
     } catch (error) {
       console.error('Erro ao buscar alunos:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar os alunos.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
-  const fetchClasses = async () => {
+  const fetchClasses = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('turmas')
-        .select('*')
+        .select('id, nome, idioma, nivel')
         .order('nome');
 
       if (error) throw error;
-      console.log('Turmas carregadas:', data);
       setClasses(data || []);
     } catch (error) {
       console.error('Erro ao buscar turmas:', error);
@@ -67,7 +116,7 @@ export const useStudents = () => {
         variant: "destructive",
       });
     }
-  };
+  }, [toast]);
 
   const saveStudent = async (data: any, editingStudent: Student | null) => {
     try {
@@ -286,7 +335,7 @@ export const useStudents = () => {
   useEffect(() => {
     fetchStudents();
     fetchClasses();
-  }, []);
+  }, [fetchStudents, fetchClasses]);
 
   return {
     students,

@@ -13,6 +13,8 @@ import { useForm, Controller } from 'react-hook-form';
 import { useBoletos, type Boleto, type CriarBoletoData } from '@/hooks/useBoletos';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffect } from 'react';
+import DatePicker from '@/components/shared/DatePicker';
+import { format } from 'date-fns';
 
 interface Student {
   id: string;
@@ -30,8 +32,9 @@ const BoletoManager = ({ filtroStatus = 'todos', alunoSelecionado }: BoletoManag
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [filtroLocal, setFiltroLocal] = useState(filtroStatus);
   const [searchTerm, setSearchTerm] = useState('');
-  
-  const { register, handleSubmit, reset, control, watch } = useForm<CriarBoletoData>();
+  const [dataVencimento, setDataVencimento] = useState<Date | null>(null);
+
+  const { register, handleSubmit, reset, control, setValue } = useForm<CriarBoletoData>();
 
   useEffect(() => {
     fetchStudents();
@@ -76,6 +79,7 @@ const BoletoManager = ({ filtroStatus = 'todos', alunoSelecionado }: BoletoManag
     try {
       await criarBoletoAvulso(data);
       setIsCreateDialogOpen(false);
+      setDataVencimento(null);
       reset();
     } catch (error) {
       console.error('Erro ao criar boleto:', error);
@@ -260,9 +264,16 @@ const BoletoManager = ({ filtroStatus = 'todos', alunoSelecionado }: BoletoManag
                   
                   <div>
                     <Label htmlFor="data_vencimento">Data de Vencimento</Label>
-                    <Input
-                      {...register('data_vencimento', { required: 'Data é obrigatória' })}
-                      type="date"
+                    <DatePicker
+                      value={dataVencimento}
+                      onChange={(date) => {
+                        setDataVencimento(date);
+                        // Atualizar o formulário com a data selecionada
+                        if (date) {
+                          setValue('data_vencimento', format(date, 'yyyy-MM-dd'));
+                        }
+                      }}
+                      placeholder="Selecione a data de vencimento"
                     />
                   </div>
                   
@@ -283,7 +294,11 @@ const BoletoManager = ({ filtroStatus = 'todos', alunoSelecionado }: BoletoManag
                   </div>
                   
                   <div className="flex justify-end space-x-2">
-                    <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                    <Button type="button" variant="outline" onClick={() => {
+                      setIsCreateDialogOpen(false);
+                      setDataVencimento(null);
+                      reset();
+                    }}>
                       Cancelar
                     </Button>
                     <Button type="submit">
@@ -334,18 +349,18 @@ const BoletoManager = ({ filtroStatus = 'todos', alunoSelecionado }: BoletoManag
               <TableBody>
                 {boletosFiltrados.map((boleto) => (
                   <TableRow key={boleto.id}>
-                    <TableCell className="font-medium">
+                    <TableCell className="font-medium text-base">
                       {boleto.alunos?.nome || 'N/A'}
                     </TableCell>
-                    <TableCell>{boleto.descricao}</TableCell>
-                    <TableCell>{formatCurrency(boleto.valor)}</TableCell>
-                    <TableCell>{formatDate(boleto.data_vencimento)}</TableCell>
+                    <TableCell className="text-base">{boleto.descricao}</TableCell>
+                    <TableCell className="text-base">{formatCurrency(boleto.valor)}</TableCell>
+                    <TableCell className="text-base">{formatDate(boleto.data_vencimento)}</TableCell>
                     <TableCell>
                       <Badge className={getStatusColor(boleto.status)}>
                         {boleto.status}
                       </Badge>
                     </TableCell>
-                    <TableCell>{boleto.metodo_pagamento || '-'}</TableCell>
+                    <TableCell className="text-base">{boleto.metodo_pagamento || '-'}</TableCell>
                     <TableCell>
                       {boleto.status !== 'Pago' && (
                         <Button

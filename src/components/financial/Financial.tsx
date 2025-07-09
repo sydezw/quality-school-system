@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import FinancialRecordsTable from './FinancialRecordsTable';
+import ParcelasTable from './ParcelasTable';
 import StudentGroupingView from './StudentGroupingView';
 
 const Financial = () => {
@@ -12,17 +12,17 @@ const Financial = () => {
         <nav className="-mb-px flex space-x-8">
           <button
             onClick={() => setCurrentView('records')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
               currentView === 'records'
                 ? 'border-red-500 text-red-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            Registros Financeiros
+            Registros (Parcelas)
           </button>
           <button
             onClick={() => setCurrentView('grouping')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
               currentView === 'grouping'
                 ? 'border-red-500 text-red-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -32,13 +32,15 @@ const Financial = () => {
           </button>
         </nav>
       </div>
-      
+
       {/* Content */}
-      {currentView === 'records' ? (
-        <FinancialRecordsTable />
-      ) : (
-        <StudentGroupingView />
-      )}
+      <div className="mt-6">
+        {currentView === 'records' ? (
+          <ParcelasTable />
+        ) : (
+          <StudentGroupingView />
+        )}
+      </div>
     </div>
   );
 };

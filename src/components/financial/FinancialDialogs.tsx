@@ -9,6 +9,7 @@ import { Plus } from 'lucide-react';
 import { Controller } from 'react-hook-form';
 import { DialogState, Student, Despesa, PlanoGenerico } from '@/types/financial';
 import { UseFormReturn } from 'react-hook-form';
+import DatePicker from '@/components/shared/DatePicker';
 
 interface FinancialDialogsProps {
   dialogState: DialogState;

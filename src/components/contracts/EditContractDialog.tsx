@@ -11,6 +11,8 @@ import { Edit } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Contract } from '@/hooks/useContracts';
+import DatePicker from '@/components/shared/DatePicker';
+import { format, parse } from 'date-fns';
 
 interface EditContractDialogProps {
   contract: Contract;
@@ -22,6 +24,8 @@ export const EditContractDialog = ({ contract, onContractUpdated }: EditContract
   const [loading, setLoading] = useState(false);
   const [alunos, setAlunos] = useState<Array<{ id: string; nome: string }>>([]);
   const [planos, setPlanos] = useState<Array<{ id: string; nome: string; valor_total: number }>>([]);
+  const [dataInicio, setDataInicio] = useState<Date | null>(null);
+  const [dataFim, setDataFim] = useState<Date | null>(null);
   const [formData, setFormData] = useState({
     aluno_id: contract.aluno_id,
     data_inicio: contract.data_inicio,
@@ -123,6 +127,14 @@ export const EditContractDialog = ({ contract, onContractUpdated }: EditContract
     if (newOpen) {
       fetchAlunos();
       fetchPlanos();
+      
+      // Inicializar as datas
+      const inicioDate = contract.data_inicio ? parse(contract.data_inicio, 'yyyy-MM-dd', new Date()) : null;
+      const fimDate = contract.data_fim ? parse(contract.data_fim, 'yyyy-MM-dd', new Date()) : null;
+      
+      setDataInicio(inicioDate);
+      setDataFim(fimDate);
+      
       setFormData({
         aluno_id: contract.aluno_id,
         data_inicio: contract.data_inicio,
@@ -238,28 +250,37 @@ export const EditContractDialog = ({ contract, onContractUpdated }: EditContract
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
+            <div>
               <Label htmlFor="data_inicio">Data de Início *</Label>
-              <Input
-                id="data_inicio"
-                type="date"
-                value={formData.data_inicio}
-                onChange={(e) => setFormData(prev => ({ ...prev, data_inicio: e.target.value }))}
-                required
+              <DatePicker
+                value={dataInicio}
+                onChange={(date) => {
+                  setDataInicio(date);
+                  setFormData(prev => ({
+                    ...prev,
+                    data_inicio: date ? format(date, 'yyyy-MM-dd') : ''
+                  }));
+                }}
+                placeholder="Selecione a data de início"
               />
             </div>
-            <div className="space-y-2">
+            
+            <div>
               <Label htmlFor="data_fim">Data de Fim *</Label>
-              <Input
-                id="data_fim"
-                type="date"
-                value={formData.data_fim}
-                onChange={(e) => setFormData(prev => ({ ...prev, data_fim: e.target.value }))}
-                required
+              <DatePicker
+                value={dataFim}
+                onChange={(date) => {
+                  setDataFim(date);
+                  setFormData(prev => ({
+                    ...prev,
+                    data_fim: date ? format(date, 'yyyy-MM-dd') : ''
+                  }));
+                }}
+                placeholder="Selecione a data de fim"
               />
             </div>
           </div>
-
+          
           <div className="space-y-2">
             <Label htmlFor="valor_mensalidade">Valor da Mensalidade *</Label>
             <Input

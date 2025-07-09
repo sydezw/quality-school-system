@@ -12,6 +12,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 import { ContractFormData } from '@/hooks/useContracts';
 import { PlanoGenerico } from '@/types/financial';
+import DatePicker from '@/components/shared/DatePicker';
+import { format } from 'date-fns';
 
 interface Student {
   id: string;

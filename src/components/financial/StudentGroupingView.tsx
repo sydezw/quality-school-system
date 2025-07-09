@@ -7,36 +7,43 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronDown, ChevronRight, Search, Plus, Edit, Trash2, Users, AlertCircle } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search, Plus, Edit, Trash2, Users, AlertCircle, DollarSign, TrendingUp, TrendingDown, Calendar, CreditCard, RefreshCw, Filter, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface AlunoFinanceiro {
   id: string;
   nome: string;
-  totalGeral: number;
-  totalPago: number;
-  totalPendente: number;
-  parcelas: Parcela[];
+  // Dados do financeiro_alunos
+  valor_total: number;
+  valor_plano: number;
+  valor_material: number;
+  valor_matricula: number;
+  status_geral: string;
+  data_primeiro_vencimento: string;
+  // Parcelas individuais
+  parcelas: ParcelaAluno[];
+  registro_financeiro_id: string;
 }
 
-interface Parcela {
-  id: string;
-  numero: number;
+interface ParcelaAluno {
+  id: number;
+  numero_parcela: number;
   valor: number;
-  vencimento: string;
-  status: 'Pago' | 'Pendente' | 'Vencido';
-  tipo: string;
-  registro_id: string;
+  data_vencimento: string;
+  data_pagamento?: string;
+  status_pagamento: 'pago' | 'pendente' | 'vencido' | 'cancelado';
+  tipo_item: 'plano' | 'material' | 'matrícula';
+  comprovante?: string;
 }
 
 interface NovaParcelaForm {
-  tipo: string;
-  numero: number;
+  registro_financeiro_id: string;
+  tipo_item: 'plano' | 'material' | 'matrícula';
+  numero_parcela: number;
   valor: number;
-  vencimento: string;
-  status: 'Pago' | 'Pendente' | 'Vencido';
-  aluno_id: string;
+  data_vencimento: string;
 }
 
 const StudentGroupingView = () => {
@@ -44,365 +51,22 @@ const StudentGroupingView = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedStudents, setExpandedStudents] = useState<Set<string>>(new Set());
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editandoParcela, setEditandoParcela] = useState<Parcela | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editandoParcela, setEditandoParcela] = useState<ParcelaAluno | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [novaParcela, setNovaParcela] = useState<NovaParcelaForm>({
-    tipo: '',
-    numero: 1,
-    valor: 0,
-    vencimento: '',
-    status: 'Pendente',
-    aluno_id: ''
-  });
+  const [novaParcela, setNovaParcela] = useState<NovaParcelaForm | null>(null);
   const [savedScrollPosition, setSavedScrollPosition] = useState<number>(0);
   const { toast } = useToast();
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Função para gerar parcelas a partir de um registro financeiro
-  const gerarParcelas = (registro: any): Parcela[] => {
-    const parcelas: Parcela[] = [];
-    
-    // Se o registro tem informações de parcelas, gerar baseado nisso
-    if (registro.numero_parcelas && registro.numero_parcelas > 0) {
-      const valorParcela = registro.valor_total / registro.numero_parcelas;
-      
-      for (let i = 1; i <= registro.numero_parcelas; i++) {
-        parcelas.push({
-          id: `${registro.id}-${i}`,
-          numero: i,
-          valor: valorParcela,
-          vencimento: registro.data_vencimento || new Date().toISOString().split('T')[0],
-          status: registro.status_pagamento || 'Pendente',
-          tipo: registro.tipo || 'Plano',
-          registro_id: registro.id
-        });
-      }
-    } else {
-      // Caso não tenha parcelas definidas, criar uma única parcela
-      parcelas.push({
-        id: `${registro.id}-1`,
-        numero: 1,
-        valor: registro.valor_total || 0,
-        vencimento: registro.data_vencimento || new Date().toISOString().split('T')[0],
-        status: registro.status_pagamento || 'Pendente',
-        tipo: registro.tipo || 'Plano',
-        registro_id: registro.id
-      });
-    }
-    
-    return parcelas;
-  };
+  // Função para filtrar alunos
+  const filteredAlunos = useMemo(() => {
+    return alunos.filter(aluno => 
+      aluno.nome.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [alunos, searchTerm]);
 
-  // Função para lidar com cliques em botões (evita propagação de eventos)
-  const handleButtonClick = useCallback((callback: () => void, event: React.MouseEvent) => {
-    event.stopPropagation();
-    callback();
-  }, []);
-
-  // CORREÇÃO: Usar useCallback para evitar re-criação da função
-  const fetchAlunos = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('financeiro_alunos')
-        .select(`
-          *,
-          alunos (id, nome)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      // Agrupar por aluno
-      const alunosMap = new Map<string, AlunoFinanceiro>();
-      
-      data?.forEach((registro: any) => {
-        const alunoId = registro.aluno_id;
-        const alunoNome = registro.alunos?.nome || 'Nome não encontrado';
-        
-        if (!alunosMap.has(alunoId)) {
-          alunosMap.set(alunoId, {
-            id: alunoId,
-            nome: alunoNome,
-            totalGeral: 0,
-            totalPago: 0,
-            totalPendente: 0,
-            parcelas: []
-          });
-        }
-
-        const aluno = alunosMap.get(alunoId)!;
-        const parcelas = gerarParcelas(registro);
-        
-        aluno.parcelas.push(...parcelas);
-        aluno.totalGeral += registro.valor_total || 0;
-        
-        // Calcular totais baseado no status das parcelas
-        parcelas.forEach(parcela => {
-          if (parcela.status === 'Pago') {
-            aluno.totalPago += parcela.valor;
-          } else {
-            aluno.totalPendente += parcela.valor;
-          }
-        });
-      });
-
-      setAlunos(Array.from(alunosMap.values()));
-    } catch (error) {
-      console.error('Erro ao buscar alunos financeiros:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar dados financeiros dos alunos.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]); // CORREÇÃO: Incluir toast nas dependências
-
-  // CORREÇÃO: useEffect otimizado - só executa uma vez na montagem
-  useEffect(() => {
-    fetchAlunos();
-  }, [fetchAlunos]); // Incluir fetchAlunos nas dependências
-
-  // CORREÇÃO: Memoizar funções que são passadas como callbacks
-  // Função para salvar a posição do scroll
-  const saveScrollPosition = useCallback(() => {
-    const scrollContainer = containerRef.current;
-    if (scrollContainer) {
-      setSavedScrollPosition(scrollContainer.scrollTop);
-    }
-  }, []);
-  
-  // Função para restaurar a posição do scroll com múltiplas tentativas
-  const restoreScrollPosition = useCallback(() => {
-    const scrollContainer = containerRef.current;
-    if (!scrollContainer) return;
-    
-    // Primeira tentativa imediata
-    scrollContainer.scrollTop = savedScrollPosition;
-    
-    // Segunda tentativa após um curto delay
-    setTimeout(() => {
-      if (scrollContainer) {
-        scrollContainer.scrollTop = savedScrollPosition;
-      }
-    }, 0);
-    
-    // Terceira tentativa com requestAnimationFrame para garantir que o DOM foi atualizado
-    requestAnimationFrame(() => {
-      if (scrollContainer) {
-        scrollContainer.scrollTop = savedScrollPosition;
-      }
-      
-      // Quarta tentativa após um delay maior
-      setTimeout(() => {
-        if (scrollContainer) {
-          scrollContainer.scrollTop = savedScrollPosition;
-        }
-      }, 100);
-      
-      // Quinta tentativa após um delay ainda maior
-      setTimeout(() => {
-        if (scrollContainer) {
-          scrollContainer.scrollTop = savedScrollPosition;
-        }
-      }, 300);
-    });
-  }, [savedScrollPosition]);
-
-  // Modificar a função criarParcela para usar uma abordagem mais controlada ao fechar o modal
-  const criarParcela = useCallback(async () => {
-    try {
-      if (!novaParcela.tipo || !novaParcela.vencimento || !novaParcela.aluno_id) {
-        toast({
-          title: "Erro",
-          description: "Preencha todos os campos obrigatórios.",
-          variant: "destructive",
-        });
-        return;
-      }
-  
-      const novaParcela_: Parcela = {
-        id: `custom-${Date.now()}`,
-        numero: novaParcela.numero,
-        valor: novaParcela.valor,
-        vencimento: novaParcela.vencimento,
-        status: novaParcela.status,
-        tipo: novaParcela.tipo,
-        registro_id: 'custom'
-      };
-  
-      // Salvar a posição atual do scroll
-      saveScrollPosition();
-  
-      setAlunos(prev => prev.map(aluno => 
-        aluno.id === novaParcela.aluno_id 
-          ? { 
-              ...aluno, 
-              parcelas: [...aluno.parcelas, novaParcela_],
-              totalGeral: aluno.totalGeral + novaParcela.valor,
-              totalPendente: aluno.totalPendente + (novaParcela.status === 'Pendente' ? novaParcela.valor : 0),
-              totalPago: aluno.totalPago + (novaParcela.status === 'Pago' ? novaParcela.valor : 0)
-            }
-          : aluno
-      ));
-  
-      toast({
-        title: "Sucesso",
-        description: "Parcela criada com sucesso!",
-      });
-  
-      // Fechar o modal de forma controlada
-      setIsDialogOpen(false);
-      
-      // Resetar o formulário
-      setNovaParcela({
-        tipo: '',
-        numero: 1,
-        valor: 0,
-        vencimento: '',
-        status: 'Pendente',
-        aluno_id: ''
-      });
-  
-      // Restaurar a posição do scroll
-      restoreScrollPosition();
-    } catch (error) {
-      console.error('Erro ao criar parcela:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao criar parcela.",
-        variant: "destructive",
-      });
-    }
-  }, [novaParcela, toast, saveScrollPosition, restoreScrollPosition]);
-  
-  // Modificar a função salvarEdicaoParcela de forma similar
-  const salvarEdicaoParcela = useCallback(async () => {
-    if (!editandoParcela) return;
-  
-    try {
-      // Salvar a posição atual do scroll
-      saveScrollPosition();
-  
-      setAlunos(prev => prev.map(aluno => ({
-        ...aluno,
-        parcelas: aluno.parcelas.map(p => 
-          p.id === editandoParcela.id ? editandoParcela : p
-        )
-      })));
-  
-      toast({
-        title: "Sucesso",
-        description: "Parcela editada com sucesso!",
-      });
-  
-      // Fechar o modal de forma controlada
-      setIsEditModalOpen(false);
-      setEditandoParcela(null);
-  
-      // Restaurar a posição do scroll
-      restoreScrollPosition();
-    } catch (error) {
-      console.error('Erro ao salvar parcela:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao salvar parcela.",
-        variant: "destructive",
-      });
-    }
-  }, [editandoParcela, toast, saveScrollPosition, restoreScrollPosition]);
-
-  const abrirModalCriarParcela = useCallback((alunoId: string, alunoNome: string) => {
-    setNovaParcela({
-      tipo: '',
-      numero: 1,
-      valor: 0,
-      vencimento: '',
-      status: 'Pendente',
-      aluno_id: alunoId
-    });
-    setIsDialogOpen(true);
-  }, []);
-
-  const abrirModalEditarParcela = useCallback((parcela: Parcela) => {
-    setEditandoParcela(parcela);
-    setIsEditModalOpen(true);
-  }, []);
-
-  const excluirParcela = useCallback(async (parcelaId: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta parcela?')) return;
-
-    try {
-      console.log('Excluindo parcela:', parcelaId);
-
-      setAlunos(prev => prev.map(aluno => ({
-        ...aluno,
-        parcelas: aluno.parcelas.filter(p => p.id !== parcelaId),
-        totalGeral: aluno.totalGeral - (aluno.parcelas.find(p => p.id === parcelaId)?.valor || 0),
-        totalPago: aluno.totalPago - (aluno.parcelas.find(p => p.id === parcelaId && p.status === 'Pago')?.valor || 0),
-        totalPendente: aluno.totalPendente - (aluno.parcelas.find(p => p.id === parcelaId && p.status !== 'Pago')?.valor || 0)
-      })));
-
-      toast({
-        title: "Sucesso",
-        description: "Parcela excluída com sucesso!",
-      });
-    } catch (error) {
-      console.error('Erro ao excluir parcela:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível excluir a parcela.",
-        variant: "destructive",
-      });
-    }
-  }, [toast]);
-
-  const toggleStudentExpansion = useCallback((studentId: string) => {
-    // Salvar a posição atual do scroll antes da mudança
-    const scrollContainer = containerRef.current;
-    const currentScrollTop = scrollContainer?.scrollTop || 0;
-    
-    // Salvar no estado global também
-    setSavedScrollPosition(currentScrollTop);
-    
-    const newExpanded = new Set(expandedStudents);
-    const wasExpanded = newExpanded.has(studentId);
-    
-    if (wasExpanded) {
-      newExpanded.delete(studentId);
-    } else {
-      newExpanded.add(studentId);
-    }
-    
-    setExpandedStudents(newExpanded);
-    
-    // Usar um timeout para garantir que o DOM foi completamente atualizado
-    if (wasExpanded && scrollContainer) {
-      // Usar a função de restauração robusta
-      setTimeout(restoreScrollPosition, 50);
-    }
-  }, [expandedStudents, restoreScrollPosition]);
-
-  const getStatusColor = useCallback((status: string) => {
-    switch (status) {
-      case 'Pago':
-        return 'bg-green-100 text-green-800';
-      case 'Vencido':
-        return 'bg-red-100 text-red-800';
-      case 'Pendente':
-        return 'bg-yellow-100 text-yellow-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  }, []);
-
-  const formatDate = useCallback((dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR');
-  }, []);
-
+  // Função para formatar moeda
   const formatCurrency = useCallback((value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -410,204 +74,573 @@ const StudentGroupingView = () => {
     }).format(value);
   }, []);
 
-  const filteredAlunos = useMemo(() => 
-    alunos.filter(aluno =>
-      aluno.nome.toLowerCase().includes(searchTerm.toLowerCase())
-    ), [alunos, searchTerm]
-  );
+  // Função para formatar data
+  const formatDate = useCallback((dateString: string) => {
+    return new Date(dateString).toLocaleDateString('pt-BR');
+  }, []);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-red-600 border-t-transparent mx-auto"></div>
-          <p className="mt-2 text-gray-600">Carregando alunos...</p>
-        </div>
-      </div>
-    );
-  }
+  // Função para obter cor do status
+  const getStatusColor = useCallback((status: string) => {
+    switch (status) {
+      case 'pago':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'pendente':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'vencido':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'cancelado':
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'Pago':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'Pendente':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'Vencido':
+        return 'bg-red-100 text-red-800 border-red-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  }, []);
+
+  // Função para salvar posição do scroll
+  const saveScrollPosition = useCallback(() => {
+    if (containerRef.current) {
+      setSavedScrollPosition(containerRef.current.scrollTop);
+    }
+  }, []);
+
+  // Função para restaurar posição do scroll
+  const restoreScrollPosition = useCallback(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTop = savedScrollPosition;
+    }
+  }, [savedScrollPosition]);
+
+  // Função para alternar expansão do aluno
+  const toggleStudentExpansion = useCallback((alunoId: string) => {
+    setExpandedStudents(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(alunoId)) {
+        newSet.delete(alunoId);
+      } else {
+        newSet.add(alunoId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  // Função para lidar com cliques em botões
+  const handleButtonClick = useCallback((action: () => void, e: React.MouseEvent) => {
+    e.stopPropagation();
+    action();
+  }, []);
+
+  // Função para abrir modal de criar parcela
+  const abrirModalCriarParcela = useCallback((alunoId: string, nomeAluno: string, registroFinanceiroId: string) => {
+    setNovaParcela({
+      registro_financeiro_id: registroFinanceiroId,
+      tipo_item: 'plano',
+      numero_parcela: 1,
+      valor: 0,
+      data_vencimento: ''
+    });
+    setIsCreateModalOpen(true);
+  }, []);
+
+  // Função para abrir modal de editar parcela
+  const abrirModalEditarParcela = useCallback((parcela: ParcelaAluno) => {
+    setEditandoParcela(parcela);
+    setIsEditModalOpen(true);
+  }, []);
+
+  // Função para carregar dados
+  const carregarDados = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // 1. Buscar dados consolidados de financeiro_alunos
+      const { data: financialData, error: financialError } = await supabase
+        .from('financeiro_alunos')
+        .select(`
+          id,
+          aluno_id,
+          valor_total,
+          valor_plano,
+          valor_material,
+          valor_matricula,
+          status_geral,
+          data_primeiro_vencimento,
+          alunos!inner(id, nome)
+        `)
+        .eq('alunos.status', 'Ativo');
+
+      if (financialError) throw financialError;
+
+      // 2. Buscar todas as parcelas relacionadas
+      const { data: parcelasData, error: parcelasError } = await supabase
+        .from('parcelas_alunos')
+        .select('*');
+
+      if (parcelasError) throw parcelasError;
+
+      // 3. Agrupar dados por aluno
+      const alunosFinanceiros: AlunoFinanceiro[] = (financialData || []).map(registro => {
+        const parcelasAluno = (parcelasData || []).filter(
+          p => p.registro_financeiro_id === registro.id
+        );
+
+        return {
+          id: registro.aluno_id,
+          nome: registro.alunos.nome,
+          valor_total: registro.valor_total,
+          valor_plano: registro.valor_plano,
+          valor_material: registro.valor_material,
+          valor_matricula: registro.valor_matricula,
+          status_geral: registro.status_geral,
+          data_primeiro_vencimento: registro.data_primeiro_vencimento,
+          parcelas: parcelasAluno,
+          registro_financeiro_id: registro.id
+        };
+      });
+
+      setAlunos(alunosFinanceiros);
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar dados financeiros",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  // Função para criar parcela
+  const criarParcela = useCallback(async () => {
+    if (!novaParcela) return;
+
+    if (!novaParcela.registro_financeiro_id || !novaParcela.tipo_item || !novaParcela.numero_parcela || !novaParcela.valor || !novaParcela.data_vencimento) {
+      toast({
+        title: "Erro",
+        description: "Preencha todos os campos obrigatórios",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('parcelas_alunos')
+        .insert({
+          registro_financeiro_id: novaParcela.registro_financeiro_id,
+          tipo_item: novaParcela.tipo_item,
+          numero_parcela: novaParcela.numero_parcela,
+          valor: novaParcela.valor,
+          data_vencimento: novaParcela.data_vencimento,
+          status_pagamento: 'pendente',
+          idioma_registro: 'Inglês'
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Parcela criada com sucesso!"
+      });
+
+      setIsCreateModalOpen(false);
+      setNovaParcela(null);
+      carregarDados();
+    } catch (error) {
+      console.error('Erro ao criar parcela:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao criar parcela",
+        variant: "destructive"
+      });
+    }
+  }, [novaParcela, toast, carregarDados]);
+
+  // Função para salvar edição de parcela
+  const salvarEdicaoParcela = useCallback(async () => {
+    if (!editandoParcela) return;
+
+    try {
+      const { error } = await supabase
+        .from('parcelas_alunos')
+        .update({
+          tipo_item: editandoParcela.tipo_item,
+          numero_parcela: editandoParcela.numero_parcela,
+          valor: editandoParcela.valor,
+          data_vencimento: editandoParcela.data_vencimento,
+          status_pagamento: editandoParcela.status_pagamento
+        })
+        .eq('id', editandoParcela.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Parcela atualizada com sucesso!"
+      });
+
+      setIsEditModalOpen(false);
+      setEditandoParcela(null);
+      carregarDados();
+    } catch (error) {
+      console.error('Erro ao atualizar parcela:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar parcela",
+        variant: "destructive"
+      });
+    }
+  }, [editandoParcela, toast, carregarDados]);
+
+  // Função para excluir parcela
+  const excluirParcela = useCallback(async (parcelaId: number) => {
+    try {
+      const { error } = await supabase
+        .from('parcelas_alunos')
+        .delete()
+        .eq('id', parcelaId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Parcela excluída com sucesso!"
+      });
+
+      carregarDados();
+    } catch (error) {
+      console.error('Erro ao excluir parcela:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir parcela",
+        variant: "destructive"
+      });
+    }
+  }, [toast, carregarDados]);
+
+  // Carregar dados ao montar o componente
+  useEffect(() => {
+    carregarDados();
+  }, [carregarDados]);
 
   return (
-    <div ref={containerRef} className="space-y-4 overflow-auto">
-      {/* Header com busca */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Registros Financeiros por Aluno</h2>
-        
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            placeholder="Buscar por nome do aluno..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 w-64"
-          />
-        </div>
-      </div>
+    <motion.div 
+      ref={containerRef}
+      className="space-y-6"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      {loading && (
+        <motion.div 
+          className="flex justify-center items-center py-8"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          >
+            <RefreshCw className="h-8 w-8 text-red-600" />
+          </motion.div>
+          <span className="ml-3 text-lg font-medium text-gray-600">Carregando dados financeiros...</span>
+        </motion.div>
+      )}
 
-      {/* Modal de criar parcela */}
-      <Dialog 
-        open={isDialogOpen} 
-        onOpenChange={(open) => {
-          if (!open) {
-            // Salvar a posição do scroll antes de fechar o modal
-            saveScrollPosition();
-            setIsDialogOpen(false);
-            // Restaurar a posição do scroll após fechar o modal
-            restoreScrollPosition();
-          } else {
-            setIsDialogOpen(true);
-          }
-        }}
+      {/* Header com gradiente e estatísticas */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.6, delay: 0.1 }}
       >
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Criar Nova Parcela</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="aluno" className="text-right">
-                Aluno
-              </Label>
-              <div className="col-span-3">
+        <Card className="overflow-hidden shadow-lg border-0">
+          <CardHeader className="bg-gradient-to-r from-red-600 to-pink-600 text-white relative overflow-hidden">
+            <motion.div 
+              className="absolute inset-0 bg-white/10"
+              animate={{ 
+                background: [
+                  'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%)',
+                  'radial-gradient(circle at 80% 50%, rgba(255,255,255,0.1) 0%, transparent 50%)',
+                  'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%)'
+                ]
+              }}
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+            />
+            <div className="relative z-10">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <motion.div
+                    whileHover={{ scale: 1.1, rotate: 5 }}
+                    transition={{ type: "spring", stiffness: 300 }}
+                  >
+                    <Users className="h-8 w-8" />
+                  </motion.div>
+                  <div>
+                    <CardTitle className="text-2xl font-bold">Agrupamento por Aluno</CardTitle>
+                    <p className="text-red-100 mt-1">Visão detalhada dos registros financeiros</p>
+                  </div>
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={carregarDados}
+                  className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg p-3 transition-all duration-200"
+                >
+                  <RefreshCw className="h-5 w-5" />
+                </motion.button>
+              </div>
+              
+              {/* Estatísticas */}
+              <motion.div 
+                className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.3 }}
+              >
+                <motion.div 
+                  className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20"
+                  whileHover={{ scale: 1.02, backgroundColor: 'rgba(255,255,255,0.15)' }}
+                  transition={{ type: "spring", stiffness: 300 }}
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="bg-white/20 rounded-full p-2">
+                      <Users className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-red-100 text-sm">Total de Alunos</p>
+                      <p className="text-2xl font-bold">{filteredAlunos.length}</p>
+                    </div>
+                  </div>
+                </motion.div>
+                
+                <motion.div 
+                  className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20"
+                  whileHover={{ scale: 1.02, backgroundColor: 'rgba(255,255,255,0.15)' }}
+                  transition={{ type: "spring", stiffness: 300 }}
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="bg-green-500/20 rounded-full p-2">
+                      <TrendingUp className="h-5 w-5 text-green-200" />
+                    </div>
+                    <div>
+                      <p className="text-red-100 text-sm">Total Arrecadado</p>
+                      <p className="text-2xl font-bold">
+                        {formatCurrency(filteredAlunos
+                          .filter(aluno => aluno.status_geral === 'Pago')
+                          .reduce((acc, aluno) => acc + aluno.valor_total, 0))}
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+                
+                <motion.div 
+                  className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20"
+                  whileHover={{ scale: 1.02, backgroundColor: 'rgba(255,255,255,0.15)' }}
+                  transition={{ type: "spring", stiffness: 300 }}
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="bg-yellow-500/20 rounded-full p-2">
+                      <TrendingDown className="h-5 w-5 text-yellow-200" />
+                    </div>
+                    <div>
+                      <p className="text-red-100 text-sm">Total Pendente</p>
+                      <p className="text-2xl font-bold">
+                        {formatCurrency(filteredAlunos
+                          .filter(aluno => aluno.status_geral !== 'Pago')
+                          .reduce((acc, aluno) => acc + aluno.valor_total, 0))}
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+                
+                <motion.div 
+                  className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20"
+                  whileHover={{ scale: 1.02, backgroundColor: 'rgba(255,255,255,0.15)' }}
+                  transition={{ type: "spring", stiffness: 300 }}
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="bg-blue-500/20 rounded-full p-2">
+                      <CreditCard className="h-5 w-5 text-blue-200" />
+                    </div>
+                    <div>
+                      <p className="text-red-100 text-sm">Total de Parcelas</p>
+                      <p className="text-2xl font-bold">
+                        {filteredAlunos.reduce((acc, aluno) => acc + aluno.parcelas.length, 0)}
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              </motion.div>
+            </div>
+          </CardHeader>
+        </Card>
+      </motion.div>
+
+      {/* Filtros */}
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+      >
+        <Card className="shadow-md border-0 bg-gradient-to-r from-gray-50 to-white">
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2 text-gray-600">
+                <Filter className="h-5 w-5" />
+                <span className="font-medium">Filtros:</span>
+              </div>
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
-                  value={alunos.find(a => a.id === novaParcela.aluno_id)?.nome || ''}
-                  disabled
-                  className="bg-gray-100"
+                  placeholder="Buscar por nome do aluno..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 border-gray-200 focus:border-red-500 focus:ring-red-500 transition-all duration-200"
                 />
               </div>
+              {searchTerm && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setSearchTerm('')}
+                  className="bg-red-100 hover:bg-red-200 text-red-600 px-3 py-2 rounded-lg transition-all duration-200"
+                >
+                  Limpar
+                </motion.button>
+              )}
             </div>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="tipo" className="text-right">
-                Tipo
-              </Label>
-              <Select value={novaParcela.tipo} onValueChange={(value) => setNovaParcela(prev => ({ ...prev, tipo: value }))}>
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Selecione o tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Plano">Plano</SelectItem>
-                  <SelectItem value="Material">Material</SelectItem>
-                  <SelectItem value="Matrícula">Matrícula</SelectItem>
-                  <SelectItem value="Taxa">Taxa</SelectItem>
-                  <SelectItem value="Outros">Outros</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="numero" className="text-right">
-                Parcela
-              </Label>
-              <Input
-                id="numero"
-                type="number"
-                value={novaParcela.numero}
-                onChange={(e) => setNovaParcela(prev => ({ ...prev, numero: parseInt(e.target.value) || 1 }))}
-                className="col-span-3"
-                min="1"
-              />
-            </div>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="valor" className="text-right">
-                Valor
-              </Label>
-              <Input
-                id="valor"
-                type="number"
-                step="0.01"
-                value={novaParcela.valor}
-                onChange={(e) => setNovaParcela(prev => ({ ...prev, valor: parseFloat(e.target.value) || 0 }))}
-                className="col-span-3"
-                min="0"
-              />
-            </div>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="vencimento" className="text-right">
-                Vencimento
-              </Label>
-              <Input
-                id="vencimento"
-                type="date"
-                value={novaParcela.vencimento}
-                onChange={(e) => setNovaParcela(prev => ({ ...prev, vencimento: e.target.value }))}
-                className="col-span-3"
-              />
-            </div>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="status" className="text-right">
-                Status
-              </Label>
-              <Select value={novaParcela.status} onValueChange={(value: 'Pago' | 'Pendente' | 'Vencido') => setNovaParcela(prev => ({ ...prev, status: value }))}>
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Selecione o status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Pendente">Pendente</SelectItem>
-                  <SelectItem value="Pago">Pago</SelectItem>
-                  <SelectItem value="Vencido">Vencido</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          
-          <div className="flex justify-end gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                // Salvar a posição do scroll antes de fechar o modal
-                saveScrollPosition();
-                setIsDialogOpen(false);
-                // Restaurar a posição do scroll após fechar o modal
-                restoreScrollPosition();
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button onClick={criarParcela} className="bg-red-600 hover:bg-red-700">
-              Criar Parcela
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </CardContent>
+        </Card>
+      </motion.div>
 
-      {/* Modal de edição de parcela */}
-      <Dialog 
-        open={isEditModalOpen} 
-        onOpenChange={(open) => {
-          if (!open) {
-            // Salvar a posição do scroll antes de fechar o modal
-            saveScrollPosition();
-            setIsEditModalOpen(false);
-            // Restaurar a posição do scroll após fechar o modal
-            restoreScrollPosition();
-          } else {
-            setIsEditModalOpen(true);
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-[425px]">
+      {/* Modal de criar parcela */}
+      <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Editar Parcela</DialogTitle>
+            <DialogTitle className="flex items-center space-x-2">
+              <Plus className="h-5 w-5 text-red-600" />
+              <span>Criar Nova Parcela</span>
+            </DialogTitle>
           </DialogHeader>
-          {editandoParcela && (
-            <div className="space-y-4">
+          {novaParcela && (
+            <motion.div 
+              className="space-y-4"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              
               <div>
-                <Label htmlFor="edit-tipo">Tipo</Label>
+                <Label htmlFor="tipo">Tipo</Label>
                 <Select 
-                  value={editandoParcela.tipo} 
-                  onValueChange={(value) => setEditandoParcela(prev => prev ? {...prev, tipo: value} : null)}
+                  value={novaParcela.tipo_item} 
+                  onValueChange={(value) => setNovaParcela(prev => prev ? {...prev, tipo_item: value as 'plano' | 'material' | 'matrícula'} : null)}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Plano">Plano</SelectItem>
-                    <SelectItem value="Material">Material</SelectItem>
-                    <SelectItem value="Matrícula">Matrícula</SelectItem>
+                    <SelectItem value="plano">Plano</SelectItem>
+                    <SelectItem value="material">Material</SelectItem>
+                    <SelectItem value="matrícula">Matrícula</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="numero">Número da Parcela</Label>
+                <Input
+                  id="numero"
+                  type="number"
+                  value={novaParcela.numero_parcela}
+                  onChange={(e) => setNovaParcela(prev => prev ? {...prev, numero_parcela: parseInt(e.target.value) || 1} : null)}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="valor">Valor</Label>
+                <Input
+                  id="valor"
+                  type="number"
+                  step="0.01"
+                  value={novaParcela.valor}
+                  onChange={(e) => setNovaParcela(prev => prev ? {...prev, valor: parseFloat(e.target.value) || 0} : null)}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="vencimento">Data de Vencimento</Label>
+                <Input
+                  id="vencimento"
+                  type="date"
+                  value={novaParcela.data_vencimento}
+                  onChange={(e) => setNovaParcela(prev => prev ? {...prev, data_vencimento: e.target.value} : null)}
+                />
+              </div>
+              
+
+              
+              <div className="flex justify-end gap-2 pt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    saveScrollPosition();
+                    setIsCreateModalOpen(false);
+                    restoreScrollPosition();
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={criarParcela}
+                  className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 transition-all duration-200"
+                >
+                  Criar Parcela
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de editar parcela */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Edit className="h-5 w-5 text-red-600" />
+              <span>Editar Parcela</span>
+            </DialogTitle>
+          </DialogHeader>
+          {editandoParcela && (
+            <motion.div 
+              className="space-y-4"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div>
+                <Label htmlFor="edit-tipo">Tipo</Label>
+                <Select 
+                  value={editandoParcela.tipo_item} 
+                  onValueChange={(value) => setEditandoParcela(prev => prev ? {...prev, tipo_item: value as 'plano' | 'material' | 'matrícula'} : null)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="plano">Plano</SelectItem>
+                    <SelectItem value="material">Material</SelectItem>
+                    <SelectItem value="matrícula">Matrícula</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -617,8 +650,8 @@ const StudentGroupingView = () => {
                 <Input
                   id="edit-numero"
                   type="number"
-                  value={editandoParcela.numero}
-                  onChange={(e) => setEditandoParcela(prev => prev ? {...prev, numero: parseInt(e.target.value) || 1} : null)}
+                  value={editandoParcela.numero_parcela}
+                  onChange={(e) => setEditandoParcela(prev => prev ? {...prev, numero_parcela: parseInt(e.target.value) || 1} : null)}
                 />
               </div>
               
@@ -638,36 +671,35 @@ const StudentGroupingView = () => {
                 <Input
                   id="edit-vencimento"
                   type="date"
-                  value={editandoParcela.vencimento}
-                  onChange={(e) => setEditandoParcela(prev => prev ? {...prev, vencimento: e.target.value} : null)}
+                  value={editandoParcela.data_vencimento}
+                  onChange={(e) => setEditandoParcela(prev => prev ? {...prev, data_vencimento: e.target.value} : null)}
                 />
               </div>
               
               <div>
                 <Label htmlFor="edit-status">Status</Label>
                 <Select 
-                  value={editandoParcela.status} 
-                  onValueChange={(value: 'Pago' | 'Pendente' | 'Vencido') => setEditandoParcela(prev => prev ? {...prev, status: value} : null)}
+                  value={editandoParcela.status_pagamento} 
+                  onValueChange={(value: 'pago' | 'pendente' | 'vencido' | 'cancelado') => setEditandoParcela(prev => prev ? {...prev, status_pagamento: value} : null)}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Pendente">Pendente</SelectItem>
-                    <SelectItem value="Pago">Pago</SelectItem>
-                    <SelectItem value="Vencido">Vencido</SelectItem>
+                    <SelectItem value="pendente">Pendente</SelectItem>
+                    <SelectItem value="pago">Pago</SelectItem>
+                    <SelectItem value="vencido">Vencido</SelectItem>
+                    <SelectItem value="cancelado">Cancelado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-end gap-2 pt-4">
                 <Button 
                   variant="outline" 
                   onClick={() => {
-                    // Salvar a posição do scroll antes de fechar o modal
                     saveScrollPosition();
                     setIsEditModalOpen(false);
-                    // Restaurar a posição do scroll após fechar o modal
                     restoreScrollPosition();
                   }}
                 >
@@ -675,260 +707,405 @@ const StudentGroupingView = () => {
                 </Button>
                 <Button 
                   onClick={salvarEdicaoParcela}
-                  className="bg-red-600 hover:bg-red-700"
+                  className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 transition-all duration-200"
                 >
                   Salvar Alterações
                 </Button>
               </div>
-            </div>
+            </motion.div>
           )}
         </DialogContent>
       </Dialog>
 
       {/* Tabela principal */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Alunos ({filteredAlunos.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12"></TableHead>
-                <TableHead>Nome do Aluno</TableHead>
-                <TableHead>Total Geral</TableHead>
-                <TableHead>Total Pago</TableHead>
-                <TableHead>Total Pendente</TableHead>
-                <TableHead>Parcelas</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAlunos.map((aluno) => {
-                const isExpanded = expandedStudents.has(aluno.id);
-                
-                return (
-                  <React.Fragment key={aluno.id}>
-                    <TableRow 
-                      className="cursor-pointer hover:bg-gray-50 transition-colors duration-200"
-                      onClick={(e) => toggleStudentExpansion(aluno.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          toggleStudentExpansion(aluno.id);
-                        }
-                      }}
-                      tabIndex={0}
-                      role="button"
-                      aria-expanded={isExpanded}
-                      aria-label={`${isExpanded ? 'Recolher' : 'Expandir'} detalhes de ${aluno.nome}`}
-                    >
-                      <TableCell>
-                        <div className="transition-transform duration-300 ease-in-out">
-                          {isExpanded ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium">{aluno.nome}</TableCell>
-                      <TableCell>{formatCurrency(aluno.totalGeral)}</TableCell>
-                      <TableCell className="text-green-600">{formatCurrency(aluno.totalPago)}</TableCell>
-                      <TableCell className="text-red-600">{formatCurrency(aluno.totalPendente)}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Badge className="bg-green-100 text-green-800">
-                            {aluno.parcelas.filter(p => p.status === 'Pago').length} Pagas
-                          </Badge>
-                          <Badge className="bg-red-100 text-red-800">
-                            {aluno.parcelas.filter(p => p.status === 'Vencido').length} Vencidas
-                          </Badge>
-                          <Badge className="bg-yellow-100 text-yellow-800">
-                            {aluno.parcelas.filter(p => p.status === 'Pendente').length} Pendentes
-                          </Badge>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    
-                    {/* Linha expandida com animação otimizada */}
-                    {isExpanded && (
-                      <TableRow className="transition-all duration-500 ease-in-out">
-                        <TableCell colSpan={6} className="p-0">
-                          <div className="bg-gray-50 p-4 border-l-4 border-blue-500 animate-fadeIn">
-                            <div className="flex justify-between items-center mb-3">
-                              <h4 className="font-semibold text-lg text-gray-800">
-                                Todas as Parcelas de {aluno.nome}
-                              </h4>
-                              <Button
-                                onClick={(e) => handleButtonClick(() => abrirModalCriarParcela(aluno.id, aluno.nome), e)}
-                                className="bg-red-600 hover:bg-red-700 text-white transition-all duration-200 hover:scale-105"
-                                size="sm"
-                              >
-                                <Plus className="h-4 w-4 mr-2" />
-                                Criar Parcela
-                              </Button>
-                            </div>
-                            <div className="rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-                              <Table>
-                                <TableHeader>
-                                  <TableRow className="bg-gray-100">
-                                    <TableHead>Tipo</TableHead>
-                                    <TableHead>Parcela</TableHead>
-                                    <TableHead>Valor</TableHead>
-                                    <TableHead>Vencimento</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Ações</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {aluno.parcelas.length > 0 ? (
-                                    aluno.parcelas
-                                      .sort((a, b) => new Date(a.vencimento).getTime() - new Date(b.vencimento).getTime())
-                                      .map((parcela, index) => (
-                                        <TableRow 
-                                          key={parcela.id}
-                                          className="hover:bg-gray-50 transition-colors duration-200 animate-slideInUp"
-                                          style={{ animationDelay: `${index * 50}ms` }}
-                                        >
-                                          <TableCell className="font-medium py-4">{parcela.tipo}</TableCell>
-                                          <TableCell className="py-4">{parcela.numero}</TableCell>
-                                          <TableCell className="font-semibold py-4">{formatCurrency(parcela.valor)}</TableCell>
-                                          <TableCell className="py-4">{formatDate(parcela.vencimento)}</TableCell>
-                                          <TableCell className="py-4">
-                                            <Badge className={`${getStatusColor(parcela.status)} transition-all duration-200`}>
-                                              {parcela.status}
-                                            </Badge>
-                                          </TableCell>
-                                          <TableCell className="py-4">
-                                            <div className="flex gap-2">
-                                              <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={(e) => handleButtonClick(() => abrirModalEditarParcela(parcela), e)}
-                                                className="h-8 w-8 p-0 hover:scale-110 transition-transform duration-200"
-                                              >
-                                                <Edit className="h-4 w-4" />
-                                              </Button>
-                                              <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={(e) => handleButtonClick(() => excluirParcela(parcela.id), e)}
-                                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:scale-110 transition-all duration-200"
-                                              >
-                                                <Trash2 className="h-4 w-4" />
-                                              </Button>
-                                            </div>
-                                          </TableCell>
-                                        </TableRow>
-                                      ))
-                                  ) : (
-                                    <>
-                                      {/* Área de mensagem quando não há parcelas */}
-                                      <TableRow>
-                                        <TableCell colSpan={6} className="py-12">
-                                          <div className="flex flex-col items-center justify-center space-y-4 border-2 border-dashed border-gray-300 rounded-lg p-8 bg-gray-50">
-                                            <AlertCircle className="h-12 w-12 text-gray-400" />
-                                            <div className="text-center">
-                                              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                                Nenhum registro financeiro encontrado
-                                              </h3>
-                                              <p className="text-gray-500 mb-4">
-                                                Este aluno ainda não possui parcelas ou registros financeiros cadastrados.
-                                              </p>
-                                              <p className="text-sm text-gray-400">
-                                                Clique no botão "Criar Parcela" acima para adicionar o primeiro registro.
-                                              </p>
-                                            </div>
-                                          </div>
-                                        </TableCell>
-                                      </TableRow>
-                                      {/* Linhas de espaçamento extra */}
-                                      {[1, 2, 3].map((i) => (
-                                        <TableRow key={`spacing-${i}`}>
-                                          <TableCell colSpan={6} className="py-3 border-b border-gray-100">
-                                            <div className="flex justify-center">
-                                              <div className="w-2 h-2 bg-gray-200 rounded-full mx-1"></div>
-                                              <div className="w-2 h-2 bg-gray-200 rounded-full mx-1"></div>
-                                              <div className="w-2 h-2 bg-gray-200 rounded-full mx-1"></div>
-                                            </div>
-                                          </TableCell>
-                                        </TableRow>
-                                      ))}
-                                    </>
-                                  )}
-                                  
-                                  {/* Linha de espaçamento final para melhor visualização */}
-                                  {aluno.parcelas.length > 0 && (
-                                    <TableRow>
-                                      <TableCell colSpan={6} className="py-4 bg-gray-25 border-t-2 border-gray-200">
-                                        <div className="flex justify-center items-center space-x-2 text-sm text-gray-500">
-                                          <span>•</span>
-                                          <span>Total de {aluno.parcelas.length} parcela{aluno.parcelas.length !== 1 ? 's' : ''}</span>
-                                          <span>•</span>
-                                        </div>
-                                      </TableCell>
-                                    </TableRow>
-                                  )}
-                                </TableBody>
-                              </Table>
-                            </div>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </TableBody>
-          </Table>
-          
-          {filteredAlunos.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 space-y-6">
-              <div className="relative">
-                <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center">
-                  <Users className="h-12 w-12 text-gray-400" />
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+      >
+        <Card className="shadow-lg border-0 overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="bg-red-100 rounded-full p-2">
+                  <Users className="h-5 w-5 text-red-600" />
                 </div>
-                <div className="absolute -top-2 -right-2 w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                  <Search className="h-4 w-4 text-red-500" />
+                <div>
+                  <CardTitle className="text-xl text-gray-800">Alunos Cadastrados</CardTitle>
+                  <p className="text-sm text-gray-500 mt-1">{filteredAlunos.length} aluno{filteredAlunos.length !== 1 ? 's' : ''} encontrado{filteredAlunos.length !== 1 ? 's' : ''}</p>
                 </div>
               </div>
-              
-              <div className="text-center space-y-2">
-                <h3 className="text-xl font-semibold text-gray-900">
-                  {searchTerm ? 'Nenhum aluno encontrado' : 'Nenhum aluno cadastrado'}
-                </h3>
-                <p className="text-gray-500 max-w-md">
-                  {searchTerm 
-                    ? `Não encontramos alunos que correspondam à busca "${searchTerm}". Tente ajustar os termos da pesquisa.`
-                    : 'Ainda não há alunos com registros financeiros cadastrados no sistema.'
-                  }
-                </p>
-                {searchTerm && (
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setSearchTerm('')}
-                    className="mt-4"
-                  >
-                    Limpar busca
-                  </Button>
-                )}
-              </div>
-              
-              {/* Linhas decorativas de espaçamento */}
-              <div className="w-full max-w-md space-y-3 pt-8">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <div key={i} className="flex justify-center space-x-2">
-                    <div className="w-2 h-2 bg-gray-200 rounded-full"></div>
-                    <div className="w-2 h-2 bg-gray-200 rounded-full"></div>
-                    <div className="w-2 h-2 bg-gray-200 rounded-full"></div>
-                  </div>
-                ))}
-              </div>
+              <Badge className="bg-red-100 text-red-800 px-3 py-1">
+                {filteredAlunos.length} registros
+              </Badge>
             </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50 hover:bg-gray-50">
+                  <TableHead className="w-12 text-center"></TableHead>
+                  <TableHead className="font-semibold text-gray-700">
+                    <div className="flex items-center space-x-2">
+                      <Users className="h-4 w-4" />
+                      <span>Nome do Aluno</span>
+                    </div>
+                  </TableHead>
+                  <TableHead className="font-semibold text-gray-700">
+                    <div className="flex items-center space-x-2">
+                      <DollarSign className="h-4 w-4" />
+                      <span>Valor Total</span>
+                    </div>
+                  </TableHead>
+                  <TableHead className="font-semibold text-gray-700">
+                    <div className="flex items-center space-x-2">
+                      <TrendingUp className="h-4 w-4 text-green-600" />
+                      <span>Status Geral</span>
+                    </div>
+                  </TableHead>
+                  <TableHead className="font-semibold text-gray-700">
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="h-4 w-4" />
+                      <span>Primeiro Vencimento</span>
+                    </div>
+                  </TableHead>
+                  <TableHead className="font-semibold text-gray-700">
+                    <div className="flex items-center space-x-2">
+                      <CreditCard className="h-4 w-4" />
+                      <span>Parcelas</span>
+                    </div>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <AnimatePresence>
+                  {filteredAlunos.map((aluno, index) => {
+                    const isExpanded = expandedStudents.has(aluno.id);
+                    
+                    return (
+                      <React.Fragment key={aluno.id}>
+                        <motion.tr
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -20 }}
+                          transition={{ duration: 0.3, delay: index * 0.05 }}
+                          className="cursor-pointer hover:bg-red-50 transition-all duration-200 border-b border-gray-100"
+                          onClick={(e) => toggleStudentExpansion(aluno.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              toggleStudentExpansion(aluno.id);
+                            }
+                          }}
+                          tabIndex={0}
+                          role="button"
+                          aria-expanded={isExpanded}
+                          aria-label={`${isExpanded ? 'Recolher' : 'Expandir'} detalhes de ${aluno.nome}`}
+                        >
+                          <TableCell className="text-center">
+                            <motion.div 
+                              className="flex justify-center"
+                              animate={{ rotate: isExpanded ? 90 : 0 }}
+                              transition={{ duration: 0.2 }}
+                            >
+                              <div className="bg-red-100 rounded-full p-1">
+                                <ChevronRight className="h-4 w-4 text-red-600" />
+                              </div>
+                            </motion.div>
+                          </TableCell>
+                          <TableCell className="font-medium text-base py-4">
+                            <div className="flex items-center space-x-3">
+                              <div className="bg-gradient-to-r from-red-600 to-pink-600 rounded-full p-2">
+                                <Users className="h-4 w-4 text-white" />
+                              </div>
+                              <span>{aluno.nome}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-base py-4">
+                            <span className="font-semibold text-gray-800">{formatCurrency(aluno.valor_total)}</span>
+                          </TableCell>
+                          <TableCell className="text-base py-4">
+                            <Badge className={`${getStatusColor(aluno.status_geral)} transition-all duration-200 border`}>
+                              {aluno.status_geral}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-base py-4">
+                            <span className="font-semibold text-gray-600">{formatDate(aluno.data_primeiro_vencimento)}</span>
+                          </TableCell>
+                          <TableCell className="py-4">
+                            <div className="flex gap-2 flex-wrap">
+                              <motion.div whileHover={{ scale: 1.05 }}>
+                                <Badge className="bg-green-100 text-green-800 text-sm border border-green-200">
+                                  {aluno.parcelas.filter(p => p.status_pagamento === 'pago').length} Pagas
+                                </Badge>
+                              </motion.div>
+                              <motion.div whileHover={{ scale: 1.05 }}>
+                                <Badge className="bg-red-100 text-red-800 text-sm border border-red-200">
+                                  {aluno.parcelas.filter(p => p.status_pagamento === 'vencido').length} Vencidas
+                                </Badge>
+                              </motion.div>
+                              <motion.div whileHover={{ scale: 1.05 }}>
+                                <Badge className="bg-yellow-100 text-yellow-800 text-sm border border-yellow-200">
+                                  {aluno.parcelas.filter(p => p.status_pagamento === 'pendente').length} Pendentes
+                                </Badge>
+                              </motion.div>
+                              <motion.div whileHover={{ scale: 1.05 }}>
+                                <Badge className="bg-gray-100 text-gray-800 text-sm border border-gray-200">
+                                  {aluno.parcelas.filter(p => p.status_pagamento === 'cancelado').length} Canceladas
+                                </Badge>
+                              </motion.div>
+                            </div>
+                          </TableCell>
+                        </motion.tr>
+                        
+                        {/* Linha expandida com animação */}
+                        <AnimatePresence>
+                          {isExpanded && (
+                            <motion.tr
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.3 }}
+                            >
+                              <TableCell colSpan={6} className="p-0">
+                                <motion.div 
+                                  className="bg-gradient-to-r from-red-50 to-pink-50 p-6 border-l-4 border-red-500"
+                                  initial={{ opacity: 0, y: -20 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ duration: 0.4, delay: 0.1 }}
+                                >
+                                  <div className="flex justify-between items-center mb-4">
+                                    <div className="flex items-center space-x-3">
+                                      <div className="bg-gradient-to-r from-red-600 to-pink-600 rounded-full p-2">
+                                        <Eye className="h-5 w-5 text-white" />
+                                      </div>
+                                      <div>
+                                        <h4 className="font-bold text-xl text-gray-800">
+                                          Parcelas de {aluno.nome}
+                                        </h4>
+                                        <p className="text-gray-600">Detalhamento completo dos registros financeiros</p>
+                                      </div>
+                                    </div>
+                                    <motion.button
+                                      whileHover={{ scale: 1.05 }}
+                                      whileTap={{ scale: 0.95 }}
+                                      onClick={(e) => handleButtonClick(() => abrirModalCriarParcela(aluno.id, aluno.nome, aluno.registro_financeiro_id), e)}
+                                      className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 shadow-lg"
+                                    >
+                                      <Plus className="h-4 w-4" />
+                                      <span>Nova Parcela</span>
+                                    </motion.button>
+                                  </div>
+                                  
+                                  <div className="rounded-xl border border-red-200 overflow-hidden shadow-lg bg-white">
+                                    <Table>
+                                      <TableHeader>
+                                        <TableRow className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700">
+                                          <TableHead className="font-semibold text-white">
+                                            <div className="flex items-center space-x-2">
+                                              <CreditCard className="h-4 w-4" />
+                                              <span>Tipo Item</span>
+                                            </div>
+                                          </TableHead>
+                                          <TableHead className="font-semibold text-white">Parcela</TableHead>
+                                          <TableHead className="font-semibold text-white">
+                                            <div className="flex items-center space-x-2">
+                                              <DollarSign className="h-4 w-4" />
+                                              <span>Valor</span>
+                                            </div>
+                                          </TableHead>
+                                          <TableHead className="font-semibold text-white">
+                                            <div className="flex items-center space-x-2">
+                                              <Calendar className="h-4 w-4" />
+                                              <span>Vencimento</span>
+                                            </div>
+                                          </TableHead>
+                                          <TableHead className="font-semibold text-white">
+                                            <div className="flex items-center space-x-2">
+                                              <Calendar className="h-4 w-4" />
+                                              <span>Pagamento</span>
+                                            </div>
+                                          </TableHead>
+                                          <TableHead className="font-semibold text-white">Status</TableHead>
+                                          <TableHead className="font-semibold text-white text-center">Ações</TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {aluno.parcelas.length > 0 ? (
+                                          aluno.parcelas
+                                            .sort((a, b) => new Date(a.data_vencimento).getTime() - new Date(b.data_vencimento).getTime())
+                                            .map((parcela, parcelaIndex) => (
+                                              <motion.tr
+                                                key={parcela.id}
+                                                initial={{ opacity: 0, x: -20 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                transition={{ duration: 0.3, delay: parcelaIndex * 0.05 }}
+                                                className="hover:bg-red-50 transition-colors duration-200 border-b border-gray-100"
+                                              >
+                                                <TableCell className="font-medium py-4 text-base">
+                                                  <Badge className="bg-blue-100 text-blue-800 border border-blue-200">
+                                                    {parcela.tipo_item}
+                                                  </Badge>
+                                                </TableCell>
+                                                <TableCell className="py-4 text-base font-semibold">{parcela.numero_parcela}</TableCell>
+                                                <TableCell className="font-bold py-4 text-base text-gray-800">{formatCurrency(parcela.valor)}</TableCell>
+                                                <TableCell className="py-4 text-base">{formatDate(parcela.data_vencimento)}</TableCell>
+                                                <TableCell className="py-4 text-base">
+                                                  {parcela.data_pagamento ? formatDate(parcela.data_pagamento) : '-'}
+                                                </TableCell>
+                                                <TableCell className="py-4">
+                                                  <motion.div whileHover={{ scale: 1.05 }}>
+                                                    <Badge className={`${getStatusColor(parcela.status_pagamento)} transition-all duration-200 border`}>
+                                                      {parcela.status_pagamento}
+                                                    </Badge>
+                                                  </motion.div>
+                                                </TableCell>
+                                                <TableCell className="py-4">
+                                                  <div className="flex gap-2 justify-center">
+                                                    <motion.button
+                                                      whileHover={{ scale: 1.1 }}
+                                                      whileTap={{ scale: 0.9 }}
+                                                      onClick={(e) => handleButtonClick(() => abrirModalEditarParcela(parcela), e)}
+                                                      className="bg-blue-100 hover:bg-blue-200 text-blue-600 p-2 rounded-lg transition-all duration-200"
+                                                    >
+                                                      <Edit className="h-4 w-4" />
+                                                    </motion.button>
+                                                    <motion.button
+                                                      whileHover={{ scale: 1.1 }}
+                                                      whileTap={{ scale: 0.9 }}
+                                                      onClick={(e) => handleButtonClick(() => excluirParcela(parcela.id), e)}
+                                                      className="bg-red-100 hover:bg-red-200 text-red-600 p-2 rounded-lg transition-all duration-200"
+                                                    >
+                                                      <Trash2 className="h-4 w-4" />
+                                                    </motion.button>
+                                                  </div>
+                                                </TableCell>
+                                              </motion.tr>
+                                            ))
+                                        ) : (
+                                          <TableRow>
+                                            <TableCell colSpan={6} className="py-16">
+                                              <motion.div 
+                                                className="flex flex-col items-center justify-center space-y-4"
+                                                initial={{ opacity: 0, scale: 0.9 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                transition={{ duration: 0.5 }}
+                                              >
+                                                <div className="relative">
+                                                  <div className="w-20 h-20 bg-gradient-to-r from-red-100 to-pink-100 rounded-full flex items-center justify-center">
+                                                    <AlertCircle className="h-10 w-10 text-red-400" />
+                                                  </div>
+                                                  <motion.div
+                                                    className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 rounded-full flex items-center justify-center"
+                                                    animate={{ scale: [1, 1.2, 1] }}
+                                                    transition={{ duration: 2, repeat: Infinity }}
+                                                  >
+                                                    <EyeOff className="h-4 w-4 text-white" />
+                                                  </motion.div>
+                                                </div>
+                                                
+                                                <div className="text-center space-y-2">
+                                                  <h3 className="text-lg font-semibold text-gray-900">
+                                                    Nenhum registro financeiro
+                                                  </h3>
+                                                  <p className="text-gray-500 max-w-md">
+                                                    Este aluno ainda não possui parcelas cadastradas.
+                                                  </p>
+                                                  <p className="text-sm text-gray-400">
+                                                    Clique em "Nova Parcela" para adicionar o primeiro registro.
+                                                  </p>
+                                                </div>
+                                              </motion.div>
+                                            </TableCell>
+                                          </TableRow>
+                                        )}
+                                      </TableBody>
+                                    </Table>
+                                  </div>
+                                  
+                                  {aluno.parcelas.length > 0 && (
+                                    <motion.div 
+                                      className="mt-4 text-center"
+                                      initial={{ opacity: 0 }}
+                                      animate={{ opacity: 1 }}
+                                      transition={{ delay: 0.3 }}
+                                    >
+                                      <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-full px-4 py-2 shadow-sm border-0">
+                                        <span className="text-sm font-medium">
+                                          Total de {aluno.parcelas.length} parcela{aluno.parcelas.length !== 1 ? 's' : ''} cadastrada{aluno.parcelas.length !== 1 ? 's' : ''}
+                                        </span>
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </motion.div>
+                              </TableCell>
+                            </motion.tr>
+                          )}
+                        </AnimatePresence>
+                      </React.Fragment>
+                    );
+                  })}
+                </AnimatePresence>
+              </TableBody>
+            </Table>
+            
+            {filteredAlunos.length === 0 && (
+              <motion.div 
+                className="flex flex-col items-center justify-center py-20 space-y-6"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5 }}
+              >
+                <div className="relative">
+                  <motion.div 
+                    className="w-32 h-32 bg-gradient-to-r from-red-100 to-pink-100 rounded-full flex items-center justify-center"
+                    animate={{ 
+                      boxShadow: [
+                        '0 0 0 0 rgba(239, 68, 68, 0.4)',
+                        '0 0 0 20px rgba(239, 68, 68, 0)',
+                        '0 0 0 0 rgba(239, 68, 68, 0)'
+                      ]
+                    }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  >
+                    <Users className="h-16 w-16 text-red-400" />
+                  </motion.div>
+                  <motion.div
+                    className="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-r from-red-500 to-pink-500 rounded-full flex items-center justify-center"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                  >
+                    <Search className="h-6 w-6 text-white" />
+                  </motion.div>
+                </div>
+                
+                <div className="text-center space-y-3">
+                  <h3 className="text-2xl font-bold text-gray-900">
+                    {searchTerm ? 'Nenhum aluno encontrado' : 'Nenhum aluno cadastrado'}
+                  </h3>
+                  <p className="text-gray-500 max-w-lg">
+                    {searchTerm 
+                      ? `Não encontramos alunos que correspondam à busca "${searchTerm}". Tente ajustar os termos da pesquisa.`
+                      : 'Ainda não há alunos com registros financeiros cadastrados no sistema.'
+                    }
+                  </p>
+                  {searchTerm && (
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setSearchTerm('')}
+                      className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white px-6 py-3 rounded-lg transition-all duration-200 mt-4"
+                    >
+                      Limpar busca
+                    </motion.button>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+    </motion.div>
   );
 };
 

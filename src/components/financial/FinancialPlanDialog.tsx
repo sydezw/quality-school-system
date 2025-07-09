@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import FinancialPlanForm from './FinancialPlanForm';
-import { Student } from '@/integrations/supabase/types';
+import { Student } from '@/types/shared';
 
 interface FinancialPlanDialogProps {
   isOpen: boolean;
