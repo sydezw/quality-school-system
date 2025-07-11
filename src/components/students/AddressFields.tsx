@@ -1,11 +1,14 @@
 
+import React, { useState } from 'react';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { formatCEP } from "@/utils/formatters";
-import { Control, UseFormSetValue } from "react-hook-form";
-import { StudentFormValues } from "@/lib/validators/student";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { Control, UseFormSetValue, useWatch } from "react-hook-form";
+import { StudentFormValues } from "@/lib/validators/student";
+import { MapPin, Search, Loader2, Home, Hash, Building2, MapIcon, Sparkles, Navigation } from "lucide-react";
+import { Download } from "lucide-react";
 
 interface AddressFieldsProps {
   control: Control<StudentFormValues>;
@@ -13,98 +16,370 @@ interface AddressFieldsProps {
 }
 
 const AddressFields = ({ control, setValue }: AddressFieldsProps) => {
-  const [loadingCep, setLoadingCep] = useState(false);
+  const [isLoadingCEP, setIsLoadingCEP] = useState(false);
   const { toast } = useToast();
 
-  const handleCEPChange = async (cep: string) => {
-    const cleanCEP = cep.replace(/\D/g, '');
-    if (cleanCEP.length === 8) {
-      setLoadingCep(true);
-      try {
-        const response = await fetch(`https://viacep.com.br/ws/${cleanCEP}/json/`);
-        const data = await response.json();
-        if (!data.erro) {
-          const endereco = `${data.logradouro}, ${data.bairro}, ${data.localidade} - ${data.uf}, CEP: ${cep}`;
-          setValue('endereco', endereco);
-          toast({
-            title: "CEP encontrado!",
-            description: "Endereço preenchido automaticamente. Adicione apenas o número.",
-          });
-        } else {
-          setValue('endereco', '');
-          toast({
-            title: "CEP não encontrado",
-            description: "Verifique se o CEP está correto.",
-            variant: "destructive",
-          });
-        }
-      } catch (error) {
-        console.error('Erro ao buscar CEP:', error);
+  // Usar useWatch para capturar os valores atuais do formulário
+  const watchedValues = useWatch({
+    control,
+    name: ['cep', 'endereco', 'numero', 'bairro', 'cidade', 'estado']
+  });
+
+  const fetchAddressByCEP = async (cep: string) => {
+    if (!cep || cep.replace(/\D/g, '').length < 8) return;
+    
+    setIsLoadingCEP(true);
+    try {
+      const cleanCEP = cep.replace(/\D/g, '');
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCEP}/json/`);
+      
+      if (!response.ok) {
+        throw new Error('Erro na requisição');
+      }
+      
+      const data = await response.json();
+      
+      if (data.erro) {
         toast({
-          title: "Erro ao buscar CEP",
-          description: "Não foi possível consultar o CEP.",
+          title: "CEP não encontrado",
+          description: "Verifique o CEP informado e tente novamente.",
           variant: "destructive",
         });
-      } finally {
-        setLoadingCep(false);
+        return;
       }
+      
+      // Preencher campos automaticamente
+      setValue('endereco', data.logradouro || '');
+      setValue('bairro', data.bairro || '');
+      setValue('cidade', data.localidade || '');
+      setValue('estado', (data.uf || '').toUpperCase());
+      
+      toast({
+        title: "🎉 Endereço encontrado!",
+        description: "Os dados do endereço foram preenchidos automaticamente.",
+      });
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error);
+      toast({
+        title: "Erro ao buscar CEP",
+        description: "Não foi possível buscar o endereço. Verifique sua conexão e tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingCEP(false);
     }
   };
 
+  const exportAddress = async () => {
+    const [cep, endereco, numero, bairro, cidade, estado] = watchedValues;
+    
+    const addressData = {
+      cep: cep || '',
+      endereco: endereco || '',
+      numero: numero || '',
+      bairro: bairro || '',
+      cidade: cidade || '',
+      estado: estado || ''
+    };
+  
+    // Verificar se há dados de endereço para exportar
+    const hasAddressData = Object.values(addressData).some(value => value.trim() !== '');
+    
+    if (!hasAddressData) {
+      toast({
+        title: "Nenhum endereço para exportar",
+        description: "Preencha os campos de endereço antes de exportar.",
+        variant: "destructive",
+      });
+      return;
+    }
+  
+    // Salvar no localStorage
+    localStorage.setItem('exportedAddress', JSON.stringify(addressData));
+    
+    // Copiar CEP para a área de transferência
+    if (addressData.cep) {
+      try {
+        await navigator.clipboard.writeText(addressData.cep);
+        toast({
+          title: "Endereço exportado e CEP copiado!",
+          description: `CEP ${addressData.cep} foi copiado para a área de transferência e o endereço completo foi salvo para uso no responsável.`,
+        });
+      } catch (error) {
+        console.error('Erro ao copiar CEP:', error);
+        toast({
+          title: "Endereço exportado!",
+          description: `CEP ${addressData.cep} e endereço completo foram salvos para uso no responsável. (Não foi possível copiar o CEP)`,
+        });
+      }
+    } else {
+      toast({
+        title: "Endereço exportado!",
+        description: "Endereço completo foi salvo para uso no responsável.",
+      });
+    }
+  
+    // Debug para verificar se o CEP está sendo capturado
+    console.log('Endereço exportado:', addressData);
+  };
+
   return (
-    <>
-      <FormField
-        control={control}
-        name="cep"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>CEP</FormLabel>
-            <FormControl>
-              <Input
-                placeholder="00000-000"
-                {...field}
-                value={field.value || ''}
-                onChange={e => {
-                  const formattedCep = formatCEP(e.target.value);
-                  field.onChange(formattedCep);
-                  handleCEPChange(formattedCep);
-                }}
-                maxLength={9}
-                disabled={loadingCep}
-              />
-            </FormControl>
-            {loadingCep && <p className="text-sm text-gray-500 mt-1">Buscando CEP...</p>}
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={control}
-        name="endereco"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Endereço</FormLabel>
-            <FormControl>
-              <Input placeholder="Será preenchido automaticamente pelo CEP" {...field} value={field.value || ''} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={control}
-        name="numero_endereco"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Número</FormLabel>
-            <FormControl>
-              <Input placeholder="Ex: 123" {...field} value={field.value || ''} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-    </>
+    <div className="space-y-8">
+      {/* Header da Seção com botão Exportar */}
+      <div className="text-center pb-6 border-b border-gray-100">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex-1">
+            <div className="inline-flex items-center gap-2 text-emerald-600 mb-2">
+              <Sparkles className="h-5 w-5" />
+              <span className="font-semibold">Endereço</span>
+            </div>
+            <p className="text-gray-600 text-sm">Informe o endereço completo do aluno</p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={exportAddress}
+            className="flex items-center gap-2 border-emerald-300 text-emerald-600 hover:bg-emerald-50"
+          >
+            <Download className="h-4 w-4" />
+            Exportar Endereço
+          </Button>
+        </div>
+      </div>
+
+      {/* CEP com busca automática - Destaque especial */}
+      <div className="bg-gradient-to-r from-emerald-50 to-green-50 p-6 rounded-2xl border border-emerald-100">
+        <FormField
+          control={control}
+          name="cep"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-base font-bold text-gray-800 flex items-center gap-3 mb-4">
+                <div className="p-2 bg-emerald-500 rounded-lg">
+                  <Navigation className="h-5 w-5 text-white" />
+                </div>
+                CEP - Busca Automática
+              </FormLabel>
+              <FormControl>
+                <div className="flex gap-3">
+                  <Input
+                    placeholder="00000-000"
+                    className="h-14 text-lg font-medium border-2 border-emerald-200 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300 bg-white shadow-sm"
+                    {...field}
+                    value={field.value || ''}
+                    onChange={(e) => {
+                      const formatted = formatCEP(e.target.value);
+                      field.onChange(formatted);
+                      // Auto-buscar quando CEP estiver completo
+                      if (formatted.replace(/\D/g, '').length === 8) {
+                        fetchAddressByCEP(formatted);
+                      }
+                    }}
+                    maxLength={9}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    className="h-14 px-6 border-2 border-emerald-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all duration-300 font-medium"
+                    onClick={() => fetchAddressByCEP(field.value || '')}
+                    disabled={isLoadingCEP || !field.value || field.value.replace(/\D/g, '').length < 8}
+                    title="Buscar endereço pelo CEP"
+                  >
+                    {isLoadingCEP ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Search className="h-5 w-5" />
+                    )}
+                  </Button>
+                </div>
+              </FormControl>
+              <FormMessage />
+              <p className="text-xs text-emerald-600 mt-2 font-medium">
+                💡 Digite o CEP e o endereço será preenchido automaticamente
+              </p>
+            </FormItem>
+          )}
+        />
+      </div>
+
+      {/* Grid de Campos de Endereço - SEM o campo complemento */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Endereço */}
+        <div className="lg:col-span-2 bg-white p-6 rounded-xl border-2 border-gray-100 hover:border-emerald-200 transition-all duration-300 shadow-sm hover:shadow-md">
+          <FormField
+            control={control}
+            name="endereco"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm font-bold text-gray-700 flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg">
+                    <Home className="h-4 w-4 text-white" />
+                  </div>
+                  Endereço *
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Rua, Avenida, etc."
+                    className="h-12 text-base border-2 border-gray-200 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300 bg-white"
+                    {...field}
+                    value={field.value || ''}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* Número */}
+        <div className="bg-white p-6 rounded-xl border-2 border-gray-100 hover:border-emerald-200 transition-all duration-300 shadow-sm hover:shadow-md">
+          <FormField
+            control={control}
+            name="numero"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm font-bold text-gray-700 flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg">
+                    <Hash className="h-4 w-4 text-white" />
+                  </div>
+                  Número *
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="123"
+                    className="h-12 text-base border-2 border-gray-200 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300 bg-white"
+                    {...field}
+                    value={field.value || ''}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* Complemento - REMOVIDO COMPLETAMENTE */}
+        {/* 
+        <div className="bg-white p-6 rounded-xl border-2 border-gray-100 hover:border-emerald-200 transition-all duration-300 shadow-sm hover:shadow-md">
+          <FormField
+            control={control}
+            name="observacoes"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm font-bold text-gray-700 flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg">
+                    <Building2 className="h-4 w-4 text-white" />
+                  </div>
+                  Complemento
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Apto, Bloco, etc."
+                    className="h-12 text-base border-2 border-gray-200 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300 bg-white"
+                    {...field}
+                    value={field.value?.toString() || ''}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+        */}
+
+        {/* Bairro */}
+        <div className="bg-white p-6 rounded-xl border-2 border-gray-100 hover:border-emerald-200 transition-all duration-300 shadow-sm hover:shadow-md">
+          <FormField
+            control={control}
+            name="bairro"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm font-bold text-gray-700 flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg">
+                    <MapIcon className="h-4 w-4 text-white" />
+                  </div>
+                  Bairro *
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Nome do bairro"
+                    className="h-12 text-base border-2 border-gray-200 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300 bg-white"
+                    {...field}
+                    value={field.value || ''}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* Cidade */}
+        <div className="bg-white p-6 rounded-xl border-2 border-gray-100 hover:border-emerald-200 transition-all duration-300 shadow-sm hover:shadow-md">
+          <FormField
+            control={control}
+            name="cidade"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm font-bold text-gray-700 flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg">
+                    <Building2 className="h-4 w-4 text-white" />
+                  </div>
+                  Cidade *
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Nome da cidade"
+                    className="h-12 text-base border-2 border-gray-200 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300 bg-white"
+                    {...field}
+                    value={field.value || ''}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* Estado */}
+        <div className="bg-white p-6 rounded-xl border-2 border-gray-100 hover:border-emerald-200 transition-all duration-300 shadow-sm hover:shadow-md">
+          <FormField
+            control={control}
+            name="estado"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm font-bold text-gray-700 flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg">
+                    <MapPin className="h-4 w-4 text-white" />
+                  </div>
+                  Estado *
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="SP"
+                    className="h-12 text-base border-2 border-gray-200 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300 bg-white uppercase"
+                    {...field}
+                    value={field.value || ''}
+                    onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                    maxLength={2}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+      </div>
+
+      {/* Dica */}
+      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
+        <p className="text-emerald-700 text-sm font-medium">
+          🏠 Dica: Use o CEP para preenchimento automático dos campos de endereço
+        </p>
+      </div>
+    </div>
   );
 };
 

@@ -63,8 +63,11 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
   const [loading, setLoading] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
   const [planosGenericos, setPlanosGenericos] = useState<PlanoGenerico[]>([]);
-
   const [openStudentSearch, setOpenStudentSearch] = useState(false);
+  
+  // Adicione esta linha que está faltando:
+  const [dataVencimentoPrimeira, setDataVencimentoPrimeira] = useState<Date | null>(null);
+  
   const { toast } = useToast();
 
   const { register, handleSubmit, reset, control, watch, setValue } = useForm<FormData>({
