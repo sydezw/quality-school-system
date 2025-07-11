@@ -66,6 +66,10 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
   const [dataVencimentoPrimeira, setDataVencimentoPrimeira] = useState<Date | null>(null);
 
   const [openStudentSearch, setOpenStudentSearch] = useState(false);
+  
+  // Adicione esta linha que está faltando:
+  const [dataVencimentoPrimeira, setDataVencimentoPrimeira] = useState<Date | null>(null);
+  
   const { toast } = useToast();
 
   const { register, handleSubmit, reset, control, watch, setValue } = useForm<FormData>({

@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { useForm } from 'react-hook-form';
 import { formatCPF, formatCEP, formatPhone } from '@/utils/formatters';
 import { useToast } from '@/hooks/use-toast';
+import { Upload, Trash2 } from 'lucide-react';
 
 interface Responsible {
   id: string;
@@ -31,8 +32,13 @@ const ResponsibleForm = ({ editingResponsible, onSubmit, onCancel }: Responsible
   const [loadingCep, setLoadingCep] = useState(false);
   const cpfValue = watch('cpf');
   const cepValue = watch('cep');
+  const [hasExportedAddress, setHasExportedAddress] = useState(false);
 
   useEffect(() => {
+    // Verificar se há endereço exportado
+    const exportedAddress = localStorage.getItem('exportedAddress');
+    setHasExportedAddress(!!exportedAddress);
+
     if (editingResponsible) {
       setValue('nome', editingResponsible.nome);
       setValue('cpf', editingResponsible.cpf ? formatCPF(editingResponsible.cpf) : '');
@@ -52,6 +58,46 @@ const ResponsibleForm = ({ editingResponsible, onSubmit, onCancel }: Responsible
       reset({ nome: '', cpf: '', endereco: '', telefone: '', cep: '', numero_endereco: '' });
     }
   }, [editingResponsible, setValue, reset]);
+
+  const importExportedAddress = async () => {
+    const exportedAddress = localStorage.getItem('exportedAddress');
+    if (exportedAddress) {
+      try {
+        const addressData = JSON.parse(exportedAddress);
+        
+        // Preencher o CEP primeiro
+        if (addressData.cep) {
+          setValue('cep', addressData.cep);
+          
+          // Executar a busca automática do CEP
+          await handleCEPChange(addressData.cep);
+        }
+        
+        // Preencher o número do endereço
+        setValue('numero_endereco', addressData.numero || '');
+        
+        toast({
+          title: "Endereço importado!",
+          description: "O endereço exportado foi preenchido automaticamente com busca por CEP.",
+        });
+      } catch (error) {
+        toast({
+          title: "Erro ao importar endereço",
+          description: "Não foi possível importar o endereço exportado.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const clearExportedAddress = () => {
+    localStorage.removeItem('exportedAddress');
+    setHasExportedAddress(false);
+    toast({
+      title: "Endereço exportado removido",
+      description: "O endereço exportado foi limpo da memória.",
+    });
+  };
 
   const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formattedCPF = formatCPF(e.target.value);

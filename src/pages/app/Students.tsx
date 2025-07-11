@@ -6,14 +6,18 @@ import FinancialPlanDialog from '@/components/financial/FinancialPlanDialog';
 import { StudentFilters } from '@/components/students/StudentFilters';
 import { useStudents } from '@/hooks/useStudents';
 import { Database } from '@/integrations/supabase/types';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 // Definir o tipo Student baseado na tabela alunos do banco
 type Student = Database['public']['Tables']['alunos']['Row'] & {
   turmas?: { nome: string } | null;
   responsaveis?: { nome: string } | null;
 };
+
+// Constante para número de alunos por página
+const STUDENTS_PER_PAGE = 20;
 
 const Students = () => {
   const { students, classes, loading, isDeleting, saveStudent, deleteStudentWithPlan } = useStudents();
@@ -24,6 +28,7 @@ const Students = () => {
   const [filters, setFilters] = useState<StudentFilters>({});
   const [isFinancialDialogOpen, setIsFinancialDialogOpen] = useState(false);
   const [selectedStudentForPlan, setSelectedStudentForPlan] = useState<Student | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const handleSubmit = async (data: any) => {
     const success = await saveStudent(data, editingStudent);
@@ -34,6 +39,7 @@ const Students = () => {
   };
 
   const handleEdit = (student: Student) => {
+    console.log('Editando aluno:', student); // Adicione esta linha
     setEditingStudent(student);
     setIsDialogOpen(true);
   };
@@ -43,13 +49,15 @@ const Students = () => {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = async (student: Student, plan: any) => {
-    await deleteStudentWithPlan(student, plan);
-  };
-
   const handleCreateFinancialPlan = (student: Student) => {
+    console.log('Criando plano financeiro para:', student); // Adicione esta linha
     setSelectedStudentForPlan(student);
     setIsFinancialDialogOpen(true);
+  };
+
+  const handleDelete = async (student: Student, plan: any) => {
+    console.log('Excluindo aluno:', student, plan); // Adicione esta linha
+    await deleteStudentWithPlan(student, plan);
   };
 
   const handleFinancialPlanSuccess = () => {
@@ -58,6 +66,12 @@ const Students = () => {
 
   const handleFilterChange = (newFilters: StudentFilters) => {
     setFilters(newFilters);
+    setCurrentPage(1); // Reset para página 1 quando filtros mudarem
+  };
+
+  const handleQueryChange = (newQuery: string) => {
+    setQuery(newQuery);
+    setCurrentPage(1); // Reset para página 1 quando busca mudar
   };
 
   // Filtra alunos pelo nome e pelos filtros selecionados
@@ -89,6 +103,46 @@ const Students = () => {
     return result;
   }, [students, query, filters]);
 
+  // Cálculos de paginação
+  const totalPages = Math.ceil(filteredStudents.length / STUDENTS_PER_PAGE);
+  const startIndex = (currentPage - 1) * STUDENTS_PER_PAGE;
+  const endIndex = startIndex + STUDENTS_PER_PAGE;
+  const currentStudents = filteredStudents.slice(startIndex, endIndex);
+
+  // Lógica para números de páginas visíveis (máximo 5)
+  const getVisiblePages = () => {
+    const pages = [];
+    const maxVisible = 5;
+    
+    if (totalPages <= maxVisible) {
+      // Se temos 5 ou menos páginas, mostra todas
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      // Lógica para centralizar a página atual
+      let start = Math.max(1, currentPage - 2);
+      let end = Math.min(totalPages, start + maxVisible - 1);
+      
+      // Ajusta o início se estivermos muito próximos do final
+      if (end - start < maxVisible - 1) {
+        start = Math.max(1, end - maxVisible + 1);
+      }
+      
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+    }
+    
+    return pages;
+  };
+
+  const visiblePages = getVisiblePages();
+
+  // Informações de exibição
+  const startItem = filteredStudents.length === 0 ? 0 : startIndex + 1;
+  const endItem = Math.min(endIndex, filteredStudents.length);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -105,13 +159,13 @@ const Students = () => {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold tracking-tight">Alunos</h1>
-          <button 
-            className="bg-brand-red text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors flex items-center gap-2"
+          <Button 
+            className="bg-brand-red text-white hover:bg-red-700 transition-colors flex items-center gap-2"
             onClick={handleCreate}
           >
             <Plus size={16} />
             Novo Aluno
-          </button>
+          </Button>
         </div>
 
         {/* Barra de busca e filtros */}
@@ -121,7 +175,7 @@ const Students = () => {
             <Input
               placeholder="Buscar alunos..."
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => handleQueryChange(e.target.value)}
               className="max-w-sm"
             />
           </div>
@@ -151,12 +205,75 @@ const Students = () => {
           </CardHeader>
           <CardContent>
             <StudentTable
-              students={filteredStudents}
+              students={currentStudents}
               onEdit={handleEdit}
               onDelete={handleDelete}
               onCreateFinancialPlan={handleCreateFinancialPlan}
               isDeleting={isDeleting}
             />
+            
+            {/* Controles de Paginação */}
+            {filteredStudents.length > 0 && (
+              <div className="mt-6 space-y-4">
+                {/* Contador de alunos */}
+                <div className="text-sm text-gray-600 text-center">
+                  Mostrando {startItem} a {endItem} de {filteredStudents.length} alunos
+                </div>
+                
+                {/* Indicador de página atual */}
+                <div className="text-sm text-gray-500 text-center">
+                  Página {currentPage} de {totalPages}
+                </div>
+                
+                {/* Controles de navegação */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center space-x-2">
+                    {/* Botão Anterior */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="flex items-center gap-1"
+                    >
+                      <ChevronLeft size={16} />
+                      Anterior
+                    </Button>
+                    
+                    {/* Números das páginas */}
+                    <div className="flex space-x-1">
+                      {visiblePages.map((page) => (
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(page)}
+                          className={`min-w-[40px] ${
+                            currentPage === page 
+                              ? "bg-brand-red text-white hover:bg-red-700" 
+                              : "hover:bg-gray-100"
+                          }`}
+                        >
+                          {page}
+                        </Button>
+                      ))}
+                    </div>
+                    
+                    {/* Botão Próxima */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="flex items-center gap-1"
+                    >
+                      Próxima
+                      <ChevronRight size={16} />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 

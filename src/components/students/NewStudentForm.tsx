@@ -1,53 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Form } from "@/components/ui/form";
+import { Form } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { studentFormSchema, StudentFormValues } from '@/lib/validators/student';
+import { useToast } from '@/hooks/use-toast';
 import { useResponsibles } from '@/hooks/useResponsibles';
 import { formatCPF, formatCEP } from '@/utils/formatters';
-import { format } from "date-fns";
+import { studentFormSchema, StudentFormValues } from '@/lib/validators/student';
 import PersonalInfoFields from './PersonalInfoFields';
 import AddressFields from './AddressFields';
 import AcademicFields from './AcademicFields';
 import ResponsibleField from './ResponsibleField';
-import { useToast } from "@/hooks/use-toast";
-interface Student {
-  id: string;
-  nome: string;
-  cpf: string;
-  data_nascimento: string;
-  telefone: string;
-  email: string;
-  endereco: string;
-  numero: string;
-  // complemento: string; // REMOVIDO
-  bairro: string;
-  cidade: string;
-  estado: string;
-  cep: string;
-  idioma: string;
-  nivel: string;
-  turma_id: string;
-  responsavel_id: string;
-  status: string;
-  observacoes: string;
-}
 import { 
   User, 
   MapPin, 
   GraduationCap, 
   Users, 
-  Save, 
+  ArrowLeft, 
+  ArrowRight, 
+  CheckCircle2, 
   X,
-  AlertCircle,
-  CheckCircle2,
-  ArrowRight,
-  ArrowLeft,
   Sparkles
 } from 'lucide-react';
 
@@ -58,14 +33,13 @@ interface Class {
   nivel: string;
 }
 
-interface StudentFormProps {
-  editingStudent: Student | null;
+interface NewStudentFormProps {
   classes: Class[];
-  onSubmit: (data: any) => void;
+  onSubmit: (data: StudentFormValues) => void;
   onCancel: () => void;
 }
 
-const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFormProps): JSX.Element => {
+const NewStudentForm = ({ classes, onSubmit, onCancel }: NewStudentFormProps): JSX.Element => {
   const { toast } = useToast();
   const { responsibles, saveResponsible } = useResponsibles();
   const [selectedIdioma, setSelectedIdioma] = useState<string>('');
@@ -78,7 +52,7 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
     defaultValues: {
       nome: '',
       cpf: '',
-      data_nascimento: null as Date | null,
+      data_nascimento: null,
       telefone: '',
       email: '',
       endereco: '',
@@ -97,47 +71,12 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
     }
   });
 
-  const { handleSubmit, formState, setValue, watch } = form;
-
-  // Watch para mudanças no idioma
+  const { handleSubmit, setValue, watch } = form;
   const watchedIdioma = watch('idioma');
-  
+
   useEffect(() => {
     setSelectedIdioma(watchedIdioma || '');
   }, [watchedIdioma]);
-
-  // Preencher formulário quando editando
-  useEffect(() => {
-    if (editingStudent) {
-      const formattedDate = editingStudent.data_nascimento 
-        ? format(new Date(editingStudent.data_nascimento), 'yyyy-MM-dd')
-        : '';
-      
-      form.reset({
-        nome: editingStudent.nome || '',
-        cpf: editingStudent.cpf || '',
-        data_nascimento: editingStudent.data_nascimento 
-          ? new Date(editingStudent.data_nascimento)
-          : null,
-        telefone: editingStudent.telefone || '',
-        email: editingStudent.email || '',
-        endereco: editingStudent.endereco || '',
-        numero: editingStudent.numero || '',
-        // complemento: editingStudent.complemento as string || '', // REMOVIDO
-        bairro: editingStudent.bairro || '',
-        cidade: editingStudent.cidade || '',
-        estado: editingStudent.estado || '',
-        cep: editingStudent.cep || '',
-        idioma: editingStudent.idioma || '',
-        nivel: editingStudent.nivel || '',
-        turma_id: editingStudent.turma_id || '',
-        responsavel_id: editingStudent.responsavel_id || '',
-        status: (editingStudent.status as "Ativo" | "Inativo" | "Suspenso") || 'Ativo',
-        observacoes: editingStudent.observacoes || ''
-      });
-      setSelectedIdioma(editingStudent.idioma || '');
-    }
-  }, [editingStudent, form]);
 
   const handleFormSubmit = async (data: StudentFormValues) => {
     try {
@@ -154,12 +93,12 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
       
       toast({
         title: "Sucesso!",
-        description: editingStudent ? "Aluno atualizado com sucesso!" : "Aluno cadastrado com sucesso!",
+        description: "Aluno cadastrado com sucesso!",
       });
     } catch (error) {
       toast({
         title: "Erro",
-        description: "Ocorreu um erro ao salvar o aluno. Tente novamente.",
+        description: "Ocorreu um erro ao cadastrar o aluno. Tente novamente.",
         variant: "destructive",
       });
     } finally {
@@ -243,38 +182,38 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 py-4 overflow-visible">
-      <div className="container mx-auto px-4 w-full max-w-4xl flex flex-col items-center justify-center">
-        {/* Header Centralizado - Mais Compacto */}
-        <div className="text-center mb-6 w-full max-w-2xl z-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-4 shadow-lg">
-            <Sparkles className="h-8 w-8 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-2 visible">
-            {editingStudent ? 'Editar Aluno' : 'Novo Aluno'}
-          </h1>
-          <p className="text-sm text-gray-600 max-w-md mx-auto px-4 visible">
-            {editingStudent 
-              ? 'Atualize as informações do aluno de forma rápida e organizada'
-              : 'Cadastre um novo aluno seguindo os passos organizados abaixo'
-            }
-          </p>
-          
-          {/* Progress Bar - Mais Compacto */}
-          <div className="mt-4 max-w-md mx-auto px-4">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-xs font-medium text-gray-600">Progresso</span>
-              <span className="text-xs font-medium text-gray-900">{Math.round(progress)}%</span>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 px-2 py-2" style={{ fontSize: '118%' }}>
+      <div className="max-w-7xl mx-auto">
+        {/* Header centralizado */}
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center gap-3 mb-4">
+            <div className="p-3 bg-gradient-to-r from-red-500 to-red-600 rounded-xl shadow-lg">
+              <User className="h-6 w-6 text-white" />
             </div>
-            <Progress value={progress} className="h-1.5" />
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Novo Aluno</h1>
+              <p className="text-gray-600 text-sm">Cadastre um novo aluno no sistema</p>
+            </div>
+          </div>
+          
+          {/* Progress Bar */}
+          <div className="max-w-lg mx-auto">
+            <Progress 
+              value={((currentStep + 1) / formSteps.length) * 100} 
+              className="h-2 bg-gray-200"
+            />
+            <div className="flex justify-between mt-2 text-xs text-gray-500">
+              <span>Passo {currentStep + 1} de {formSteps.length}</span>
+              <span>{Math.round(((currentStep + 1) / formSteps.length) * 100)}% concluído</span>
+            </div>
           </div>
         </div>
 
         <Form {...form}>
-          <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6 w-full max-w-3xl flex flex-col items-center z-10">
+          <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4 w-full max-w-6xl flex flex-col items-center z-10">
             {/* Step Navigation - Mais Compacto */}
-            <div className="flex justify-center mb-4 w-full overflow-visible">
-              <div className="flex items-center space-x-2 bg-white rounded-xl p-2 shadow-md border z-20">
+            <div className="flex justify-center mb-3 w-full overflow-visible">
+              <div className="flex items-center space-x-1 bg-white rounded-xl p-1.5 shadow-md border z-20">
                 {formSteps.map((step, index) => {
                   const IconComponent = step.icon;
                   const isActive = index === currentStep;
@@ -286,7 +225,7 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
                       type="button"
                       onClick={() => goToStep(index)}
                       className={`
-                        flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-300 relative z-30
+                        flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-all duration-300 relative z-30
                         ${isActive 
                           ? `bg-gradient-to-r ${step.color} text-white shadow-md scale-105` 
                           : isCompleted
@@ -295,7 +234,7 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
                         }
                       `}
                     >
-                      <IconComponent className="h-4 w-4" />
+                      <IconComponent className="h-3.5 w-3.5" />
                       <span className="font-medium text-xs hidden sm:block">{step.title}</span>
                       {isCompleted && <CheckCircle2 className="h-3 w-3" />}
                     </button>
@@ -304,12 +243,12 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
               </div>
             </div>
 
-            {/* Main Content Card - Mais Compacto */}
+            {/* Main Content Card - Muito Maior */}
             <Card className={`
               border-2 ${currentStepData.borderColor} shadow-xl transition-all duration-500
-              bg-gradient-to-br from-white to-gray-50 w-full max-w-2xl overflow-visible z-10
+              bg-gradient-to-br from-white to-gray-50 w-full max-w-5xl overflow-visible z-10
             `}>
-              <CardHeader className={`${currentStepData.bgColor} border-b-2 ${currentStepData.borderColor} overflow-visible py-4`}>
+              <CardHeader className={`${currentStepData.bgColor} border-b-2 ${currentStepData.borderColor} overflow-visible py-3`}>
                 <div className="flex items-center justify-between px-4">
                   <div className="flex items-center gap-3">
                     <div className={`p-2 rounded-lg bg-gradient-to-r ${currentStepData.color} text-white shadow-md z-20`}>
@@ -331,9 +270,9 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
                 </div>
               </CardHeader>
               
-              <CardContent className="p-6 overflow-visible">
-                <div className="min-h-[300px] flex justify-center w-full overflow-visible">
-                  <div className="w-full max-w-xl overflow-visible">
+              <CardContent className="p-8 overflow-visible">
+                <div className="min-h-[500px] flex justify-center w-full overflow-visible">
+                  <div className="w-full max-w-4xl overflow-visible">
                     {currentStepData.component}
                   </div>
                 </div>
@@ -343,8 +282,8 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
             {/* Navigation Buttons - Mais Compacto */}
             <div className="flex justify-center w-full z-10">
               <Card className="border-0 shadow-md bg-white overflow-visible">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-4 justify-center">
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-3 justify-center">
                     <Button
                       type="button"
                       variant="outline"
@@ -371,7 +310,7 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
                       <Button
                         type="button"
                         onClick={nextStep}
-                        className={`px-4 py-2 text-sm font-medium bg-gradient-to-r ${currentStepData.color} hover:shadow-md transition-all duration-200 z-20`}
+                        className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md transition-all duration-200 z-20"
                       >
                         Próximo
                         <ArrowRight className="h-4 w-4 ml-1" />
@@ -380,61 +319,16 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
                       <Button
                         type="submit"
                         disabled={isSubmitting}
-                        className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 transition-all duration-200 shadow-md hover:shadow-lg z-20"
+                        className="px-6 py-2 text-sm font-medium bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-md transition-all duration-200 disabled:opacity-50 z-20"
                       >
-                        {isSubmitting ? (
-                          <>
-                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
-                            Salvando...
-                          </>
-                        ) : (
-                          <>
-                            <Save className="h-4 w-4 mr-1" />
-                            {editingStudent ? 'Atualizar Aluno' : 'Salvar Aluno'}
-                          </>
-                        )}
+                        {isSubmitting ? 'Cadastrando...' : 'Cadastrar Aluno'}
+                        <CheckCircle2 className="h-4 w-4 ml-1" />
                       </Button>
                     )}
                   </div>
                 </CardContent>
               </Card>
             </div>
-
-            {/* Error Display - Mais Compacto */}
-            {formState.isSubmitted && !formState.isValid && (
-              <Card className="border-red-200 bg-red-50 max-w-xl mx-auto w-full overflow-visible z-10">
-                <CardContent className="pt-4 px-4">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <h4 className="font-medium text-red-800 mb-1 text-sm visible">Erro de Validação</h4>
-                      <div className="text-xs text-red-700 space-y-1">
-                        {Object.entries(formState.errors).map(([field, error]) => (
-                          <div key={field} className="flex items-center gap-1 visible">
-                            <span className="w-1 h-1 bg-red-500 rounded-full"></span>
-                            {error?.message || `Campo ${field} é obrigatório`}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Success Indicator - Mais Compacto */}
-            {formState.isValid && formState.isSubmitted && !isSubmitting && (
-              <Card className="border-green-200 bg-green-50 max-w-xl mx-auto w-full overflow-visible z-10">
-                <CardContent className="pt-4 px-4">
-                  <div className="flex items-center gap-2 justify-center">
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    <span className="text-xs font-medium text-green-800 visible">
-                      Formulário válido e pronto para envio
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </form>
         </Form>
       </div>
@@ -442,4 +336,4 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
   );
 };
 
-export default StudentForm;
+export default NewStudentForm;
