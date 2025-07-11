@@ -70,7 +70,7 @@ const CalendarTemplate: React.FC<CalendarTemplateProps> = ({
       case 'event':
         return 'bg-gradient-to-r from-green-500 to-green-600 text-white';
       case 'birthday':
-        return 'bg-gradient-to-r from-red-500 to-pink-500 text-white';
+        return 'bg-gradient-to-r from-red-500 to-gray-800 text-white';
       case 'exam':
         return 'bg-gradient-to-r from-orange-500 to-orange-600 text-white';
       default:
@@ -156,10 +156,10 @@ const CalendarTemplate: React.FC<CalendarTemplateProps> = ({
         transition={{ duration: 0.5 }}
       >
         <div className="flex items-center justify-center gap-3 mb-4">
-          <div className="p-3 bg-gradient-to-br from-red-500/10 to-pink-100 rounded-full">
+          <div className="p-3 bg-gradient-to-br from-red-500/10 to-gray-100 rounded-full">
             <Calendar className="h-8 w-8 text-red-600" />
           </div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-red-600 to-pink-600 bg-clip-text text-transparent">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-red-600 to-gray-800 bg-clip-text text-transparent">
             {title}
           </h1>
         </div>
@@ -248,7 +248,7 @@ const CalendarTemplate: React.FC<CalendarTemplateProps> = ({
         transition={{ duration: 0.5, delay: 0.2 }}
       >
         <Card className="overflow-hidden border-0 shadow-xl bg-white">
-          <CardHeader className="bg-gradient-to-r from-red-600 to-pink-600 text-white py-4">
+          <CardHeader className="bg-gradient-to-r from-red-500 to-gray-800 text-white border-0 hover:from-red-600 hover:to-gray-900 transition-all duration-300">
             <div className="grid grid-cols-7 gap-2">
               {weekDays.map((day) => (
                 <div key={day} className="text-center font-semibold py-2">
@@ -267,10 +267,10 @@ const CalendarTemplate: React.FC<CalendarTemplateProps> = ({
                 return (
                   <motion.div
                     key={index}
-                    className={`min-h-[120px] border-r border-b border-gray-100 p-2 cursor-pointer transition-all duration-200 hover:bg-gradient-to-br hover:from-red-50 hover:to-pink-50 ${
+                    className={`min-h-[120px] border-r border-b border-gray-100 p-2 cursor-pointer transition-all duration-200 hover:bg-gradient-to-br hover:from-red-50 hover:to-gray-100 ${
                       day ? 'bg-white' : 'bg-gray-50'
                     } ${
-                      isCurrentDay ? 'bg-gradient-to-br from-red-100 to-pink-100 ring-2 ring-red-500' : ''
+                      isCurrentDay ? 'bg-gradient-to-br from-red-100 to-gray-200 ring-2 ring-red-500' : ''
                     }`}
                     onClick={() => {
                       if (day) {

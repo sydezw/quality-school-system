@@ -34,6 +34,7 @@ interface Parcela {
   tipo_item: 'plano' | 'material' | 'matrícula';
   idioma_registro: 'Inglês' | 'Japonês';
   comprovante: string | null;
+  observacoes?: string | null;
   criado_em: string | null;
   atualizado_em: string | null;
   // Dados relacionados via join
@@ -187,7 +188,7 @@ const ParcelasTable: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.1 }}
       >
-        <Card className="shadow-lg border-0 bg-gradient-to-r from-red-50 to-pink-50">
+        <Card className="shadow-lg border-0 bg-gradient-to-r from-red-50 to-gray-100">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-3 text-red-700">
               <Filter className="h-6 w-6" />
@@ -388,7 +389,7 @@ const ParcelasTable: React.FC = () => {
         transition={{ duration: 0.5, delay: 0.2 }}
       >
         <Card className="shadow-xl border-0">
-          <CardHeader className="bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-t-lg">
+          <CardHeader className="bg-gradient-to-r from-red-600 to-gray-800 text-white rounded-t-lg">
             <CardTitle className="flex items-center justify-between w-full">
               <div className="flex items-center gap-3">
                 <CreditCard className="h-6 w-6" />
@@ -490,6 +491,7 @@ const ParcelasTable: React.FC = () => {
                       <TableHead className="font-bold text-gray-700">Valor</TableHead>
                       <TableHead className="font-bold text-gray-700">Vencimento</TableHead>
                       <TableHead className="font-bold text-gray-700">Status</TableHead>
+                      <TableHead className="font-bold text-gray-700">Observações</TableHead>
                       <TableHead className="font-bold text-gray-700 text-center">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -545,6 +547,17 @@ const ParcelasTable: React.FC = () => {
                                   {status.charAt(0).toUpperCase() + status.slice(1)}
                                 </Badge>
                               </motion.div>
+                            </TableCell>
+                            <TableCell className="max-w-xs">
+                              <div className="text-sm text-gray-600">
+                                {parcela.observacoes ? (
+                                  <div className="truncate" title={parcela.observacoes}>
+                                    {parcela.observacoes}
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400 italic">-</span>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-2 justify-center">
@@ -609,7 +622,7 @@ const ParcelasTable: React.FC = () => {
             whileHover={{ scale: 1.01 }}
             transition={{ duration: 0.3 }}
           >
-            <Card className="shadow-sm border-0 bg-gradient-to-r from-red-600 to-pink-600 overflow-hidden">
+            <Card className="shadow-sm border-0 bg-gradient-to-r from-red-600 to-gray-800 overflow-hidden">
               <CardContent className="p-2">
                 <div className="flex items-center gap-2">
                   <CreditCard className="h-3 w-3 text-white flex-shrink-0" />
@@ -629,7 +642,7 @@ const ParcelasTable: React.FC = () => {
             whileHover={{ scale: 1.01 }}
             transition={{ duration: 0.3 }}
           >
-            <Card className="shadow-sm border-0 bg-gradient-to-r from-red-600 to-pink-600 overflow-hidden">
+            <Card className="shadow-sm border-0 bg-gradient-to-r from-red-600 to-gray-800 overflow-hidden">
               <CardContent className="p-2">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-3 w-3 text-white flex-shrink-0" />

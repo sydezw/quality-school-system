@@ -37,9 +37,9 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
   const [formData, setFormData] = useState({
     nome: '',
     descricao: '',
-    numero_aulas: 1,
+    numero_aulas: '', // Alterado de 1 para string vazia
     frequencia_aulas: 'semanal',
-    idioma: 'Inglês' as 'Inglês' | 'Japonês', // Type assertion aqui também
+    idioma: 'Inglês' as 'Inglês' | 'Japonês',
     carga_horaria_total: '',
     valor_total: '',
     valor_por_aula: '',
@@ -122,7 +122,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
     try {
       // Validações
       const valorTotal = parseFloat(formData.valor_total) || 0;
-      const numeroAulas = formData.numero_aulas || 0;
+      const numeroAulas = parseInt(formData.numero_aulas.toString()) || 0; // Conversão segura
       const horarioPorAula = parseFloat(formData.horario_por_aula) || 0;
 
       if (valorTotal <= 0) {
@@ -249,7 +249,8 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
             type="number"
             min="1"
             value={formData.numero_aulas}
-            onChange={(e) => handleInputChange('numero_aulas', parseInt(e.target.value) || 0)}
+            onChange={(e) => handleInputChange('numero_aulas', e.target.value)}
+            placeholder="Digite o número de aulas"
             required
           />
         </div>

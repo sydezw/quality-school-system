@@ -230,7 +230,7 @@ const DatePicker: React.FC<DatePickerProps> = ({
           className="bg-white rounded-lg overflow-hidden"
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-red-500 to-pink-500 text-white p-4">
+          <div className="bg-gradient-to-r from-red-500 to-black text-white p-4">
             <div className="flex items-center justify-between">
               <Button
                 variant="ghost"
@@ -308,10 +308,10 @@ const DatePicker: React.FC<DatePickerProps> = ({
                       <motion.button
                         key={index}
                         className={cn(
-                          "h-10 w-10 text-sm transition-all duration-200 hover:bg-gradient-to-br hover:from-red-50 hover:to-pink-50",
+                          "h-10 w-10 text-sm transition-all duration-200 hover:bg-gradient-to-br hover:from-red-50 hover:to-gray-100",
                           day ? "text-gray-900" : "text-gray-300 cursor-not-allowed",
-                          isCurrentDay && "bg-gradient-to-br from-red-100 to-pink-100 font-semibold text-red-700",
-                          isSelectedDay && "bg-gradient-to-r from-red-500 to-pink-500 text-white font-semibold"
+                          isCurrentDay && "bg-gradient-to-br from-red-100 to-gray-200 font-semibold text-red-700",
+                          isSelectedDay && "bg-gradient-to-r from-red-500 to-gray-800 text-white font-semibold"
                         )}
                         onClick={() => day && handleDateSelect(day)}
                         disabled={!day}
@@ -343,10 +343,10 @@ const DatePicker: React.FC<DatePickerProps> = ({
                       <motion.button
                         key={month}
                         className={cn(
-                          "h-12 text-sm font-medium rounded-lg transition-all duration-200 hover:bg-gradient-to-br hover:from-red-50 hover:to-pink-50",
+                          "h-12 text-sm font-medium rounded-lg transition-all duration-200 hover:bg-gradient-to-br hover:from-red-50 hover:to-gray-100",
                           "text-gray-900",
-                          isCurrentMonthValue && "bg-gradient-to-br from-red-100 to-pink-100 font-semibold text-red-700",
-                          isSelectedMonthValue && "bg-gradient-to-r from-red-500 to-pink-500 text-white font-semibold"
+                          isCurrentMonthValue && "bg-gradient-to-br from-red-100 to-gray-200 font-semibold text-red-700",
+                          isSelectedMonthValue && "bg-gradient-to-r from-red-500 to-gray-800 text-white font-semibold"
                         )}
                         onClick={() => handleMonthSelect(index)}
                         whileHover={{ scale: 1.05 }}
@@ -377,10 +377,10 @@ const DatePicker: React.FC<DatePickerProps> = ({
                       <motion.button
                         key={year}
                         className={cn(
-                          "h-12 text-sm font-medium rounded-lg transition-all duration-200 hover:bg-gradient-to-br hover:from-red-50 hover:to-pink-50",
+                          "h-12 text-sm font-medium rounded-lg transition-all duration-200 hover:bg-gradient-to-br hover:from-red-50 hover:to-gray-100",
                           "text-gray-900",
-                          isCurrentYearValue && "bg-gradient-to-br from-red-100 to-pink-100 font-semibold text-red-700",
-                          isSelectedYearValue && "bg-gradient-to-r from-red-500 to-pink-500 text-white font-semibold"
+                          isCurrentYearValue && "bg-gradient-to-br from-red-100 to-gray-200 font-semibold text-red-700",
+                          isSelectedYearValue && "bg-gradient-to-r from-red-500 to-gray-800 text-white font-semibold"
                         )}
                         onClick={() => handleYearSelect(year)}
                         whileHover={{ scale: 1.05 }}

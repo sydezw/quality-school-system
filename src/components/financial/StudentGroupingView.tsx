@@ -5,9 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronDown, ChevronRight, Search, Plus, Edit, Trash2, Users, AlertCircle, DollarSign, TrendingUp, TrendingDown, Calendar, CreditCard, RefreshCw, Filter, Eye, EyeOff } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search, Plus, Edit, Trash2, Users, AlertCircle, DollarSign, TrendingUp, TrendingDown, Calendar, CreditCard, RefreshCw, Filter, Eye, EyeOff, CheckCircle, XCircle, Clock, AlertTriangle, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -25,6 +26,9 @@ interface AlunoFinanceiro {
   // Parcelas individuais
   parcelas: ParcelaAluno[];
   registro_financeiro_id: string;
+  numero_parcelas_plano?: number;
+  numero_parcelas_material?: number;
+  numero_parcelas_matricula?: number;
 }
 
 interface ParcelaAluno {
@@ -36,6 +40,7 @@ interface ParcelaAluno {
   status_pagamento: 'pago' | 'pendente' | 'vencido' | 'cancelado';
   tipo_item: 'plano' | 'material' | 'matrícula';
   comprovante?: string;
+  observacoes?: string | null;
 }
 
 interface NovaParcelaForm {
@@ -44,6 +49,7 @@ interface NovaParcelaForm {
   numero_parcela: number;
   valor: number;
   data_vencimento: string;
+  observacoes?: string;
 }
 
 const StudentGroupingView = () => {
@@ -79,26 +85,84 @@ const StudentGroupingView = () => {
     return new Date(dateString).toLocaleDateString('pt-BR');
   }, []);
 
+  // Função para ícones de tipo
+  const getTipoIcon = useCallback((tipo: string) => {
+    switch (tipo.toLowerCase()) {
+      case 'plano':
+        return <CreditCard className="h-4 w-4 text-blue-600" />;
+      case 'material':
+        return <Calendar className="h-4 w-4 text-purple-600" />;
+      case 'matrícula':
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
+      default:
+        return <CreditCard className="h-4 w-4 text-gray-600" />;
+    }
+  }, []);
+
+  // Função para ícones de status
+  const getStatusIcon = useCallback((status: string) => {
+    switch (status.toLowerCase()) {
+      case 'pago':
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'vencido':
+        return <AlertTriangle className="h-4 w-4 text-red-600" />;
+      case 'cancelado':
+        return <XCircle className="h-4 w-4 text-gray-600" />;
+      default:
+        return <Clock className="h-4 w-4 text-yellow-600" />;
+    }
+  }, []);
+
+  // Função para ícones de status geral
+  const getStatusGeralIcon = useCallback((status: string) => {
+    switch (status.toLowerCase()) {
+      case 'pago':
+        return <CheckCircle className="h-4 w-4" />;
+      case 'pendente':
+        return <Clock className="h-4 w-4" />;
+      case 'vencido':
+        return <AlertTriangle className="h-4 w-4" />;
+      case 'cancelado':
+        return <XCircle className="h-4 w-4" />;
+      default:
+        return <Clock className="h-4 w-4" />;
+    }
+  }, []);
+
   // Função para obter cor do status
   const getStatusColor = useCallback((status: string) => {
-    switch (status) {
+    switch (status.toLowerCase()) {
       case 'pago':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200 transition-colors';
       case 'pendente':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200 transition-colors';
       case 'vencido':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'bg-red-100 text-red-800 border-red-200 hover:bg-red-200 transition-colors';
       case 'cancelado':
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-      case 'Pago':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'Pendente':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'Vencido':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200 transition-colors';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200 transition-colors';
     }
+  }, []);
+
+  // Função para calcular progresso total
+  const calcularProgressoTotal = useCallback((aluno: AlunoFinanceiro) => {
+    // Buscar dados do registro financeiro para obter número total de parcelas
+    const totalParcelas = {
+      plano: aluno.numero_parcelas_plano || 0,
+      material: aluno.numero_parcelas_material || 0,
+      matricula: aluno.numero_parcelas_matricula || 0
+    };
+    
+    const totalGeralParcelas = totalParcelas.plano + totalParcelas.material + totalParcelas.matricula;
+    const parcelasPagas = aluno.parcelas.filter(p => p.status_pagamento === 'pago').length;
+    const percentual = totalGeralParcelas > 0 ? (parcelasPagas / totalGeralParcelas) * 100 : 0;
+    
+    return {
+      pagas: parcelasPagas,
+      total: totalGeralParcelas,
+      percentual: Math.round(percentual)
+    };
   }, []);
 
   // Função para salvar posição do scroll
@@ -141,7 +205,8 @@ const StudentGroupingView = () => {
       tipo_item: 'plano',
       numero_parcela: 1,
       valor: 0,
-      data_vencimento: ''
+      data_vencimento: '',
+      observacoes: ''
     });
     setIsCreateModalOpen(true);
   }, []);
@@ -169,6 +234,9 @@ const StudentGroupingView = () => {
           valor_matricula,
           status_geral,
           data_primeiro_vencimento,
+          numero_parcelas_plano,
+          numero_parcelas_material,
+          numero_parcelas_matricula,
           alunos!inner(id, nome)
         `)
         .eq('alunos.status', 'Ativo');
@@ -178,7 +246,7 @@ const StudentGroupingView = () => {
       // 2. Buscar todas as parcelas relacionadas
       const { data: parcelasData, error: parcelasError } = await supabase
         .from('parcelas_alunos')
-        .select('*');
+        .select('*, observacoes');
 
       if (parcelasError) throw parcelasError;
 
@@ -198,7 +266,10 @@ const StudentGroupingView = () => {
           status_geral: registro.status_geral,
           data_primeiro_vencimento: registro.data_primeiro_vencimento,
           parcelas: parcelasAluno,
-          registro_financeiro_id: registro.id
+          registro_financeiro_id: registro.id,
+          numero_parcelas_plano: registro.numero_parcelas_plano,
+          numero_parcelas_material: registro.numero_parcelas_material,
+          numero_parcelas_matricula: registro.numero_parcelas_matricula
         };
       });
 
@@ -238,7 +309,8 @@ const StudentGroupingView = () => {
           valor: novaParcela.valor,
           data_vencimento: novaParcela.data_vencimento,
           status_pagamento: 'pendente',
-          idioma_registro: 'Inglês'
+          idioma_registro: 'Inglês',
+          observacoes: novaParcela.observacoes || null
         });
 
       if (error) throw error;
@@ -273,7 +345,8 @@ const StudentGroupingView = () => {
           numero_parcela: editandoParcela.numero_parcela,
           valor: editandoParcela.valor,
           data_vencimento: editandoParcela.data_vencimento,
-          status_pagamento: editandoParcela.status_pagamento
+          status_pagamento: editandoParcela.status_pagamento,
+          observacoes: editandoParcela.observacoes || null
         })
         .eq('id', editandoParcela.id);
 
@@ -360,7 +433,7 @@ const StudentGroupingView = () => {
         transition={{ duration: 0.6, delay: 0.1 }}
       >
         <Card className="overflow-hidden shadow-lg border-0">
-          <CardHeader className="bg-gradient-to-r from-red-600 to-pink-600 text-white relative overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-red-600 to-gray-800 text-white relative overflow-hidden">
             <motion.div 
               className="absolute inset-0 bg-white/10"
               animate={{ 
@@ -587,7 +660,16 @@ const StudentGroupingView = () => {
                 />
               </div>
               
-
+              <div>
+                <Label htmlFor="observacoes">Observações</Label>
+                <textarea
+                  id="observacoes"
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                  placeholder="Adicione observações sobre esta parcela..."
+                  value={novaParcela.observacoes || ''}
+                  onChange={(e) => setNovaParcela(prev => prev ? {...prev, observacoes: e.target.value} : null)}
+                />
+              </div>
               
               <div className="flex justify-end gap-2 pt-4">
                 <Button 
@@ -602,7 +684,7 @@ const StudentGroupingView = () => {
                 </Button>
                 <Button 
                   onClick={criarParcela}
-                  className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 transition-all duration-200"
+                  className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 transition-all duration-200"
                 >
                   Criar Parcela
                 </Button>
@@ -694,6 +776,17 @@ const StudentGroupingView = () => {
                 </Select>
               </div>
               
+              <div>
+                <Label htmlFor="edit-observacoes">Observações</Label>
+                <textarea
+                  id="edit-observacoes"
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                  placeholder="Adicione observações sobre esta parcela..."
+                  value={editandoParcela.observacoes || ''}
+                  onChange={(e) => setEditandoParcela(prev => prev ? {...prev, observacoes: e.target.value} : null)}
+                />
+              </div>
+              
               <div className="flex justify-end gap-2 pt-4">
                 <Button 
                   variant="outline" 
@@ -707,7 +800,7 @@ const StudentGroupingView = () => {
                 </Button>
                 <Button 
                   onClick={salvarEdicaoParcela}
-                  className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 transition-all duration-200"
+                  className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 transition-all duration-200"
                 >
                   Salvar Alterações
                 </Button>
@@ -759,8 +852,8 @@ const StudentGroupingView = () => {
                   </TableHead>
                   <TableHead className="font-semibold text-gray-700">
                     <div className="flex items-center space-x-2">
-                      <TrendingUp className="h-4 w-4 text-green-600" />
-                      <span>Status Geral</span>
+                      <CreditCard className="h-4 w-4" />
+                      <span>Parcelas</span>
                     </div>
                   </TableHead>
                   <TableHead className="font-semibold text-gray-700">
@@ -771,8 +864,8 @@ const StudentGroupingView = () => {
                   </TableHead>
                   <TableHead className="font-semibold text-gray-700">
                     <div className="flex items-center space-x-2">
-                      <CreditCard className="h-4 w-4" />
-                      <span>Parcelas</span>
+                      <TrendingUp className="h-4 w-4 text-green-600" />
+                      <span>Status Geral</span>
                     </div>
                   </TableHead>
                 </TableRow>
@@ -815,7 +908,7 @@ const StudentGroupingView = () => {
                           </TableCell>
                           <TableCell className="font-medium text-base py-4">
                             <div className="flex items-center space-x-3">
-                              <div className="bg-gradient-to-r from-red-600 to-pink-600 rounded-full p-2">
+                              <div className="bg-gradient-to-r from-red-600 to-gray-800 rounded-full p-2">
                                 <Users className="h-4 w-4 text-white" />
                               </div>
                               <span>{aluno.nome}</span>
@@ -824,36 +917,91 @@ const StudentGroupingView = () => {
                           <TableCell className="text-base py-4">
                             <span className="font-semibold text-gray-800">{formatCurrency(aluno.valor_total)}</span>
                           </TableCell>
-                          <TableCell className="text-base py-4">
-                            <Badge className={`${getStatusColor(aluno.status_geral)} transition-all duration-200 border`}>
-                              {aluno.status_geral}
-                            </Badge>
+                          <TableCell className="py-4">
+                            <div className="flex gap-1 flex-wrap">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <motion.div whileHover={{ scale: 1.05 }}>
+                                    <Badge className="bg-green-100 text-green-800 text-xs border border-green-200 flex items-center gap-1 px-1 py-0.5 min-w-[30px] justify-center cursor-help">
+                                      <span className="font-semibold">{aluno.parcelas.filter(p => p.status_pagamento === 'pago').length}</span>
+                                      <CheckCircle className="h-5 w-5" />
+                                    </Badge>
+                                  </motion.div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Parcelas Pagas</p>
+                                </TooltipContent>
+                              </Tooltip>
+                              
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <motion.div whileHover={{ scale: 1.05 }}>
+                                    <Badge className="bg-red-100 text-red-800 text-xs border border-red-200 flex items-center gap-1 px-1 py-0.5 min-w-[30px] justify-center cursor-help">
+                                      <span className="font-semibold">{aluno.parcelas.filter(p => p.status_pagamento === 'vencido').length}</span>
+                                      <AlertTriangle className="h-5 w-5" />
+                                    </Badge>
+                                  </motion.div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Parcelas Vencidas</p>
+                                </TooltipContent>
+                              </Tooltip>
+                              
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <motion.div whileHover={{ scale: 1.05 }}>
+                                    <Badge className="bg-yellow-100 text-yellow-800 text-xs border border-yellow-200 flex items-center gap-1 px-1 py-0.5 min-w-[30px] justify-center cursor-help">
+                                      <span className="font-semibold">{aluno.parcelas.filter(p => p.status_pagamento === 'pendente').length}</span>
+                                      <Clock className="h-5 w-5" />
+                                    </Badge>
+                                  </motion.div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Parcelas Pendentes</p>
+                                </TooltipContent>
+                              </Tooltip>
+                              
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <motion.div whileHover={{ scale: 1.05 }}>
+                                    <Badge className="bg-gray-100 text-gray-800 text-xs border border-gray-200 flex items-center gap-1 px-1 py-0.5 min-w-[30px] justify-center cursor-help">
+                                      <span className="font-semibold">{aluno.parcelas.filter(p => p.status_pagamento === 'cancelado').length}</span>
+                                      <XCircle className="h-5 w-5" />
+                                    </Badge>
+                                  </motion.div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Parcelas Canceladas</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
                           </TableCell>
                           <TableCell className="text-base py-4">
                             <span className="font-semibold text-gray-600">{formatDate(aluno.data_primeiro_vencimento)}</span>
                           </TableCell>
-                          <TableCell className="py-4">
-                            <div className="flex gap-2 flex-wrap">
-                              <motion.div whileHover={{ scale: 1.05 }}>
-                                <Badge className="bg-green-100 text-green-800 text-sm border border-green-200">
-                                  {aluno.parcelas.filter(p => p.status_pagamento === 'pago').length} Pagas
-                                </Badge>
-                              </motion.div>
-                              <motion.div whileHover={{ scale: 1.05 }}>
-                                <Badge className="bg-red-100 text-red-800 text-sm border border-red-200">
-                                  {aluno.parcelas.filter(p => p.status_pagamento === 'vencido').length} Vencidas
-                                </Badge>
-                              </motion.div>
-                              <motion.div whileHover={{ scale: 1.05 }}>
-                                <Badge className="bg-yellow-100 text-yellow-800 text-sm border border-yellow-200">
-                                  {aluno.parcelas.filter(p => p.status_pagamento === 'pendente').length} Pendentes
-                                </Badge>
-                              </motion.div>
-                              <motion.div whileHover={{ scale: 1.05 }}>
-                                <Badge className="bg-gray-100 text-gray-800 text-sm border border-gray-200">
-                                  {aluno.parcelas.filter(p => p.status_pagamento === 'cancelado').length} Canceladas
-                                </Badge>
-                              </motion.div>
+                          <TableCell className="text-base py-4">
+                            <div className="flex flex-col gap-2 min-w-[120px]">
+                              {(() => {
+                                const progresso = calcularProgressoTotal(aluno);
+                                return (
+                                  <>
+                                    <div className="flex items-center justify-between text-sm">
+                                      <span className="font-semibold text-gray-700">
+                                        {progresso.pagas}/{progresso.total}
+                                      </span>
+                                      <span className="text-xs text-gray-500">
+                                        {progresso.percentual}%
+                                      </span>
+                                    </div>
+                                    <div className="w-full bg-gray-200 rounded-full h-5">
+                                      <div 
+                                        className="h-5 rounded-full transition-all duration-300 bg-gradient-to-r from-red-600 to-gray-800"
+                                        style={{ width: `${progresso.percentual}%` }}
+                                      ></div>
+                                    </div>
+                                  </>
+                                );
+                              })()}
                             </div>
                           </TableCell>
                         </motion.tr>
@@ -869,14 +1017,14 @@ const StudentGroupingView = () => {
                             >
                               <TableCell colSpan={6} className="p-0">
                                 <motion.div 
-                                  className="bg-gradient-to-r from-red-50 to-pink-50 p-6 border-l-4 border-red-500"
+                                  className="bg-gradient-to-r from-red-50 to-gray-100 p-6 border-l-4 border-red-500"
                                   initial={{ opacity: 0, y: -20 }}
                                   animate={{ opacity: 1, y: 0 }}
                                   transition={{ duration: 0.4, delay: 0.1 }}
                                 >
                                   <div className="flex justify-between items-center mb-4">
                                     <div className="flex items-center space-x-3">
-                                      <div className="bg-gradient-to-r from-red-600 to-pink-600 rounded-full p-2">
+                                      <div className="bg-gradient-to-r from-red-600 to-gray-800 rounded-full p-2">
                                         <Eye className="h-5 w-5 text-white" />
                                       </div>
                                       <div>
@@ -890,7 +1038,7 @@ const StudentGroupingView = () => {
                                       whileHover={{ scale: 1.05 }}
                                       whileTap={{ scale: 0.95 }}
                                       onClick={(e) => handleButtonClick(() => abrirModalCriarParcela(aluno.id, aluno.nome, aluno.registro_financeiro_id), e)}
-                                      className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 shadow-lg"
+                                      className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 shadow-lg"
                                     >
                                       <Plus className="h-4 w-4" />
                                       <span>Nova Parcela</span>
@@ -900,7 +1048,7 @@ const StudentGroupingView = () => {
                                   <div className="rounded-xl border border-red-200 overflow-hidden shadow-lg bg-white">
                                     <Table>
                                       <TableHeader>
-                                        <TableRow className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700">
+                                        <TableRow className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900">
                                           <TableHead className="font-semibold text-white">
                                             <div className="flex items-center space-x-2">
                                               <CreditCard className="h-4 w-4" />
@@ -927,6 +1075,12 @@ const StudentGroupingView = () => {
                                             </div>
                                           </TableHead>
                                           <TableHead className="font-semibold text-white">Status</TableHead>
+                                          <TableHead className="font-semibold text-white">
+                                            <div className="flex items-center space-x-2">
+                                              <FileText className="h-4 w-4" />
+                                              <span>Observações</span>
+                                            </div>
+                                          </TableHead>
                                           <TableHead className="font-semibold text-white text-center">Ações</TableHead>
                                         </TableRow>
                                       </TableHeader>
@@ -943,48 +1097,70 @@ const StudentGroupingView = () => {
                                                 className="hover:bg-red-50 transition-colors duration-200 border-b border-gray-100"
                                               >
                                                 <TableCell className="font-medium py-4 text-base">
-                                                  <Badge className="bg-blue-100 text-blue-800 border border-blue-200">
-                                                    {parcela.tipo_item}
-                                                  </Badge>
+                                                  <div className="flex items-center gap-2">
+                                                    {getTipoIcon(parcela.tipo_item)}
+                                                    <span className="capitalize font-medium text-base">{parcela.tipo_item}</span>
+                                                  </div>
                                                 </TableCell>
                                                 <TableCell className="py-4 text-base font-semibold">{parcela.numero_parcela}</TableCell>
-                                                <TableCell className="font-bold py-4 text-base text-gray-800">{formatCurrency(parcela.valor)}</TableCell>
+                                                <TableCell className="font-bold py-4 text-base text-green-700">{formatCurrency(parcela.valor)}</TableCell>
                                                 <TableCell className="py-4 text-base">{formatDate(parcela.data_vencimento)}</TableCell>
                                                 <TableCell className="py-4 text-base">
                                                   {parcela.data_pagamento ? formatDate(parcela.data_pagamento) : '-'}
                                                 </TableCell>
                                                 <TableCell className="py-4">
                                                   <motion.div whileHover={{ scale: 1.05 }}>
-                                                    <Badge className={`${getStatusColor(parcela.status_pagamento)} transition-all duration-200 border`}>
-                                                      {parcela.status_pagamento}
+                                                    <Badge className={`${getStatusColor(parcela.status_pagamento)} flex items-center gap-1 w-fit`}>
+                                                      {getStatusIcon(parcela.status_pagamento)}
+                                                      {parcela.status_pagamento.charAt(0).toUpperCase() + parcela.status_pagamento.slice(1)}
                                                     </Badge>
                                                   </motion.div>
                                                 </TableCell>
+                                                <TableCell className="py-4 max-w-xs">
+                                                  <div className="text-sm text-gray-600">
+                                                    {parcela.observacoes ? (
+                                                      <div className="truncate" title={parcela.observacoes}>
+                                                        {parcela.observacoes}
+                                                      </div>
+                                                    ) : (
+                                                      <span className="text-gray-400 italic">Sem observações</span>
+                                                    )}
+                                                  </div>
+                                                </TableCell>
                                                 <TableCell className="py-4">
                                                   <div className="flex gap-2 justify-center">
-                                                    <motion.button
+                                                    <motion.div
                                                       whileHover={{ scale: 1.1 }}
                                                       whileTap={{ scale: 0.9 }}
-                                                      onClick={(e) => handleButtonClick(() => abrirModalEditarParcela(parcela), e)}
-                                                      className="bg-blue-100 hover:bg-blue-200 text-blue-600 p-2 rounded-lg transition-all duration-200"
                                                     >
-                                                      <Edit className="h-4 w-4" />
-                                                    </motion.button>
-                                                    <motion.button
+                                                      <Button
+                                                        size="sm"
+                                                        onClick={(e) => handleButtonClick(() => abrirModalEditarParcela(parcela), e)}
+                                                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                                                      >
+                                                        <Edit className="h-4 w-4" />
+                                                      </Button>
+                                                    </motion.div>
+                                                    <motion.div
                                                       whileHover={{ scale: 1.1 }}
                                                       whileTap={{ scale: 0.9 }}
-                                                      onClick={(e) => handleButtonClick(() => excluirParcela(parcela.id), e)}
-                                                      className="bg-red-100 hover:bg-red-200 text-red-600 p-2 rounded-lg transition-all duration-200"
                                                     >
-                                                      <Trash2 className="h-4 w-4" />
-                                                    </motion.button>
+                                                      <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={(e) => handleButtonClick(() => excluirParcela(parcela.id), e)}
+                                                        className="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
+                                                      >
+                                                        <Trash2 className="h-4 w-4" />
+                                                      </Button>
+                                                    </motion.div>
                                                   </div>
                                                 </TableCell>
                                               </motion.tr>
                                             ))
                                         ) : (
                                           <TableRow>
-                                            <TableCell colSpan={6} className="py-16">
+                                            <TableCell colSpan={7} className="py-16">
                                               <motion.div 
                                                 className="flex flex-col items-center justify-center space-y-4"
                                                 initial={{ opacity: 0, scale: 0.9 }}
@@ -992,7 +1168,7 @@ const StudentGroupingView = () => {
                                                 transition={{ duration: 0.5 }}
                                               >
                                                 <div className="relative">
-                                                  <div className="w-20 h-20 bg-gradient-to-r from-red-100 to-pink-100 rounded-full flex items-center justify-center">
+                                                  <div className="w-20 h-20 bg-gradient-to-r from-red-100 to-gray-200 rounded-full flex items-center justify-center">
                                                     <AlertCircle className="h-10 w-10 text-red-400" />
                                                   </div>
                                                   <motion.div
@@ -1030,7 +1206,7 @@ const StudentGroupingView = () => {
                                       animate={{ opacity: 1 }}
                                       transition={{ delay: 0.3 }}
                                     >
-                                      <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-full px-4 py-2 shadow-sm border-0">
+                                      <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-red-500 to-gray-800 text-white rounded-full px-4 py-2 shadow-sm border-0">
                                         <span className="text-sm font-medium">
                                           Total de {aluno.parcelas.length} parcela{aluno.parcelas.length !== 1 ? 's' : ''} cadastrada{aluno.parcelas.length !== 1 ? 's' : ''}
                                         </span>
@@ -1058,7 +1234,7 @@ const StudentGroupingView = () => {
               >
                 <div className="relative">
                   <motion.div 
-                    className="w-32 h-32 bg-gradient-to-r from-red-100 to-pink-100 rounded-full flex items-center justify-center"
+                    className="w-32 h-32 bg-gradient-to-r from-red-100 to-gray-200 rounded-full flex items-center justify-center"
                     animate={{ 
                       boxShadow: [
                         '0 0 0 0 rgba(239, 68, 68, 0.4)',
@@ -1071,7 +1247,7 @@ const StudentGroupingView = () => {
                     <Users className="h-16 w-16 text-red-400" />
                   </motion.div>
                   <motion.div
-                    className="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-r from-red-500 to-pink-500 rounded-full flex items-center justify-center"
+                    className="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-r from-red-500 to-gray-800 rounded-full flex items-center justify-center"
                     animate={{ rotate: 360 }}
                     transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
                   >
@@ -1094,7 +1270,7 @@ const StudentGroupingView = () => {
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => setSearchTerm('')}
-                      className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white px-6 py-3 rounded-lg transition-all duration-200 mt-4"
+                      className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 text-white px-6 py-3 rounded-lg transition-all duration-200 mt-4"
                     >
                       Limpar busca
                     </motion.button>

@@ -1,8 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { motion } from 'framer-motion';
-import { Save, X, Loader2 } from 'lucide-react';
+import { Save, X } from 'lucide-react';
 import { Student } from '@/integrations/supabase/types';
 
 interface FormActionsProps {
@@ -13,47 +12,23 @@ interface FormActionsProps {
 
 const FormActions = ({ editingStudent, isSubmitting, onCancel }: FormActionsProps) => {
   return (
-    <div className="flex justify-end gap-4 pt-6 border-t border-gray-200">
-      <motion.div
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-        transition={{ duration: 0.2 }}
+    <div className="flex justify-end gap-3 pt-6">
+      <Button
+        type="button"
+        variant="outline"
+        onClick={onCancel}
+        disabled={isSubmitting}
       >
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={isSubmitting}
-          className="px-6 py-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-200"
-        >
-          <X className="h-4 w-4 mr-2" />
-          Cancelar
-        </Button>
-      </motion.div>
-      
-      <motion.div
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-        transition={{ duration: 0.2 }}
+        <X className="h-4 w-4 mr-2" />
+        Cancelar
+      </Button>
+      <Button
+        type="submit"
+        disabled={isSubmitting}
       >
-        <Button
-          type="submit"
-          disabled={isSubmitting}
-          className="px-6 py-2 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 font-medium"
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Salvando...
-            </>
-          ) : (
-            <>
-              <Save className="h-4 w-4 mr-2" />
-              {editingStudent ? 'Atualizar' : 'Salvar'} Aluno
-            </>
-          )}
-        </Button>
-      </motion.div>
+        <Save className="h-4 w-4 mr-2" />
+        {isSubmitting ? 'Salvando...' : (editingStudent ? 'Atualizar' : 'Salvar')} Aluno
+      </Button>
     </div>
   );
 };

@@ -75,11 +75,11 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
       valor_matricula: '0',
       valor_material: '0',
       forma_pagamento_plano: 'boleto',
-      numero_parcelas_plano: '1',
+      numero_parcelas_plano: '', // Removido valor padrão '1'
       forma_pagamento_material: 'boleto',
-      numero_parcelas_material: '1',
+      numero_parcelas_material: '', // Removido valor padrão '1'
       forma_pagamento_matricula: 'boleto',
-      numero_parcelas_matricula: '1',
+      numero_parcelas_matricula: '', // Removido valor padrão '1'
       data_vencimento_primeira: ''
     }
   });
