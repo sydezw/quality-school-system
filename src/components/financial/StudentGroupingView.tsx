@@ -8,10 +8,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronDown, ChevronRight, Search, Plus, Edit, Trash2, Users, AlertCircle, DollarSign, TrendingUp, TrendingDown, Calendar, CreditCard, RefreshCw, Filter, Eye, EyeOff, CheckCircle, XCircle, Clock, AlertTriangle, FileText } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search, Plus, Edit, Trash2, Users, AlertCircle, DollarSign, TrendingUp, TrendingDown, Calendar, CreditCard, RefreshCw, Filter, Eye, EyeOff, CheckCircle, XCircle, Clock, AlertTriangle, FileText, Archive, History } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { MoverParaHistoricoModal } from './modals/MoverParaHistoricoModal';
+import { HistoricoParcelasModal } from './modals/HistoricoParcelasModal';
+import FinancialPlanDialog from './FinancialPlanDialog';
 
 interface AlunoFinanceiro {
   id: string;
@@ -52,7 +55,12 @@ interface NovaParcelaForm {
   observacoes?: string;
 }
 
-const StudentGroupingView = () => {
+interface StudentGroupingViewProps {
+  alunosFinanceiros?: AlunoFinanceiro[];
+  onRefresh?: () => void;
+}
+
+const StudentGroupingView = ({ alunosFinanceiros, onRefresh }: StudentGroupingViewProps = {}) => {
   const [alunos, setAlunos] = useState<AlunoFinanceiro[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -62,6 +70,12 @@ const StudentGroupingView = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [novaParcela, setNovaParcela] = useState<NovaParcelaForm | null>(null);
   const [savedScrollPosition, setSavedScrollPosition] = useState<number>(0);
+  const [isVerHistoricoModalOpen, setIsVerHistoricoModalOpen] = useState(false);
+  const [alunoHistorico, setAlunoHistorico] = useState<{id: string, nome: string} | null>(null);
+  const [isMoverHistoricoModalOpen, setIsMoverHistoricoModalOpen] = useState(false);
+  const [alunoParaArquivar, setAlunoParaArquivar] = useState<{id: string, nome: string, parcelas: ParcelaAluno[]} | null>(null);
+  const [isFinancialPlanDialogOpen, setIsFinancialPlanDialogOpen] = useState(false);
+  const [selectedStudentForPlan, setSelectedStudentForPlan] = useState(null);
   const { toast } = useToast();
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -216,6 +230,84 @@ const StudentGroupingView = () => {
     setEditandoParcela(parcela);
     setIsEditModalOpen(true);
   }, []);
+
+  // Função para abrir modal de ver histórico
+  const abrirModalVerHistorico = useCallback((alunoId: string, nomeAluno: string) => {
+    setAlunoHistorico({ id: alunoId, nome: nomeAluno });
+    setIsVerHistoricoModalOpen(true);
+  }, []);
+
+  // Função para abrir modal de mover para histórico
+  const abrirModalMoverParaHistorico = useCallback((alunoId: string, nomeAluno: string, parcelas: ParcelaAluno[]) => {
+    setAlunoParaArquivar({ id: alunoId, nome: nomeAluno, parcelas });
+    setIsMoverHistoricoModalOpen(true);
+  }, []);
+
+  // Função para criar plano de pagamento
+  const handleCreatePlan = async () => {
+    try {
+      // Buscar todos os alunos ativos
+      const { data: students, error: studentsError } = await supabase
+        .from('alunos')
+        .select('id, nome')
+        .eq('status', 'Ativo')
+        .order('nome');
+
+      if (studentsError) throw studentsError;
+
+      if (!students || students.length === 0) {
+        toast({
+          title: "Nenhum aluno encontrado",
+          description: "Não há alunos ativos para criar plano de pagamento.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Buscar alunos que já possuem plano
+      const { data: existingPlans, error: plansError } = await supabase
+        .from('financeiro_alunos')
+        .select('aluno_id');
+
+      if (plansError) throw plansError;
+
+      const studentsWithPlans = new Set(existingPlans?.map(plan => plan.aluno_id) || []);
+      const availableStudents = students.filter(student => !studentsWithPlans.has(student.id));
+
+      if (availableStudents.length === 0) {
+        toast({
+          title: "Todos os alunos já possuem plano",
+          description: "Todos os alunos ativos já possuem um plano de pagamento criado.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Abrir modal sem aluno pré-selecionado
+      setSelectedStudentForPlan(null);
+      setIsFinancialPlanDialogOpen(true);
+    } catch (error) {
+      console.error('Erro ao verificar planos:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível verificar os planos existentes.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Função para sucesso do plano
+  const handlePlanSuccess = () => {
+    if (onRefresh) {
+      onRefresh(); // Atualizar a lista de alunos financeiros
+    } else {
+      carregarDados(); // Fallback para carregamento interno
+    }
+    setIsFinancialPlanDialogOpen(false);
+    setSelectedStudentForPlan(null);
+  };
+
+
 
   // Função para carregar dados
   const carregarDados = useCallback(async () => {
@@ -396,10 +488,17 @@ const StudentGroupingView = () => {
     }
   }, [toast, carregarDados]);
 
+
+
   // Carregar dados ao montar o componente
   useEffect(() => {
-    carregarDados();
-  }, [carregarDados]);
+    if (alunosFinanceiros) {
+      setAlunos(alunosFinanceiros);
+      setLoading(false);
+    } else {
+      carregarDados();
+    }
+  }, [alunosFinanceiros, carregarDados]);
 
   return (
     <motion.div 
@@ -463,9 +562,10 @@ const StudentGroupingView = () => {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={carregarDados}
-                  className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg p-3 transition-all duration-200"
+                  className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg p-2 transition-all duration-200"
+                  title="Atualizar dados"
                 >
-                  <RefreshCw className="h-5 w-5" />
+                  <RefreshCw className="h-4 w-4" />
                 </motion.button>
               </div>
               
@@ -563,33 +663,50 @@ const StudentGroupingView = () => {
       >
         <Card className="shadow-md border-0 bg-gradient-to-r from-gray-50 to-white">
           <CardContent className="p-6">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 text-gray-600">
-                <Filter className="h-5 w-5" />
-                <span className="font-medium">Filtros:</span>
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+              <div className="flex items-center space-x-4 flex-1 min-w-[800px]">
+                <div className="flex items-center space-x-2 text-gray-600">
+                  <Filter className="h-5 w-5" />
+                  <span className="font-medium">Filtros:</span>
+                </div>
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Buscar por nome do aluno..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 border-gray-200 focus:border-red-500 focus:ring-red-500 transition-all duration-200"
+                  />
+                </div>
+                {searchTerm && (
+                  <motion.button
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setSearchTerm('')}
+                    className="bg-red-100 hover:bg-red-200 text-red-600 px-3 py-2 rounded-lg transition-all duration-200"
+                  >
+                    Limpar
+                  </motion.button>
+                )}
               </div>
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Buscar por nome do aluno..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 border-gray-200 focus:border-red-500 focus:ring-red-500 transition-all duration-200"
-                />
-              </div>
-              {searchTerm && (
-                <motion.button
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setSearchTerm('')}
-                  className="bg-red-100 hover:bg-red-200 text-red-600 px-3 py-2 rounded-lg transition-all duration-200"
+              
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="flex-1 max-w-xs"
+              >
+                <Button
+                  onClick={handleCreatePlan}
+                  className="w-full bg-gradient-to-r from-red-600 via-gray-700 to-black hover:from-red-700 hover:via-gray-800 hover:to-gray-900 text-white border-0 px-6 py-2 shadow-lg transition-all duration-300"
                 >
-                  Limpar
-                </motion.button>
-              )}
+                  <Plus className="h-4 w-4 mr-2" />
+                  <Users className="h-4 w-4 mr-2" />
+                  Criar Plano de Pagamento
+                </Button>
+              </motion.div>
             </div>
           </CardContent>
         </Card>
@@ -693,6 +810,8 @@ const StudentGroupingView = () => {
           )}
         </DialogContent>
       </Dialog>
+
+
 
       {/* Modal de editar parcela */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
@@ -1034,15 +1153,35 @@ const StudentGroupingView = () => {
                                         <p className="text-gray-600">Detalhamento completo dos registros financeiros</p>
                                       </div>
                                     </div>
-                                    <motion.button
-                                      whileHover={{ scale: 1.05 }}
-                                      whileTap={{ scale: 0.95 }}
-                                      onClick={(e) => handleButtonClick(() => abrirModalCriarParcela(aluno.id, aluno.nome, aluno.registro_financeiro_id), e)}
-                                      className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 shadow-lg"
-                                    >
-                                      <Plus className="h-4 w-4" />
-                                      <span>Nova Parcela</span>
-                                    </motion.button>
+                                    <div className="flex items-center space-x-3">
+                                      <motion.button
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        onClick={(e) => handleButtonClick(() => abrirModalVerHistorico(aluno.id, aluno.nome), e)}
+                                        className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 shadow-lg"
+                                      >
+                                        <History className="h-4 w-4" />
+                                        <span>Ver Histórico</span>
+                                      </motion.button>
+                                      <motion.button
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        onClick={(e) => handleButtonClick(() => abrirModalMoverParaHistorico(aluno.id, aluno.nome, aluno.parcelas), e)}
+                                        className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 shadow-lg"
+                                      >
+                                        <Archive className="h-4 w-4" />
+                                        <span>Mover para Histórico</span>
+                                      </motion.button>
+                                      <motion.button
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        onClick={(e) => handleButtonClick(() => abrirModalCriarParcela(aluno.id, aluno.nome, aluno.registro_financeiro_id), e)}
+                                        className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 shadow-lg"
+                                      >
+                                        <Plus className="h-4 w-4" />
+                                        <span>Nova Parcela</span>
+                                      </motion.button>
+                                    </div>
                                   </div>
                                   
                                   <div className="rounded-xl border border-red-200 overflow-hidden shadow-lg bg-white">
@@ -1136,7 +1275,7 @@ const StudentGroupingView = () => {
                                                       <Button
                                                         size="sm"
                                                         onClick={(e) => handleButtonClick(() => abrirModalEditarParcela(parcela), e)}
-                                                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                                                        className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 text-white"
                                                       >
                                                         <Edit className="h-4 w-4" />
                                                       </Button>
@@ -1147,9 +1286,8 @@ const StudentGroupingView = () => {
                                                     >
                                                       <Button
                                                         size="sm"
-                                                        variant="outline"
                                                         onClick={(e) => handleButtonClick(() => excluirParcela(parcela.id), e)}
-                                                        className="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
+                                                        className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 text-white"
                                                       >
                                                         <Trash2 className="h-4 w-4" />
                                                       </Button>
@@ -1281,6 +1419,29 @@ const StudentGroupingView = () => {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Modal Ver Histórico */}
+      <HistoricoParcelasModal
+        isOpen={isVerHistoricoModalOpen}
+        onClose={() => setIsVerHistoricoModalOpen(false)}
+        aluno={alunoHistorico}
+      />
+
+      {/* Modal Mover para Histórico */}
+      <MoverParaHistoricoModal
+        isOpen={isMoverHistoricoModalOpen}
+        onClose={() => setIsMoverHistoricoModalOpen(false)}
+        aluno={alunoParaArquivar}
+        onSuccess={carregarDados}
+      />
+
+      {/* Modal Criar Plano de Pagamento */}
+      <FinancialPlanDialog
+        isOpen={isFinancialPlanDialogOpen}
+        onOpenChange={setIsFinancialPlanDialogOpen}
+        selectedStudent={selectedStudentForPlan}
+        onSuccess={handlePlanSuccess}
+      />
     </motion.div>
   );
 };

@@ -63,6 +63,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
   const [loading, setLoading] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
   const [planosGenericos, setPlanosGenericos] = useState<PlanoGenerico[]>([]);
+  const [dataVencimentoPrimeira, setDataVencimentoPrimeira] = useState<Date | null>(null);
 
   const [openStudentSearch, setOpenStudentSearch] = useState(false);
   const { toast } = useToast();
@@ -221,6 +222,37 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
       toast({
         title: "Erro",
         description: "Por favor, selecione um aluno.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Verificar se o aluno já possui um plano
+    try {
+      const { data: existingPlan, error: checkError } = await supabase
+        .from('financeiro_alunos')
+        .select('id')
+        .eq('aluno_id', data.aluno_id)
+        .single();
+        
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
+        throw checkError;
+      }
+      
+      if (existingPlan) {
+        const studentName = students.find(s => s.id === data.aluno_id)?.nome || 'Aluno';
+        toast({
+          title: "Plano já existe",
+          description: `${studentName} já possui um plano de pagamento. Não é possível criar um novo plano para este aluno.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    } catch (error) {
+      console.error('Erro ao verificar plano existente:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível verificar se o aluno já possui um plano.",
         variant: "destructive",
       });
       return;
