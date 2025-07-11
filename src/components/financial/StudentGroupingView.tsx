@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronDown, ChevronRight, Search, Plus, Edit, Trash2, Users, AlertCircle, DollarSign, TrendingUp, TrendingDown, Calendar, CreditCard, RefreshCw, Filter, Eye, EyeOff, CheckCircle, XCircle, Clock, AlertTriangle, FileText, Archive, History } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search, Plus, Edit, Trash2, Users, AlertCircle, DollarSign, TrendingUp, TrendingDown, Calendar, CreditCard, RefreshCw, Filter, Eye, EyeOff, CheckCircle, XCircle, Clock, AlertTriangle, FileText, Archive, History, Receipt, Banknote, Smartphone, Building2, Wallet } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -32,6 +32,10 @@ interface AlunoFinanceiro {
   numero_parcelas_plano?: number;
   numero_parcelas_material?: number;
   numero_parcelas_matricula?: number;
+  // Formas de pagamento
+  forma_pagamento_plano?: string;
+  forma_pagamento_material?: string;
+  forma_pagamento_matricula?: string;
 }
 
 interface ParcelaAluno {
@@ -44,6 +48,7 @@ interface ParcelaAluno {
   tipo_item: 'plano' | 'material' | 'matrícula';
   comprovante?: string;
   observacoes?: string | null;
+  forma_pagamento?: string;
 }
 
 interface NovaParcelaForm {
@@ -53,6 +58,7 @@ interface NovaParcelaForm {
   valor: number;
   data_vencimento: string;
   observacoes?: string;
+  forma_pagamento?: string;
 }
 
 interface StudentGroupingViewProps {
@@ -76,6 +82,8 @@ const StudentGroupingView = ({ alunosFinanceiros, onRefresh }: StudentGroupingVi
   const [alunoParaArquivar, setAlunoParaArquivar] = useState<{id: string, nome: string, parcelas: ParcelaAluno[]} | null>(null);
   const [isFinancialPlanDialogOpen, setIsFinancialPlanDialogOpen] = useState(false);
   const [selectedStudentForPlan, setSelectedStudentForPlan] = useState(null);
+  const [isVisualizarPlanoModalOpen, setIsVisualizarPlanoModalOpen] = useState(false);
+  const [alunoPlanoDetalhes, setAlunoPlanoDetalhes] = useState<AlunoFinanceiro | null>(null);
   const { toast } = useToast();
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -159,6 +167,28 @@ const StudentGroupingView = ({ alunosFinanceiros, onRefresh }: StudentGroupingVi
     }
   }, []);
 
+
+
+  // Função para obter forma de pagamento da parcela
+  const getFormaPagamentoParcela = useCallback((parcela: ParcelaAluno, aluno: AlunoFinanceiro) => {
+    // Se a parcela já tem forma_pagamento definida, usar ela
+    if (parcela.forma_pagamento) {
+      return parcela.forma_pagamento;
+    }
+    
+    // Caso contrário, buscar do registro financeiro baseado no tipo_item
+    switch (parcela.tipo_item) {
+      case 'plano':
+        return aluno.forma_pagamento_plano || 'boleto';
+      case 'material':
+        return aluno.forma_pagamento_material || 'boleto';
+      case 'matrícula':
+        return aluno.forma_pagamento_matricula || 'boleto';
+      default:
+        return 'boleto';
+    }
+  }, []);
+
   // Função para calcular progresso total
   const calcularProgressoTotal = useCallback((aluno: AlunoFinanceiro) => {
     // Buscar dados do registro financeiro para obter número total de parcelas
@@ -220,7 +250,8 @@ const StudentGroupingView = ({ alunosFinanceiros, onRefresh }: StudentGroupingVi
       numero_parcela: 1,
       valor: 0,
       data_vencimento: '',
-      observacoes: ''
+      observacoes: '',
+      forma_pagamento: 'boleto'
     });
     setIsCreateModalOpen(true);
   }, []);
@@ -241,6 +272,12 @@ const StudentGroupingView = ({ alunosFinanceiros, onRefresh }: StudentGroupingVi
   const abrirModalMoverParaHistorico = useCallback((alunoId: string, nomeAluno: string, parcelas: ParcelaAluno[]) => {
     setAlunoParaArquivar({ id: alunoId, nome: nomeAluno, parcelas });
     setIsMoverHistoricoModalOpen(true);
+  }, []);
+
+  // Função para abrir modal de visualizar plano
+  const abrirModalVisualizarPlano = useCallback((aluno: AlunoFinanceiro) => {
+    setAlunoPlanoDetalhes(aluno);
+    setIsVisualizarPlanoModalOpen(true);
   }, []);
 
   // Função para criar plano de pagamento
@@ -329,6 +366,9 @@ const StudentGroupingView = ({ alunosFinanceiros, onRefresh }: StudentGroupingVi
           numero_parcelas_plano,
           numero_parcelas_material,
           numero_parcelas_matricula,
+          forma_pagamento_plano,
+          forma_pagamento_material,
+          forma_pagamento_matricula,
           alunos!inner(id, nome)
         `)
         .eq('alunos.status', 'Ativo');
@@ -361,7 +401,10 @@ const StudentGroupingView = ({ alunosFinanceiros, onRefresh }: StudentGroupingVi
           registro_financeiro_id: registro.id,
           numero_parcelas_plano: registro.numero_parcelas_plano,
           numero_parcelas_material: registro.numero_parcelas_material,
-          numero_parcelas_matricula: registro.numero_parcelas_matricula
+          numero_parcelas_matricula: registro.numero_parcelas_matricula,
+          forma_pagamento_plano: registro.forma_pagamento_plano,
+          forma_pagamento_material: registro.forma_pagamento_material,
+          forma_pagamento_matricula: registro.forma_pagamento_matricula
         };
       });
 
@@ -402,7 +445,8 @@ const StudentGroupingView = ({ alunosFinanceiros, onRefresh }: StudentGroupingVi
           data_vencimento: novaParcela.data_vencimento,
           status_pagamento: 'pendente',
           idioma_registro: 'Inglês',
-          observacoes: novaParcela.observacoes || null
+          observacoes: novaParcela.observacoes || null,
+          forma_pagamento: novaParcela.forma_pagamento || 'boleto'
         });
 
       if (error) throw error;
@@ -438,7 +482,8 @@ const StudentGroupingView = ({ alunosFinanceiros, onRefresh }: StudentGroupingVi
           valor: editandoParcela.valor,
           data_vencimento: editandoParcela.data_vencimento,
           status_pagamento: editandoParcela.status_pagamento,
-          observacoes: editandoParcela.observacoes || null
+          observacoes: editandoParcela.observacoes || null,
+          forma_pagamento: editandoParcela.forma_pagamento || 'boleto'
         })
         .eq('id', editandoParcela.id);
 
@@ -778,6 +823,25 @@ const StudentGroupingView = ({ alunosFinanceiros, onRefresh }: StudentGroupingVi
               </div>
               
               <div>
+                <Label htmlFor="forma-pagamento">Forma de Pagamento</Label>
+                <Select 
+                  value={novaParcela.forma_pagamento || 'boleto'} 
+                  onValueChange={(value) => setNovaParcela(prev => prev ? {...prev, forma_pagamento: value} : null)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="boleto">Boleto</SelectItem>
+                    <SelectItem value="cartao">Cartão</SelectItem>
+                    <SelectItem value="pix">PIX</SelectItem>
+                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                    <SelectItem value="transferencia">Transferência</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
                 <Label htmlFor="observacoes">Observações</Label>
                 <textarea
                   id="observacoes"
@@ -891,6 +955,25 @@ const StudentGroupingView = ({ alunosFinanceiros, onRefresh }: StudentGroupingVi
                     <SelectItem value="pago">Pago</SelectItem>
                     <SelectItem value="vencido">Vencido</SelectItem>
                     <SelectItem value="cancelado">Cancelado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="edit-forma-pagamento">Forma de Pagamento</Label>
+                <Select 
+                  value={editandoParcela.forma_pagamento || 'boleto'} 
+                  onValueChange={(value) => setEditandoParcela(prev => prev ? {...prev, forma_pagamento: value} : null)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="boleto">Boleto</SelectItem>
+                    <SelectItem value="cartao">Cartão</SelectItem>
+                    <SelectItem value="pix">PIX</SelectItem>
+                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                    <SelectItem value="transferencia">Transferência</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1157,6 +1240,15 @@ const StudentGroupingView = ({ alunosFinanceiros, onRefresh }: StudentGroupingVi
                                       <motion.button
                                         whileHover={{ scale: 1.05 }}
                                         whileTap={{ scale: 0.95 }}
+                                        onClick={(e) => handleButtonClick(() => abrirModalVisualizarPlano(aluno), e)}
+                                        className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 shadow-lg"
+                                      >
+                                        <Receipt className="h-4 w-4" />
+                                        <span>Visualizar Plano de Pagamento</span>
+                                      </motion.button>
+                                      <motion.button
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
                                         onClick={(e) => handleButtonClick(() => abrirModalVerHistorico(aluno.id, aluno.nome), e)}
                                         className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 shadow-lg"
                                       >
@@ -1201,6 +1293,7 @@ const StudentGroupingView = ({ alunosFinanceiros, onRefresh }: StudentGroupingVi
                                               <span>Valor</span>
                                             </div>
                                           </TableHead>
+                                          <TableHead className="font-semibold text-white">Forma Pagamento</TableHead>
                                           <TableHead className="font-semibold text-white">
                                             <div className="flex items-center space-x-2">
                                               <Calendar className="h-4 w-4" />
@@ -1227,78 +1320,84 @@ const StudentGroupingView = ({ alunosFinanceiros, onRefresh }: StudentGroupingVi
                                         {aluno.parcelas.length > 0 ? (
                                           aluno.parcelas
                                             .sort((a, b) => new Date(a.data_vencimento).getTime() - new Date(b.data_vencimento).getTime())
-                                            .map((parcela, parcelaIndex) => (
-                                              <motion.tr
-                                                key={parcela.id}
-                                                initial={{ opacity: 0, x: -20 }}
-                                                animate={{ opacity: 1, x: 0 }}
-                                                transition={{ duration: 0.3, delay: parcelaIndex * 0.05 }}
-                                                className="hover:bg-red-50 transition-colors duration-200 border-b border-gray-100"
-                                              >
-                                                <TableCell className="font-medium py-4 text-base">
-                                                  <div className="flex items-center gap-2">
-                                                    {getTipoIcon(parcela.tipo_item)}
-                                                    <span className="capitalize font-medium text-base">{parcela.tipo_item}</span>
-                                                  </div>
-                                                </TableCell>
-                                                <TableCell className="py-4 text-base font-semibold">{parcela.numero_parcela}</TableCell>
-                                                <TableCell className="font-bold py-4 text-base text-green-700">{formatCurrency(parcela.valor)}</TableCell>
-                                                <TableCell className="py-4 text-base">{formatDate(parcela.data_vencimento)}</TableCell>
-                                                <TableCell className="py-4 text-base">
-                                                  {parcela.data_pagamento ? formatDate(parcela.data_pagamento) : '-'}
-                                                </TableCell>
-                                                <TableCell className="py-4">
-                                                  <motion.div whileHover={{ scale: 1.05 }}>
-                                                    <Badge className={`${getStatusColor(parcela.status_pagamento)} flex items-center gap-1 w-fit`}>
-                                                      {getStatusIcon(parcela.status_pagamento)}
-                                                      {parcela.status_pagamento.charAt(0).toUpperCase() + parcela.status_pagamento.slice(1)}
-                                                    </Badge>
-                                                  </motion.div>
-                                                </TableCell>
-                                                <TableCell className="py-4 max-w-xs">
-                                                  <div className="text-sm text-gray-600">
-                                                    {parcela.observacoes ? (
-                                                      <div className="truncate" title={parcela.observacoes}>
-                                                        {parcela.observacoes}
-                                                      </div>
-                                                    ) : (
-                                                      <span className="text-gray-400 italic">Sem observações</span>
-                                                    )}
-                                                  </div>
-                                                </TableCell>
-                                                <TableCell className="py-4">
-                                                  <div className="flex gap-2 justify-center">
-                                                    <motion.div
-                                                      whileHover={{ scale: 1.1 }}
-                                                      whileTap={{ scale: 0.9 }}
-                                                    >
-                                                      <Button
-                                                        size="sm"
-                                                        onClick={(e) => handleButtonClick(() => abrirModalEditarParcela(parcela), e)}
-                                                        className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 text-white"
-                                                      >
-                                                        <Edit className="h-4 w-4" />
-                                                      </Button>
+                                            .map((parcela, parcelaIndex) => {
+                                              const formaPagamento = getFormaPagamentoParcela(parcela, aluno);
+                                              return (
+                                                <motion.tr
+                                                  key={parcela.id}
+                                                  initial={{ opacity: 0, x: -20 }}
+                                                  animate={{ opacity: 1, x: 0 }}
+                                                  transition={{ duration: 0.3, delay: parcelaIndex * 0.05 }}
+                                                  className="hover:bg-red-50 transition-colors duration-200 border-b border-gray-100"
+                                                >
+                                                  <TableCell className="font-medium py-4 text-base">
+                                                    <div className="flex items-center gap-2">
+                                                      {getTipoIcon(parcela.tipo_item)}
+                                                      <span className="capitalize font-medium text-base">{parcela.tipo_item}</span>
+                                                    </div>
+                                                  </TableCell>
+                                                  <TableCell className="py-4 text-base font-semibold">{parcela.numero_parcela}</TableCell>
+                                                  <TableCell className="font-bold py-4 text-base text-green-700">{formatCurrency(parcela.valor)}</TableCell>
+                                                  <TableCell className="py-4 text-base capitalize">
+                                                    {formaPagamento}
+                                                  </TableCell>
+                                                  <TableCell className="py-4 text-base">{formatDate(parcela.data_vencimento)}</TableCell>
+                                                  <TableCell className="py-4 text-base">
+                                                    {parcela.data_pagamento ? formatDate(parcela.data_pagamento) : '-'}
+                                                  </TableCell>
+                                                  <TableCell className="py-4">
+                                                    <motion.div whileHover={{ scale: 1.05 }}>
+                                                      <Badge className={`${getStatusColor(parcela.status_pagamento)} flex items-center gap-1 w-fit`}>
+                                                        {getStatusIcon(parcela.status_pagamento)}
+                                                        {parcela.status_pagamento.charAt(0).toUpperCase() + parcela.status_pagamento.slice(1)}
+                                                      </Badge>
                                                     </motion.div>
-                                                    <motion.div
-                                                      whileHover={{ scale: 1.1 }}
-                                                      whileTap={{ scale: 0.9 }}
-                                                    >
-                                                      <Button
-                                                        size="sm"
-                                                        onClick={(e) => handleButtonClick(() => excluirParcela(parcela.id), e)}
-                                                        className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 text-white"
+                                                  </TableCell>
+                                                  <TableCell className="py-4 max-w-xs">
+                                                    <div className="text-sm text-gray-600">
+                                                      {parcela.observacoes ? (
+                                                        <div className="truncate" title={parcela.observacoes}>
+                                                          {parcela.observacoes}
+                                                        </div>
+                                                      ) : (
+                                                        <span className="text-gray-400 italic">Sem observações</span>
+                                                      )}
+                                                    </div>
+                                                  </TableCell>
+                                                  <TableCell className="py-4">
+                                                    <div className="flex gap-2 justify-center">
+                                                      <motion.div
+                                                        whileHover={{ scale: 1.1 }}
+                                                        whileTap={{ scale: 0.9 }}
                                                       >
-                                                        <Trash2 className="h-4 w-4" />
-                                                      </Button>
-                                                    </motion.div>
-                                                  </div>
-                                                </TableCell>
-                                              </motion.tr>
-                                            ))
+                                                        <Button
+                                                          size="sm"
+                                                          onClick={(e) => handleButtonClick(() => abrirModalEditarParcela(parcela), e)}
+                                                          className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 text-white"
+                                                        >
+                                                          <Edit className="h-4 w-4" />
+                                                        </Button>
+                                                      </motion.div>
+                                                      <motion.div
+                                                        whileHover={{ scale: 1.1 }}
+                                                        whileTap={{ scale: 0.9 }}
+                                                      >
+                                                        <Button
+                                                          size="sm"
+                                                          onClick={(e) => handleButtonClick(() => excluirParcela(parcela.id), e)}
+                                                          className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 text-white"
+                                                        >
+                                                          <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                      </motion.div>
+                                                    </div>
+                                                  </TableCell>
+                                                </motion.tr>
+                                              );
+                                            })
                                         ) : (
                                           <TableRow>
-                                            <TableCell colSpan={7} className="py-16">
+                                            <TableCell colSpan={9} className="py-16">
                                               <motion.div 
                                                 className="flex flex-col items-center justify-center space-y-4"
                                                 initial={{ opacity: 0, scale: 0.9 }}
@@ -1434,6 +1533,211 @@ const StudentGroupingView = ({ alunosFinanceiros, onRefresh }: StudentGroupingVi
         aluno={alunoParaArquivar}
         onSuccess={carregarDados}
       />
+
+      {/* Modal Visualizar Plano de Pagamento */}
+      <Dialog open={isVisualizarPlanoModalOpen} onOpenChange={setIsVisualizarPlanoModalOpen}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-3 text-2xl">
+              <div className="bg-gradient-to-r from-red-600 to-gray-800 rounded-full p-2">
+                <Receipt className="h-6 w-6 text-white" />
+              </div>
+              <span>Plano de Pagamento - {alunoPlanoDetalhes?.nome}</span>
+            </DialogTitle>
+          </DialogHeader>
+          
+          {alunoPlanoDetalhes && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-6"
+            >
+              {/* Cards de Resumo Financeiro */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  className="bg-gradient-to-r from-red-50 to-gray-100 p-6 rounded-xl border border-red-200 shadow-lg"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Valor Total</p>
+                      <p className="text-2xl font-bold text-gray-900">{formatCurrency(alunoPlanoDetalhes.valor_total)}</p>
+                    </div>
+                    <div className="bg-gradient-to-r from-red-600 to-gray-800 rounded-full p-3">
+                      <DollarSign className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                </motion.div>
+
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  className="bg-gradient-to-r from-red-50 to-gray-100 p-6 rounded-xl border border-red-200 shadow-lg"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Total de Parcelas</p>
+                      <p className="text-2xl font-bold text-gray-900">{alunoPlanoDetalhes.parcelas.length}</p>
+                    </div>
+                    <div className="bg-gradient-to-r from-red-600 to-gray-800 rounded-full p-3">
+                      <CreditCard className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                </motion.div>
+
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  className="bg-gradient-to-r from-red-50 to-gray-100 p-6 rounded-xl border border-red-200 shadow-lg"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Status Geral</p>
+                      <div className="flex items-center space-x-2 mt-1">
+                        {getStatusGeralIcon(alunoPlanoDetalhes.status_geral)}
+                        <span className="text-lg font-semibold capitalize">{alunoPlanoDetalhes.status_geral}</span>
+                      </div>
+                    </div>
+                    <div className="bg-gradient-to-r from-red-600 to-gray-800 rounded-full p-3">
+                      <TrendingUp className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+
+              {/* Detalhamento por Tipo de Item */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Plano */}
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="bg-white rounded-xl border border-blue-200 shadow-lg overflow-hidden"
+                >
+                  <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-4">
+                    <div className="flex items-center space-x-2 text-white">
+                      <CreditCard className="h-5 w-5" />
+                      <h3 className="font-bold text-lg">Plano</h3>
+                    </div>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Valor Total:</span>
+                      <span className="font-bold text-blue-700">{formatCurrency(alunoPlanoDetalhes.valor_plano || 0)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Parcelas:</span>
+                      <span className="font-semibold">{alunoPlanoDetalhes.numero_parcelas_plano || alunoPlanoDetalhes.parcelas.filter(p => p.tipo_item === 'plano').length}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Pagas:</span>
+                      <span className="font-semibold text-green-600">{alunoPlanoDetalhes.parcelas.filter(p => p.tipo_item === 'plano' && p.status_pagamento === 'pago').length}</span>
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Material */}
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="bg-white rounded-xl border border-purple-200 shadow-lg overflow-hidden"
+                >
+                  <div className="bg-gradient-to-r from-purple-600 to-purple-800 p-4">
+                    <div className="flex items-center space-x-2 text-white">
+                      <Calendar className="h-5 w-5" />
+                      <h3 className="font-bold text-lg">Material</h3>
+                    </div>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Valor Total:</span>
+                      <span className="font-bold text-purple-700">{formatCurrency(alunoPlanoDetalhes.valor_material || 0)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Parcelas:</span>
+                      <span className="font-semibold">{alunoPlanoDetalhes.numero_parcelas_material || alunoPlanoDetalhes.parcelas.filter(p => p.tipo_item === 'material').length}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Pagas:</span>
+                      <span className="font-semibold text-green-600">{alunoPlanoDetalhes.parcelas.filter(p => p.tipo_item === 'material' && p.status_pagamento === 'pago').length}</span>
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Matrícula */}
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="bg-white rounded-xl border border-green-200 shadow-lg overflow-hidden"
+                >
+                  <div className="bg-gradient-to-r from-green-600 to-green-800 p-4">
+                    <div className="flex items-center space-x-2 text-white">
+                      <CheckCircle className="h-5 w-5" />
+                      <h3 className="font-bold text-lg">Matrícula</h3>
+                    </div>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Valor Total:</span>
+                      <span className="font-bold text-green-700">{formatCurrency(alunoPlanoDetalhes.valor_matricula || 0)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Parcelas:</span>
+                      <span className="font-semibold">{alunoPlanoDetalhes.numero_parcelas_matricula || alunoPlanoDetalhes.parcelas.filter(p => p.tipo_item === 'matrícula').length}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Pagas:</span>
+                      <span className="font-semibold text-green-600">{alunoPlanoDetalhes.parcelas.filter(p => p.tipo_item === 'matrícula' && p.status_pagamento === 'pago').length}</span>
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+
+
+
+              {/* Resumo Final */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="bg-gradient-to-r from-red-50 to-gray-100 p-6 rounded-xl border border-red-200 shadow-lg"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
+                  <div>
+                    <p className="text-sm text-gray-600">Parcelas Pagas</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {alunoPlanoDetalhes.parcelas.filter(p => p.status_pagamento === 'pago').length}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Parcelas Pendentes</p>
+                    <p className="text-2xl font-bold text-yellow-600">
+                      {alunoPlanoDetalhes.parcelas.filter(p => p.status_pagamento === 'pendente').length}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Parcelas Vencidas</p>
+                    <p className="text-2xl font-bold text-red-600">
+                      {alunoPlanoDetalhes.parcelas.filter(p => p.status_pagamento === 'vencido').length}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Valor Pago</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {formatCurrency(
+                        alunoPlanoDetalhes.parcelas
+                          .filter(p => p.status_pagamento === 'pago')
+                          .reduce((sum, p) => sum + p.valor, 0)
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Modal Criar Plano de Pagamento */}
       <FinancialPlanDialog

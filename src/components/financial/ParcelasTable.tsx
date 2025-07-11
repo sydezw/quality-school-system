@@ -41,6 +41,7 @@ interface Parcela {
   observacoes?: string | null;
   criado_em: string | null;
   atualizado_em: string | null;
+  forma_pagamento?: string;
   // Dados relacionados via join
   aluno_nome?: string;
   plano_nome?: string;
@@ -523,15 +524,15 @@ const ParcelasTable: React.FC = () => {
                   <motion.div
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    className="flex-1"
+                    className="flex-1 max-w-xs"
                   >
                     <Button
                       onClick={handleCreatePlan}
-                      className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 text-white border-0 px-6 py-2 shadow-lg w-full"
+                      className="w-full bg-gradient-to-r from-red-600 via-gray-700 to-black hover:from-red-700 hover:via-gray-800 hover:to-gray-900 text-white border-0 px-6 py-2 shadow-lg transition-all duration-300"
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       <Users className="h-4 w-4 mr-2" />
-                      Criar Plano Financeiro
+                      Criar Plano de Pagamento
                     </Button>
                   </motion.div>
                   
@@ -582,6 +583,7 @@ const ParcelasTable: React.FC = () => {
                         <TableHead className="font-bold text-gray-700 w-20">Parcela</TableHead>
                         <TableHead className="font-bold text-gray-700 w-32">Valor</TableHead>
                         <TableHead className="font-bold text-gray-700 w-32">Vencimento</TableHead>
+                        <TableHead className="font-bold text-gray-700 w-32">Forma Pagamento</TableHead>
                         <TableHead className="font-bold text-gray-700 w-32">Status</TableHead>
                         <TableHead className="font-bold text-gray-700 min-w-[200px]">Observações</TableHead>
                         <TableHead className="font-bold text-gray-700 text-center w-32">Ações</TableHead>
@@ -628,6 +630,9 @@ const ParcelasTable: React.FC = () => {
                                 <div className="text-base">
                                   {new Date(parcela.data_vencimento).toLocaleDateString('pt-BR')}
                                 </div>
+                              </TableCell>
+                              <TableCell className="text-base text-gray-700">
+                                {parcela.forma_pagamento || '-'}
                               </TableCell>
                               <TableCell>
                                 <motion.div

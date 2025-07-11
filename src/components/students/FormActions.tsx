@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Save, X } from 'lucide-react';
+import { Save } from 'lucide-react';
 import { Student } from '@/integrations/supabase/types';
 
 interface FormActionsProps {
@@ -12,22 +12,13 @@ interface FormActionsProps {
 
 const FormActions = ({ editingStudent, isSubmitting, onCancel }: FormActionsProps) => {
   return (
-    <div className="flex justify-end gap-3 pt-6">
-      <Button
-        type="button"
-        variant="outline"
-        onClick={onCancel}
-        disabled={isSubmitting}
-      >
-        <X className="h-4 w-4 mr-2" />
-        Cancelar
+    <div className="flex gap-2 pt-4">
+      <Button type="submit" className="flex-1 bg-brand-red hover:bg-brand-red/90" disabled={isSubmitting}>
+        <Save />
+        {editingStudent ? 'Salvar Alterações' : 'Salvar Aluno'}
       </Button>
-      <Button
-        type="submit"
-        disabled={isSubmitting}
-      >
-        <Save className="h-4 w-4 mr-2" />
-        {isSubmitting ? 'Salvando...' : (editingStudent ? 'Atualizar' : 'Salvar')} Aluno
+      <Button type="button" variant="outline" onClick={onCancel}>
+        Cancelar
       </Button>
     </div>
   );

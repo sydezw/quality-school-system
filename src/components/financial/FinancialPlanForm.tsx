@@ -29,7 +29,9 @@ interface PlanoGenerico {
   numero_aulas: number;
   descricao?: string;
   carga_horaria_total?: number;
-  frequencia_aulas?: string | number; // Mudança aqui para aceitar Json
+  frequencia_aulas?: any; // Alterado de 'string | number' para 'any' para aceitar Json
+  idioma?: string; // Adicionada propriedade idioma
+  observacao?: string; // Adicionada propriedade observacao
 }
 
 interface Student {
@@ -64,14 +66,12 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
   const [students, setStudents] = useState<Student[]>([]);
   const [planosGenericos, setPlanosGenericos] = useState<PlanoGenerico[]>([]);
   const [dataVencimentoPrimeira, setDataVencimentoPrimeira] = useState<Date | null>(null);
-
   const [openStudentSearch, setOpenStudentSearch] = useState(false);
+  const [openCombobox, setOpenCombobox] = useState(false); // Adicionado estado faltante
   
-  // Adicione esta linha que está faltando:
-  const [dataVencimentoPrimeira, setDataVencimentoPrimeira] = useState<Date | null>(null);
-  
+  // Adicionar esta linha que está faltando:
   const { toast } = useToast();
-
+  
   const { register, handleSubmit, reset, control, watch, setValue } = useForm<FormData>({
     defaultValues: {
       aluno_id: '',
@@ -411,7 +411,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
       <h2 className="text-2xl font-bold mb-4">Criar Plano de Pagamento</h2>
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {/* Seleção de Aluno e Plano */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4 mb-6">
           <div>
             <Label htmlFor="aluno_id">Aluno *</Label>
             <Controller
@@ -419,36 +419,37 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
               control={control}
               rules={{ required: true }}
               render={({ field }) => {
-                const selectedStudent = students.find(student => student.id === field.value);
                 return (
                   <div>
-                    <Popover open={openStudentSearch} onOpenChange={setOpenStudentSearch}>
+                    <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
                           role="combobox"
-                          aria-expanded={openStudentSearch}
-                          className="w-full justify-between"
-                          disabled={!!preSelectedStudent}
+                          aria-expanded={openCombobox}
+                          className="w-full justify-between px-2 py-1 text-sm"
                         >
-                          {selectedStudent ? selectedStudent.nome : "Buscar aluno..."}
+                          {field.value
+                            ? students.find((student) => student.id === field.value)?.nome
+                            : "Selecione o aluno..."}
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-full p-0">
                         <Command>
-                          <CommandInput placeholder="Digite o nome do aluno..." />
+                          <CommandInput placeholder="Buscar aluno..." />
                           <CommandEmpty>Nenhum aluno encontrado.</CommandEmpty>
                           <CommandGroup>
-                            <CommandList className="max-h-[200px] overflow-y-auto">
+                            <CommandList>
                               {students.map((student) => (
                                 <CommandItem
                                   key={student.id}
                                   value={student.nome}
                                   onSelect={() => {
                                     field.onChange(student.id);
-                                    setOpenStudentSearch(false);
+                                    setOpenCombobox(false);
                                   }}
+                                  className="cursor-pointer"
                                 >
                                   <Check
                                     className={cn(
@@ -506,7 +507,127 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
           </div>
         </div>
 
-
+        {/* Header com Cards de Estatísticas - Aparece apenas quando plano é selecionado */}
+        {watchedValues.plano_id && (() => {
+          const planoSelecionado = planosGenericos.find(p => p.id === watchedValues.plano_id);
+          if (!planoSelecionado) return null;
+          
+          const valorPorAula = planoSelecionado.numero_aulas > 0 
+            ? (planoSelecionado.valor_total / planoSelecionado.numero_aulas)
+            : 0;
+          
+          return (
+            <div className="mb-6">
+              {/* Header com fundo harmônico */}
+              <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-lg p-4 shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 text-center">
+                  Detalhes do Plano Selecionado
+                </h3>
+                
+                {/* Grid de Cards de Estatísticas */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {/* Card Valor Total */}
+                  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-gray-500 font-medium">Valor Total</p>
+                        <p className="text-sm font-bold text-gray-800">
+                          R$ {(planoSelecionado.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center">
+                        <span className="text-blue-600 text-xs font-bold">R$</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Card Número de Aulas */}
+                  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-gray-500 font-medium">Nº de Aulas</p>
+                        <p className="text-sm font-bold text-gray-800">
+                          {planoSelecionado.numero_aulas || 0}
+                        </p>
+                      </div>
+                      <div className="w-8 h-8 bg-green-50 rounded-full flex items-center justify-center">
+                        <span className="text-green-600 text-xs font-bold">#</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Card Valor por Aula */}
+                  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-gray-500 font-medium">Valor/Aula</p>
+                        <p className="text-sm font-bold text-gray-800">
+                          R$ {valorPorAula.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div className="w-8 h-8 bg-purple-50 rounded-full flex items-center justify-center">
+                        <span className="text-purple-600 text-xs font-bold">÷</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Card Frequência */}
+                  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-gray-500 font-medium">Frequência</p>
+                        <p className="text-sm font-bold text-gray-800">
+                          {planoSelecionado.frequencia_aulas || 'N/A'}
+                        </p>
+                      </div>
+                      <div className="w-8 h-8 bg-orange-50 rounded-full flex items-center justify-center">
+                        <span className="text-orange-600 text-xs font-bold">⏰</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Segunda linha de cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+                  {/* Card Idioma */}
+                  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-gray-500 font-medium">Idioma</p>
+                        <p className="text-sm font-bold text-gray-800">
+                          {planoSelecionado.idioma || 'N/A'}
+                        </p>
+                      </div>
+                      <div className="w-8 h-8 bg-indigo-50 rounded-full flex items-center justify-center">
+                        <span className="text-indigo-600 text-xs font-bold">🌐</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Card Descrição */}
+                  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
+                    <div>
+                      <p className="text-xs text-gray-500 font-medium mb-1">Descrição</p>
+                      <p className="text-xs text-gray-700 leading-relaxed">
+                        {planoSelecionado.descricao || 'Sem descrição disponível'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Card Observação */}
+                  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
+                    <div>
+                      <p className="text-xs text-gray-500 font-medium mb-1">Observação</p>
+                      <p className="text-xs text-gray-700 leading-relaxed">
+                        {planoSelecionado.observacao || 'Nenhuma observação'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Espaço para futura barra de pesquisa de alunos */}
         <div className="mb-6 h-12">
@@ -876,10 +997,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
             value={dataVencimentoPrimeira}
             onChange={(date) => {
               setDataVencimentoPrimeira(date);
-              setFormData(prev => ({
-                ...prev,
-                data_vencimento_primeira: date ? format(date, 'yyyy-MM-dd') : ''
-              }));
+              setValue('data_vencimento_primeira', date ? format(date, 'yyyy-MM-dd') : ''); // Corrigido: usar setValue ao invés de setFormData
             }}
             placeholder="Selecione a data do primeiro vencimento"
           />

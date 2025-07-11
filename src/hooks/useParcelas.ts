@@ -10,6 +10,7 @@ type ParcelaBase = Tables<'parcelas_alunos'>;
 export interface ParcelaComDetalhes extends ParcelaBase {
   aluno_nome?: string;
   plano_nome?: string;
+  forma_pagamento?: string;
 }
 
 // Tipo para inserção de nova parcela
