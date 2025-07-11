@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MoverParaHistoricoModal } from './modals/MoverParaHistoricoModal';
 import { HistoricoParcelasModal } from './modals/HistoricoParcelasModal';
+import { ExcluirRegistroModal } from './modals/ExcluirRegistroModal';
 import FinancialPlanDialog from './FinancialPlanDialog';
 
 interface AlunoFinanceiro {
@@ -84,6 +85,9 @@ const StudentGroupingView = ({ alunosFinanceiros, onRefresh }: StudentGroupingVi
   const [selectedStudentForPlan, setSelectedStudentForPlan] = useState(null);
   const [isVisualizarPlanoModalOpen, setIsVisualizarPlanoModalOpen] = useState(false);
   const [alunoPlanoDetalhes, setAlunoPlanoDetalhes] = useState<AlunoFinanceiro | null>(null);
+  const [excluirModalOpen, setExcluirModalOpen] = useState(false);
+  const [selectedAluno, setSelectedAluno] = useState<{id: string, nome: string} | null>(null);
+  const [selectedRegistroId, setSelectedRegistroId] = useState<string | null>(null);
   const { toast } = useToast();
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -278,6 +282,13 @@ const StudentGroupingView = ({ alunosFinanceiros, onRefresh }: StudentGroupingVi
   const abrirModalVisualizarPlano = useCallback((aluno: AlunoFinanceiro) => {
     setAlunoPlanoDetalhes(aluno);
     setIsVisualizarPlanoModalOpen(true);
+  }, []);
+
+  // Função para abrir modal de excluir registro
+  const abrirModalExcluirRegistro = useCallback((alunoId: string, nomeAluno: string, registroId: string) => {
+    setSelectedAluno({ id: alunoId, nome: nomeAluno });
+    setSelectedRegistroId(registroId);
+    setExcluirModalOpen(true);
   }, []);
 
   // Função para criar plano de pagamento
@@ -532,6 +543,55 @@ const StudentGroupingView = ({ alunosFinanceiros, onRefresh }: StudentGroupingVi
       });
     }
   }, [toast, carregarDados]);
+
+  // Função para excluir registro financeiro completo
+  const excluirRegistroFinanceiro = useCallback(async (registroId: string, alunoNome: string) => {
+    try {
+      // 1. Verificar se existem parcelas pagas (importante para auditoria)
+      const { data: parcelasPagas } = await supabase
+        .from('parcelas_alunos')
+        .select('*')
+        .eq('registro_financeiro_id', registroId)
+        .eq('status_pagamento', 'pago');
+      
+      if (parcelasPagas && parcelasPagas.length > 0) {
+        toast({
+          title: "Atenção!",
+          description: `Este registro possui ${parcelasPagas.length} parcela(s) já paga(s). Considere mover para histórico em vez de excluir.`,
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // 2. Excluir o registro financeiro principal (parcelas serão excluídas automaticamente por CASCADE)
+      const { error } = await supabase
+        .from('financeiro_alunos')
+        .delete()
+        .eq('id', registroId);
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Sucesso!",
+        description: `Registro financeiro de ${alunoNome} excluído permanentemente.`,
+      });
+      
+      // 3. Atualizar a interface
+      if (onRefresh) {
+        onRefresh();
+      } else {
+        carregarDados();
+      }
+      
+    } catch (error) {
+      console.error('Erro ao excluir registro:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao excluir registro financeiro. Tente novamente.",
+        variant: "destructive"
+      });
+    }
+  }, [toast, carregarDados, onRefresh]);
 
 
 
@@ -1273,6 +1333,16 @@ const StudentGroupingView = ({ alunosFinanceiros, onRefresh }: StudentGroupingVi
                                         <Plus className="h-4 w-4" />
                                         <span>Nova Parcela</span>
                                       </motion.button>
+                                      <motion.button
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        onClick={(e) => handleButtonClick(() => abrirModalExcluirRegistro(aluno.id, aluno.nome, aluno.registro_financeiro_id), e)}
+                                        className="bg-gradient-to-r from-red-700 to-red-900 hover:from-red-800 hover:to-red-950 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 shadow-lg border border-red-600"
+                                        title="Excluir registro financeiro permanentemente"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                        <span>Excluir Registro</span>
+                                      </motion.button>
                                     </div>
                                   </div>
                                   
@@ -1738,6 +1808,28 @@ const StudentGroupingView = ({ alunosFinanceiros, onRefresh }: StudentGroupingVi
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Modal Excluir Registro */}
+      <ExcluirRegistroModal
+        aluno={selectedAluno}
+        registroId={selectedRegistroId}
+        isOpen={excluirModalOpen}
+        onClose={() => {
+          setExcluirModalOpen(false);
+          setSelectedAluno(null);
+          setSelectedRegistroId(null);
+        }}
+        onSuccess={() => {
+          setExcluirModalOpen(false);
+          setSelectedAluno(null);
+          setSelectedRegistroId(null);
+          if (onRefresh) {
+            onRefresh();
+          } else {
+            carregarDados();
+          }
+        }}
+      />
 
       {/* Modal Criar Plano de Pagamento */}
       <FinancialPlanDialog
