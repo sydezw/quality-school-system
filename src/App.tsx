@@ -23,6 +23,7 @@ import Plans from "./pages/app/Plans";
 import Rooms from "./pages/app/Rooms";
 import Birthdays from "./pages/app/Birthdays";
 import ApproveLogins from "./pages/app/ApproveLogins";
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 const queryClient = new QueryClient();
 
@@ -57,7 +58,11 @@ const App = () => {
                                 <Route path="/students" element={<Students />} />
                                 <Route path="/teachers" element={<Teachers />} />
                                 <Route path="/classes" element={<Classes />} />
-                                <Route path="/financial" element={<Financial />} />
+                                <Route path="/financial" element={
+                                    <ErrorBoundary>
+                                        <Financial />
+                                    </ErrorBoundary>
+                                } />
                                 <Route path="/agenda" element={<Agenda />} />
                                 <Route path="/materials" element={<Materials />} />
                                 <Route path="/documents" element={<Documents />} />

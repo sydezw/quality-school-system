@@ -25,6 +25,7 @@ import {
   X,
   Sparkles
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Class {
   id: string;
@@ -46,6 +47,7 @@ const NewStudentForm = ({ classes, onSubmit, onCancel }: NewStudentFormProps): J
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
 
   const form = useForm<StudentFormValues>({
     resolver: zodResolver(studentFormSchema),
@@ -57,7 +59,6 @@ const NewStudentForm = ({ classes, onSubmit, onCancel }: NewStudentFormProps): J
       email: '',
       endereco: '',
       numero: '',
-      // complemento: '', // REMOVIDO
       bairro: '',
       cidade: '',
       estado: '',
@@ -66,7 +67,7 @@ const NewStudentForm = ({ classes, onSubmit, onCancel }: NewStudentFormProps): J
       nivel: '',
       turma_id: '',
       responsavel_id: '',
-      status: 'Ativo',
+      status: undefined,
       observacoes: ''
     }
   });
@@ -89,16 +90,28 @@ const NewStudentForm = ({ classes, onSubmit, onCancel }: NewStudentFormProps): J
         cep: data.cep ? formatCEP(data.cep) : ''
       };
       
+      // Aguardar o resultado do onSubmit
       await onSubmit(formattedData);
+      
+      // Só mostrar animação se salvou com sucesso
+      setShowSuccessAnimation(true);
       
       toast({
         title: "Sucesso!",
         description: "Aluno cadastrado com sucesso!",
       });
+      
+      // Fechar modal após 2 segundos
+      setTimeout(() => {
+        setShowSuccessAnimation(false);
+        onCancel();
+      }, 2000);
+      
     } catch (error) {
+      console.error('Erro detalhado:', error);
       toast({
         title: "Erro",
-        description: "Ocorreu um erro ao cadastrar o aluno. Tente novamente.",
+        description: "Erro ao cadastrar aluno. Tente novamente.",
         variant: "destructive",
       });
     } finally {

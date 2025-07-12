@@ -63,15 +63,19 @@ const PersonalInfoFields = ({ control }: PersonalInfoFieldsProps) => {
                   <div className="p-2 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg">
                     <Calendar className="h-4 w-4 text-white" />
                   </div>
-                  Data de Nascimento *
+                  Data de Nascimento
                 </FormLabel>
                 <FormControl>
                   <Input
                     type="date"
                     placeholder="dd/mm/aaaa"
+
                     className="h-12 text-base border-2 border-gray-200 focus:border-blue-500 focus:ring-blue-500/20 transition-all duration-300 bg-white"
-                    {...field}
                     value={field.value ? new Date(field.value).toISOString().split('T')[0] : ''}
+                    onChange={(e) => {
+                      const dateValue = e.target.value;
+                      field.onChange(dateValue ? new Date(dateValue) : null);
+                    }}
                   />
                 </FormControl>
                 <FormMessage />

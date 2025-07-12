@@ -120,47 +120,79 @@ export const useStudents = () => {
 
   const saveStudent = async (data: any, editingStudent: Student | null) => {
     try {
-      // Processar dados antes de enviar
-      const submitData = {
-        ...data,
-        turma_id: data.turma_id === 'none' ? null : data.turma_id,
-        responsavel_id: data.responsavel_id === 'none' ? null : data.responsavel_id,
-        idioma: (!data.idioma || data.idioma === 'none' || data.idioma === '') ? null : data.idioma
+      // Processar apenas os campos essenciais, removendo campos UUID vazios
+      const submitData: any = {
+        nome: data.nome || null,
+        cpf: data.cpf || null,
+        data_nascimento: data.data_nascimento || null,
+        telefone: data.telefone || null,
+        email: data.email || null,
+        endereco: data.endereco || null,
+        numero_endereco: data.numero || null, // Mapear 'numero' para 'numero_endereco'
+        status: data.status || 'Ativo'
       };
-
+  
+      // Só incluir idioma se tiver valor válido
+      if (data.idioma && data.idioma !== 'none' && data.idioma !== '') {
+        submitData.idioma = data.idioma;
+      }
+  
+      // Só incluir turma_id se tiver valor UUID válido
+      if (data.turma_id && data.turma_id !== 'none' && data.turma_id !== '' && data.turma_id.length > 10) {
+        submitData.turma_id = data.turma_id;
+      }
+  
+      // Só incluir responsavel_id se tiver valor UUID válido
+      if (data.responsavel_id && data.responsavel_id !== 'none' && data.responsavel_id !== '' && data.responsavel_id.length > 10) {
+        submitData.responsavel_id = data.responsavel_id;
+      }
+  
+      console.log('Dados que serão enviados:', submitData);
+  
       if (editingStudent) {
         const { error } = await supabase
           .from('alunos')
           .update(submitData)
           .eq('id', editingStudent.id);
-
-        if (error) throw error;
+  
+        if (error) {
+          console.error('Erro ao atualizar:', error);
+          throw error;
+        }
+        
         toast({
           title: "Sucesso",
           description: "Aluno atualizado com sucesso!",
         });
       } else {
-        const { error } = await supabase
+        const { data: insertedData, error } = await supabase
           .from('alunos')
-          .insert([submitData]);
-
-        if (error) throw error;
+          .insert([submitData])
+          .select();
+  
+        if (error) {
+          console.error('Erro ao inserir:', error);
+          throw error;
+        }
+        
+        console.log('Aluno criado:', insertedData);
+        
         toast({
           title: "Sucesso",
           description: "Aluno criado com sucesso!",
         });
       }
-
-      fetchStudents();
+  
+      await fetchStudents();
       return true;
     } catch (error) {
       console.error('Erro ao salvar aluno:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível salvar o aluno.",
+        description: `Não foi possível salvar o aluno: ${error.message || 'Erro desconhecido'}`,
         variant: "destructive",
       });
-      return false;
+      throw error;
     }
   };
 

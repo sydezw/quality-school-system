@@ -31,10 +31,14 @@ const Students = () => {
   const [currentPage, setCurrentPage] = useState(1);
 
   const handleSubmit = async (data: any) => {
-    const success = await saveStudent(data, editingStudent);
-    if (success) {
-      setIsDialogOpen(false);
-      setEditingStudent(null);
+    try {
+      const success = await saveStudent(data, editingStudent);
+      if (success) {
+        setIsDialogOpen(false);
+        setEditingStudent(null);
+      }
+    } catch (error) {
+      console.error('Erro ao salvar aluno:', error);
     }
   };
 

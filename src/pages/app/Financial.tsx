@@ -16,7 +16,9 @@ import FinancialPlanDialog from '@/components/financial/FinancialPlanDialog';
 import RenewalAlertsTable from '@/components/financial/RenewalAlertsTable';
 import ParcelasTable from '@/components/financial/ParcelasTable';
 import StudentGroupingView from '@/components/financial/StudentGroupingView';
+import DespesasTable from '@/components/financial/DespesasTable';
 import { StatusAluno } from '@/types/financial';
+import FinancialReportsTable from '@/components/financial/FinancialReportsTable';
 
 
 // Interfaces movidas para @/types/financial
@@ -201,7 +203,7 @@ const Financial = () => {
                 whileTap={{ scale: 0.95 }}
                 transition={{ duration: 0.2 }}
               >
-                Financeiro Operacional
+                Despesas
               </motion.span>
             </TabsTrigger>
             <TabsTrigger 
@@ -262,7 +264,7 @@ const Financial = () => {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3, delay: 0.1 }}
             >
-              {/* ... existing code ... */}
+              <DespesasTable />
             </motion.div>
           </TabsContent>
 
@@ -282,7 +284,7 @@ const Financial = () => {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3, delay: 0.1 }}
             >
-              {/* ... existing code ... */}
+              <FinancialReportsTable />
             </motion.div>
           </TabsContent>
         </motion.div>

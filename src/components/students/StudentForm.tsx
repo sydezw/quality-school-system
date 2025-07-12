@@ -123,7 +123,6 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
         email: editingStudent.email || '',
         endereco: editingStudent.endereco || '',
         numero: editingStudent.numero || '',
-        // complemento: editingStudent.complemento as string || '', // REMOVIDO
         bairro: editingStudent.bairro || '',
         cidade: editingStudent.cidade || '',
         estado: editingStudent.estado || '',
@@ -135,9 +134,33 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
         status: (editingStudent.status as "Ativo" | "Inativo" | "Suspenso") || 'Ativo',
         observacoes: editingStudent.observacoes || ''
       });
+      
       setSelectedIdioma(editingStudent.idioma || '');
     }
   }, [editingStudent, form]);
+
+  // Preencher formulário quando editingStudent mudar
+  useEffect(() => {
+    if (editingStudent) {
+      const formattedDate = editingStudent.data_nascimento 
+        ? new Date(editingStudent.data_nascimento + 'T00:00:00') 
+        : null;
+  
+      setValue('nome', editingStudent.nome || '');
+      setValue('cpf', editingStudent.cpf || '');
+      setValue('data_nascimento', formattedDate);
+      setValue('telefone', editingStudent.telefone || '');
+      setValue('email', editingStudent.email || '');
+      setValue('endereco', editingStudent.endereco || '');
+      setValue('numero', editingStudent.numero_endereco || editingStudent.numero || ''); // Mapear numero_endereco para numero
+      setValue('idioma', editingStudent.idioma || '');
+      setValue('turma_id', editingStudent.turma_id || '');
+      setValue('responsavel_id', editingStudent.responsavel_id || '');
+      setValue('status', editingStudent.status || 'Ativo');
+      
+      setSelectedIdioma(editingStudent.idioma || '');
+    }
+  }, [editingStudent, setValue]);
 
   const handleFormSubmit = async (data: StudentFormValues) => {
     try {
@@ -147,16 +170,17 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
       const formattedData = {
         ...data,
         cpf: data.cpf ? formatCPF(data.cpf) : '',
-        cep: data.cep ? formatCEP(data.cep) : ''
+        cep: data.cep ? formatCEP(data.cep) : '',
+        numero: data.numero || '' // Garantir que o campo numero seja enviado
       };
       
       await onSubmit(formattedData);
       
-      toast({
-        title: "Sucesso!",
-        description: editingStudent ? "Aluno atualizado com sucesso!" : "Aluno cadastrado com sucesso!",
-      });
+      // Fechar o formulário após sucesso
+      onCancel();
+      
     } catch (error) {
+      console.error('Erro ao salvar:', error);
       toast({
         title: "Erro",
         description: "Ocorreu um erro ao salvar o aluno. Tente novamente.",
