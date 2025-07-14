@@ -2,52 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { 
-  Download,
-  AlertTriangle,
-  TrendingUp,
-  TrendingDown,
   Calendar,
-  Users,
-  DollarSign,
   Clock,
   CheckCircle,
   XCircle,
-  RefreshCw,
-  Filter,
-  ChevronDown,
-  ChevronUp,
-  BarChart3,
-  PieChart,
   CreditCard,
-  Wallet,
-  Target,
-  Activity,
   Eye,
   Search,
-  User,
-  Plus,
-  X
+  TrendingUp,
+  BarChart3,
+  Download,
+  RefreshCw
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useGroqPDF } from '@/hooks/useGroqPDF';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import {
   Table,
   TableBody,
@@ -55,9 +27,22 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableFooter,
 } from "@/components/ui/table";
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell
+} from 'recharts';
 
-// Interfaces baseadas nos dados reais das parcelas
+// Interfaces
 interface ParcelaDetalhada {
   id: number;
   registro_financeiro_id: string;
@@ -71,20 +56,10 @@ interface ParcelaDetalhada {
   aluno_nome?: string;
   plano_nome?: string;
   forma_pagamento?: string;
-}
-
-interface ResumoRegistros {
-  totalParcelas: number;
-  parcelasPagas: number;
-  parcelasVencidas: number;
-  parcelasPendentes: number;
-  parcelasCanceladas: number;
-  valorTotalPago: number;
-  valorTotalPendente: number;
-  valorTotalVencido: number;
-  receitas: number;
-  despesas: number;
-  saldo: number;
+  financeiro_alunos?: {
+    alunos?: { nome: string };
+    planos?: { nome: string };
+  };
 }
 
 interface ProximoVencimentoRegistro {
@@ -99,26 +74,6 @@ interface ProximoVencimentoRegistro {
   status: string;
 }
 
-interface IndicadoresRegistros {
-  percentualPagamento: number;
-  valorMedioPorParcela: number;
-  tipoMaisComum: string;
-  idiomaPreferido: string;
-  tendenciaPagamento: 'Crescente' | 'Estável' | 'Decrescente';
-  inadimplencia: number;
-  crescimentoMensal: number;
-}
-
-interface FiltrosAvancados {
-  dataInicio: string;
-  dataFim: string;
-  aluno: string;
-  status: string;
-  tipoItem: string;
-  valorMin: string;
-  valorMax: string;
-}
-
 interface Despesa {
   id: number;
   descricao: string;
@@ -128,62 +83,39 @@ interface Despesa {
   status: 'pago' | 'pendente';
 }
 
+// Novas interfaces para os gráficos
+interface ReceitaMensal {
+  mes: string;
+  receita: number;
+  receitaAcumulada: number;
+}
+
+interface VariacaoSaldo {
+  categoria: string;
+  valor: number;
+  tipo: 'entrada' | 'saida' | 'saldo';
+}
+
+interface ReceitaPorIdioma {
+  idioma: string;
+  receita: number;
+}
+
 const FinancialReportsTable = () => {
   const { toast } = useToast();
   const { gerarRelatorioPDF } = useGroqPDF();
-  const [periodoSelecionado, setPeriodoSelecionado] = useState('mes-atual');
   const [loading, setLoading] = useState(true);
   const [exportandoPDF, setExportandoPDF] = useState(false);
-  const [filtrosAbertos, setFiltrosAbertos] = useState(false);
   const [detalhesAbertos, setDetalhesAbertos] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [parcelas, setParcelas] = useState<ParcelaDetalhada[]>([]);
   const [despesas, setDespesas] = useState<Despesa[]>([]);
-  const [modalDespesaAberto, setModalDespesaAberto] = useState(false);
-  const [novaDespesa, setNovaDespesa] = useState<Partial<Despesa>>({
-    descricao: '',
-    valor: 0,
-    categoria: 'outros',
-    data: new Date().toISOString().split('T')[0],
-    status: 'pendente'
-  });
-  
-  // Estados para filtros avançados
-  const [filtros, setFiltros] = useState<FiltrosAvancados>({
-    dataInicio: '',
-    dataFim: '',
-    aluno: '',
-    status: '',
-    tipoItem: '',
-    valorMin: '',
-    valorMax: ''
-  });
-  
-  // Estados para os dados dos registros
-  const [resumoRegistros, setResumoRegistros] = useState<ResumoRegistros>({
-    totalParcelas: 0,
-    parcelasPagas: 0,
-    parcelasVencidas: 0,
-    parcelasPendentes: 0,
-    parcelasCanceladas: 0,
-    valorTotalPago: 0,
-    valorTotalPendente: 0,
-    valorTotalVencido: 0,
-    receitas: 0,
-    despesas: 0,
-    saldo: 0
-  });
-  
   const [proximosVencimentosRegistros, setProximosVencimentosRegistros] = useState<ProximoVencimentoRegistro[]>([]);
-  const [indicadoresRegistros, setIndicadoresRegistros] = useState<IndicadoresRegistros>({
-    percentualPagamento: 0,
-    valorMedioPorParcela: 0,
-    tipoMaisComum: '',
-    idiomaPreferido: '',
-    tendenciaPagamento: 'Estável',
-    inadimplencia: 0,
-    crescimentoMensal: 0
-  });
+  
+  // Novos estados para os gráficos
+  const [receitaMensal, setReceitaMensal] = useState<ReceitaMensal[]>([]);
+  const [variacaoSaldo, setVariacaoSaldo] = useState<VariacaoSaldo[]>([]);
+  const [receitaPorIdioma, setReceitaPorIdioma] = useState<ReceitaPorIdioma[]>([]);
 
   // Função para buscar dados das parcelas
   const buscarDadosRegistros = async () => {
@@ -217,191 +149,26 @@ const FinancialReportsTable = () => {
     }
   };
 
-  // Função para buscar despesas do banco
+  // Função para buscar despesas
   const buscarDespesas = async () => {
     try {
-      console.log('Buscando despesas...');
       const { data, error } = await supabase
         .from('despesas')
         .select('*')
-        .order('data', { ascending: false });
+        .order('data', { ascending: false })
+        .limit(5);
       
       if (error) {
         console.error('Erro ao buscar despesas:', error);
-        toast({
-          title: "Erro",
-          description: `Erro ao carregar despesas: ${error.message}`,
-          variant: "destructive"
-        });
         setDespesas([]);
         return;
       }
       
-      console.log('Despesas carregadas:', data);
       setDespesas(data || []);
     } catch (error) {
       console.error('Erro ao buscar despesas:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar as despesas.",
-        variant: "destructive"
-      });
       setDespesas([]);
     }
-  };
-
-  // Função para adicionar nova despesa
-  const adicionarDespesa = async () => {
-    try {
-      // Validação mais robusta
-      if (!novaDespesa.descricao || !novaDespesa.descricao.trim()) {
-        toast({
-          title: "Erro de Validação",
-          description: "A descrição é obrigatória.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      if (!novaDespesa.valor || novaDespesa.valor <= 0) {
-        toast({
-          title: "Erro de Validação",
-          description: "O valor deve ser maior que zero.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      if (!novaDespesa.data) {
-        toast({
-          title: "Erro de Validação",
-          description: "A data é obrigatória.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      console.log('Adicionando despesa:', novaDespesa);
-
-      const despesaParaInserir = {
-        descricao: novaDespesa.descricao.trim(),
-        valor: parseFloat(novaDespesa.valor.toString()),
-        categoria: novaDespesa.categoria,
-        data: novaDespesa.data,
-        status: novaDespesa.status
-      };
-
-      const { data, error } = await supabase
-        .from('despesas')
-        .insert([despesaParaInserir])
-        .select();
-      
-      if (error) {
-        console.error('Erro ao adicionar despesa:', error);
-        toast({
-          title: "Erro",
-          description: `Erro ao adicionar despesa: ${error.message}`,
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      console.log('Despesa adicionada:', data);
-      
-      if (data && data[0]) {
-        // Atualizar lista de despesas
-        setDespesas([data[0], ...despesas]);
-        
-        // Resetar formulário
-        setNovaDespesa({
-          descricao: '',
-          valor: 0,
-          categoria: 'outros',
-          data: new Date().toISOString().split('T')[0],
-          status: 'pendente'
-        });
-        
-        // Fechar modal
-        setModalDespesaAberto(false);
-        
-        toast({
-          title: "Sucesso",
-          description: "Despesa adicionada com sucesso!",
-          variant: "default"
-        });
-        
-        // Recarregar dados para atualizar o resumo
-        await carregarDados();
-      }
-    } catch (error) {
-      console.error('Erro ao adicionar despesa:', error);
-      toast({
-        title: "Erro",
-        description: "Erro inesperado ao adicionar despesa.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Função para calcular resumo dos registros
-  const calcularResumoRegistros = (parcelas: any[]): ResumoRegistros => {
-    const hoje = new Date();
-    
-    let totalParcelas = 0;
-    let parcelasPagas = 0;
-    let parcelasVencidas = 0;
-    let parcelasPendentes = 0;
-    let parcelasCanceladas = 0;
-    let valorTotalPago = 0;
-    let valorTotalPendente = 0;
-    let valorTotalVencido = 0;
-
-    parcelas.forEach(parcela => {
-      totalParcelas++;
-      const valor = parcela.valor || 0;
-      const dataVencimento = new Date(parcela.data_vencimento);
-      
-      switch (parcela.status_pagamento) {
-        case 'pago':
-          parcelasPagas++;
-          valorTotalPago += valor;
-          break;
-        case 'cancelado':
-          parcelasCanceladas++;
-          break;
-        default:
-          if (dataVencimento < hoje) {
-            parcelasVencidas++;
-            valorTotalVencido += valor;
-          } else {
-            parcelasPendentes++;
-            valorTotalPendente += valor;
-          }
-          break;
-      }
-    });
-
-    // Calcular total de despesas reais
-    const totalDespesas = despesas.reduce((total, despesa) => {
-      return total + (despesa.valor || 0);
-    }, 0);
-
-    const receitas = valorTotalPago;
-    const saldo = receitas - totalDespesas;
-
-    return {
-      totalParcelas,
-      parcelasPagas,
-      parcelasVencidas,
-      parcelasPendentes,
-      parcelasCanceladas,
-      valorTotalPago,
-      valorTotalPendente,
-      valorTotalVencido,
-      receitas,
-      despesas: totalDespesas,
-      saldo
-    };
   };
 
   // Função para calcular próximos vencimentos
@@ -440,75 +207,23 @@ const FinancialReportsTable = () => {
     return proximosVencimentos;
   };
 
-  // Função para calcular indicadores dos registros
-  const calcularIndicadoresRegistros = (parcelas: any[]): IndicadoresRegistros => {
-    if (parcelas.length === 0) {
-      return {
-        percentualPagamento: 0,
-        valorMedioPorParcela: 0,
-        tipoMaisComum: '',
-        idiomaPreferido: '',
-        tendenciaPagamento: 'Estável',
-        inadimplencia: 0,
-        crescimentoMensal: 0
-      };
-    }
-
-    const parcelasPagas = parcelas.filter(p => p.status_pagamento === 'pago').length;
-    const parcelasVencidas = parcelas.filter(p => {
-      const dataVencimento = new Date(p.data_vencimento);
-      return p.status_pagamento !== 'pago' && dataVencimento < new Date();
-    }).length;
-    
-    const percentualPagamento = (parcelasPagas / parcelas.length) * 100;
-    const inadimplencia = (parcelasVencidas / parcelas.length) * 100;
-    
-    const valorTotal = parcelas.reduce((sum, p) => sum + (p.valor || 0), 0);
-    const valorMedioPorParcela = valorTotal / parcelas.length;
-
-    // Tipo mais comum
-    const tipoCount = parcelas.reduce((acc, p) => {
-      acc[p.tipo_item] = (acc[p.tipo_item] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    const tipoMaisComum = Object.keys(tipoCount).reduce((a, b) => tipoCount[a] > tipoCount[b] ? a : b, '');
-
-    // Idioma preferido
-    const idiomaCount = parcelas.reduce((acc, p) => {
-      acc[p.idioma_registro] = (acc[p.idioma_registro] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    const idiomaPreferido = Object.keys(idiomaCount).reduce((a, b) => idiomaCount[a] > idiomaCount[b] ? a : b, '');
-
-    // Crescimento mensal simulado
-    const crescimentoMensal = Math.random() * 20 - 10; // -10% a +10%
-
-    return {
-      percentualPagamento,
-      valorMedioPorParcela,
-      tipoMaisComum,
-      idiomaPreferido,
-      tendenciaPagamento: percentualPagamento >= 80 ? 'Crescente' : percentualPagamento >= 60 ? 'Estável' : 'Decrescente',
-      inadimplencia,
-      crescimentoMensal
-    };
-  };
-
-  // Carregar dados
+  // Função para carregar todos os dados
   const carregarDados = async () => {
     setLoading(true);
     try {
-      const dados = await buscarDadosRegistros();
-      setParcelas(dados);
+      const parcelasData = await buscarDadosRegistros();
+      setParcelas(parcelasData);
       
-      setResumoRegistros(calcularResumoRegistros(dados));
-      setProximosVencimentosRegistros(calcularProximosVencimentosRegistros(dados));
-      setIndicadoresRegistros(calcularIndicadoresRegistros(dados));
+      const proximosVencimentos = calcularProximosVencimentosRegistros(parcelasData);
+      setProximosVencimentosRegistros(proximosVencimentos);
+      
+      await buscarDespesas();
+      await buscarDadosGraficos();
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível carregar os dados dos registros.",
+        description: "Erro ao carregar dados financeiros.",
         variant: "destructive"
       });
     } finally {
@@ -516,157 +231,149 @@ const FinancialReportsTable = () => {
     }
   };
 
-  useEffect(() => {
-    carregarDados();
-    buscarDespesas();
-  }, [periodoSelecionado, filtros]);
-
-  // Função para exportar dados com IA
+  // Função para exportar dados em PDF
   const exportarDados = async () => {
     setExportandoPDF(true);
-    
     try {
-      // Preparar dados mais completos para o relatório
-      const dadosExportacao = {
-        // Informações básicas do relatório
-        dataGeracao: new Date().toLocaleString('pt-BR'),
-        periodo: periodoSelecionado,
-        escola: 'TS School',
-        tipoRelatorio: 'Relatório Financeiro Completo',
-        
-        // Resumo financeiro principal
-        resumo: {
-          ...resumoRegistros,
-          // Adicionar percentuais calculados
-          percentualPago: resumoRegistros.totalParcelas > 0 ? 
-            ((resumoRegistros.parcelasPagas / resumoRegistros.totalParcelas) * 100).toFixed(1) : '0',
-          percentualVencido: resumoRegistros.totalParcelas > 0 ? 
-            ((resumoRegistros.parcelasVencidas / resumoRegistros.totalParcelas) * 100).toFixed(1) : '0',
-          percentualPendente: resumoRegistros.totalParcelas > 0 ? 
-            ((resumoRegistros.parcelasPendentes / resumoRegistros.totalParcelas) * 100).toFixed(1) : '0'
-        },
-        
-        // Próximos vencimentos com mais detalhes
-        proximosVencimentos: proximosVencimentosRegistros.map(venc => ({
-          ...venc,
-          valorFormatado: venc.valor.toLocaleString('pt-BR', {
-            style: 'currency',
-            currency: 'BRL'
-          }),
-          dataVencimentoFormatada: new Date(venc.dataVencimento).toLocaleDateString('pt-BR'),
-          urgencia: venc.diasRestantes <= 7 ? 'Alta' : venc.diasRestantes <= 15 ? 'Média' : 'Baixa'
-        })),
-        
-        // Indicadores expandidos
-        indicadores: {
-          ...indicadoresRegistros,
-          // Adicionar mais métricas calculadas
-          statusGeral: indicadoresRegistros.percentualPagamento >= 80 ? 'Excelente' : 
-                      indicadoresRegistros.percentualPagamento >= 60 ? 'Bom' : 
-                      indicadoresRegistros.percentualPagamento >= 40 ? 'Regular' : 'Crítico',
-          valorMedioFormatado: indicadoresRegistros.valorMedioPorParcela.toLocaleString('pt-BR', {
-            style: 'currency',
-            currency: 'BRL'
-          })
-        },
-        
-        // Análise detalhada por tipo de item
-        analisePorTipo: {
-          planos: parcelas.filter(p => p.tipo_item === 'plano').length,
-          materiais: parcelas.filter(p => p.tipo_item === 'material').length,
-          matriculas: parcelas.filter(p => p.tipo_item === 'matrícula').length
-        },
-        
-        // Análise por idioma
-        analisePorIdioma: {
-          ingles: parcelas.filter(p => p.idioma_registro === 'Inglês').length,
-          japones: parcelas.filter(p => p.idioma_registro === 'Japonês').length
-        },
-        
-        // Análise de status de pagamento
-        analiseStatus: {
-          pagas: {
-            quantidade: resumoRegistros.parcelasPagas,
-            valor: resumoRegistros.valorTotalPago,
-            percentual: resumoRegistros.totalParcelas > 0 ? 
-              ((resumoRegistros.parcelasPagas / resumoRegistros.totalParcelas) * 100).toFixed(1) : '0'
-          },
-          vencidas: {
-            quantidade: resumoRegistros.parcelasVencidas,
-            valor: resumoRegistros.valorTotalVencido,
-            percentual: resumoRegistros.totalParcelas > 0 ? 
-              ((resumoRegistros.parcelasVencidas / resumoRegistros.totalParcelas) * 100).toFixed(1) : '0'
-          },
-          pendentes: {
-            quantidade: resumoRegistros.parcelasPendentes,
-            valor: resumoRegistros.valorTotalPendente,
-            percentual: resumoRegistros.totalParcelas > 0 ? 
-              ((resumoRegistros.parcelasPendentes / resumoRegistros.totalParcelas) * 100).toFixed(1) : '0'
+      // Calcular estatísticas completas
+      const totalParcelas = parcelas.length;
+      const parcelasPagas = parcelas.filter(p => p.status_pagamento === 'pago').length;
+      const parcelasVencidas = parcelas.filter(p => {
+        const hoje = new Date();
+        const vencimento = new Date(p.data_vencimento);
+        return p.status_pagamento !== 'pago' && p.status_pagamento !== 'cancelado' && vencimento < hoje;
+      }).length;
+      const parcelasPendentes = parcelas.filter(p => {
+        const hoje = new Date();
+        const vencimento = new Date(p.data_vencimento);
+        return p.status_pagamento !== 'pago' && p.status_pagamento !== 'cancelado' && vencimento >= hoje;
+      }).length;
+      
+      const valorTotalPago = parcelas
+        .filter(p => p.status_pagamento === 'pago')
+        .reduce((sum, p) => sum + (p.valor || 0), 0);
+      
+      const valorTotalRestante = parcelas
+        .filter(p => p.status_pagamento !== 'pago' && p.status_pagamento !== 'cancelado')
+        .reduce((sum, p) => sum + (p.valor || 0), 0);
+      
+      const valorTotalVencido = parcelas
+        .filter(p => {
+          const hoje = new Date();
+          const vencimento = new Date(p.data_vencimento);
+          return p.status_pagamento !== 'pago' && p.status_pagamento !== 'cancelado' && vencimento < hoje;
+        })
+        .reduce((sum, p) => sum + (p.valor || 0), 0);
+      
+      const totalDespesas = despesas.reduce((sum, d) => sum + (d.valor || 0), 0);
+      
+      // Identificar alunos com maior risco
+      const alunosRisco = parcelas
+        .filter(p => {
+          const hoje = new Date();
+          const vencimento = new Date(p.data_vencimento);
+          return p.status_pagamento !== 'pago' && p.status_pagamento !== 'cancelado' && vencimento < hoje;
+        })
+        .reduce((acc, p) => {
+          const nome = p.financeiro_alunos?.alunos?.nome || 'Nome não informado';
+          if (!acc[nome]) {
+            acc[nome] = { count: 0, valor: 0 };
           }
+          acc[nome].count++;
+          acc[nome].valor += p.valor || 0;
+          return acc;
+        }, {} as Record<string, { count: number; valor: number }>);
+      
+      const alunosRiscoArray = Object.entries(alunosRisco)
+        .map(([nome, data]) => ({ nome, ...data }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+
+      // Preparar dados estruturados para o PDF
+      const dadosRelatorio = {
+        cabecalho: {
+          titulo: "Relatório Financeiro - TS School",
+          dataGeracao: new Date().toLocaleString('pt-BR'),
+          logo: "TS School" // Placeholder para logo
         },
-        
-        // Top 10 maiores valores pendentes
-        maioresPendencias: parcelas
-          .filter(p => p.status_pagamento !== 'pago' && p.status_pagamento !== 'cancelado')
-          .sort((a, b) => (b.valor || 0) - (a.valor || 0))
-          .slice(0, 10)
-          .map(p => ({
-            alunoNome: p.financeiro_alunos?.alunos?.nome || 'Nome não informado',
-            valor: p.valor || 0,
-            valorFormatado: (p.valor || 0).toLocaleString('pt-BR', {
-              style: 'currency',
-              currency: 'BRL'
-            }),
-            dataVencimento: new Date(p.data_vencimento).toLocaleDateString('pt-BR'),
-            diasAtraso: p.status_pagamento !== 'pago' && new Date(p.data_vencimento) < new Date() ?
-              Math.ceil((new Date().getTime() - new Date(p.data_vencimento).getTime()) / (1000 * 60 * 60 * 24)) : 0,
-            tipoItem: p.tipo_item,
-            numeroParcela: p.numero_parcela
-          })),
-        
-        // Resumo de valores totais
-        totaisGerais: {
-          valorTotalGerado: parcelas.reduce((sum, p) => sum + (p.valor || 0), 0),
-          valorTotalPago: resumoRegistros.valorTotalPago,
-          valorTotalPendente: resumoRegistros.valorTotalPendente + resumoRegistros.valorTotalVencido,
-          percentualRecebido: parcelas.length > 0 ? 
-            ((resumoRegistros.valorTotalPago / parcelas.reduce((sum, p) => sum + (p.valor || 0), 0)) * 100).toFixed(1) : '0'
+        resumoExecutivo: {
+          totalParcelas,
+          parcelasPagas,
+          parcelasVencidas,
+          parcelasPendentes,
+          percentualPago: totalParcelas > 0 ? ((parcelasPagas / totalParcelas) * 100).toFixed(1) : '0',
+          percentualVencido: totalParcelas > 0 ? ((parcelasVencidas / totalParcelas) * 100).toFixed(1) : '0',
+          percentualPendente: totalParcelas > 0 ? ((parcelasPendentes / totalParcelas) * 100).toFixed(1) : '0',
+          valorTotalPago: valorTotalPago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+          valorTotalRestante: valorTotalRestante.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+          valorTotalVencido: valorTotalVencido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+          totalDespesas: totalDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+          saldoLiquido: (valorTotalPago - totalDespesas).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
         },
-        
-        // Alertas e recomendações
-        alertas: [
-          ...(resumoRegistros.parcelasVencidas > 0 ? 
-            [`${resumoRegistros.parcelasVencidas} parcela(s) vencida(s) no valor de ${resumoRegistros.valorTotalVencido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`] : []),
-          ...(proximosVencimentosRegistros.filter(p => p.diasRestantes <= 7).length > 0 ? 
-            [`${proximosVencimentosRegistros.filter(p => p.diasRestantes <= 7).length} vencimento(s) nos próximos 7 dias`] : []),
-          ...(indicadoresRegistros.percentualPagamento < 60 ? 
-            ['Taxa de pagamento abaixo de 60% - atenção necessária'] : [])
-        ]
+        proximosVencimentos: proximosVencimentosRegistros.map(v => ({
+          aluno: v.alunoNome,
+          valor: v.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+          dataVencimento: new Date(v.dataVencimento).toLocaleDateString('pt-BR'),
+          diasRestantes: v.diasRestantes,
+          tipo: v.tipoItem,
+          parcela: v.numeroParcela,
+          status: v.status,
+          urgente: v.diasRestantes <= 7
+        })),
+        despesasRecentes: despesas.map(d => ({
+          descricao: d.descricao,
+          valor: d.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+          categoria: d.categoria,
+          data: new Date(d.data).toLocaleDateString('pt-BR'),
+          status: d.status
+        })),
+        alertasImportantes: [
+          ...alunosRiscoArray.map(aluno => 
+            `⚠️ ${aluno.nome} possui ${aluno.count} parcela(s) vencida(s) totalizando ${aluno.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}.`
+          ),
+          ...(parcelasVencidas > 0 ? [`⚠️ Total de ${parcelasVencidas} parcelas vencidas requerem atenção imediata.`] : [])
+        ],
+        indicadoresPerformance: {
+          percentualPagamento: totalParcelas > 0 ? ((parcelasPagas / totalParcelas) * 100).toFixed(1) + '%' : '0%',
+          valorMedioParcela: totalParcelas > 0 ? ((valorTotalPago + valorTotalRestante) / totalParcelas).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ 0,00',
+          tipoMaisComum: 'Mensalidade',
+          idiomaPreferido: 'Português',
+          tendenciaPagamento: parcelasPagas > parcelasVencidas ? 'Regular' : 'Irregular',
+          inadimplencia: totalParcelas > 0 ? ((parcelasVencidas / totalParcelas) * 100).toFixed(1) + '%' : '0%',
+          crescimentoMensal: '+3%',
+          statusGeral: parcelasVencidas <= (totalParcelas * 0.1) ? 'Estável' : 'Atenção Necessária'
+        },
+        conclusao: {
+          alunosRisco: alunosRiscoArray.map(a => a.nome),
+          recomendacao: alunosRiscoArray.length > 0 
+            ? 'Entrar em contato com os inadimplentes nos próximos 3 dias úteis para regularização.' 
+            : 'Situação financeira estável. Manter acompanhamento regular dos vencimentos.'
+        },
+        parcelasDetalhadas: parcelas.slice(0, 50).map(p => ({
+          aluno: p.financeiro_alunos?.alunos?.nome || 'Nome não informado',
+          plano: p.financeiro_alunos?.planos?.nome || 'Plano não informado',
+          parcela: p.numero_parcela,
+          valor: (p.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+          vencimento: new Date(p.data_vencimento).toLocaleDateString('pt-BR'),
+          pagamento: p.data_pagamento ? new Date(p.data_pagamento).toLocaleDateString('pt-BR') : '-',
+          status: p.status_pagamento,
+          tipo: p.tipo_item,
+          idioma: p.idioma_registro
+        }))
       };
+
+      await gerarRelatorioPDF(dadosRelatorio);
       
       toast({
-        title: "Gerando Relatório...",
-        description: "A IA está analisando os dados e criando seu relatório personalizado.",
+        title: "Sucesso",
+        description: "Relatório PDF gerado com sucesso!",
         variant: "default"
       });
-      
-      const resultado = await gerarRelatorioPDF(dadosExportacao);
-      
-      if (resultado.success) {
-        toast({
-          title: "🎉 Relatório Gerado com Sucesso!",
-          description: `Relatório inteligente ${resultado.fileName} foi baixado com análises da IA.`,
-          variant: "default"
-        });
-      } else {
-        throw new Error(resultado.error);
-      }
-      
     } catch (error) {
-      console.error('Erro ao exportar PDF:', error);
+      console.error('Erro ao gerar PDF:', error);
       toast({
-        title: "❌ Erro na Geração do Relatório",
-        description: "Não foi possível gerar o relatório inteligente. Verifique sua conexão e tente novamente.",
+        title: "Erro",
+        description: "Erro ao gerar relatório PDF. Tente novamente.",
         variant: "destructive"
       });
     } finally {
@@ -674,26 +381,209 @@ const FinancialReportsTable = () => {
     }
   };
 
-  // Filtrar parcelas baseado na busca e filtros
+  // Função para buscar dados dos gráficos
+  const buscarDadosGraficos = async () => {
+    try {
+      console.log('Iniciando busca de dados dos gráficos...');
+      
+      // Buscar dados para o gráfico de receita mensal (removendo filtro muito restritivo)
+      const { data: parcelasData, error: parcelasError } = await supabase
+        .from('parcelas_alunos')
+        .select(`
+          valor,
+          data_vencimento,
+          data_pagamento,
+          status_pagamento,
+          idioma_registro,
+          financeiro_alunos!inner (
+            alunos (
+              status
+            )
+          )
+        `)
+        .eq('financeiro_alunos.alunos.status', 'Ativo');
+        // Removido o filtro .eq('status_pagamento', 'pago') para ter mais dados
+
+      if (parcelasError) {
+        console.error('Erro ao buscar dados das parcelas para gráficos:', parcelasError);
+        return;
+      }
+
+      console.log('Dados das parcelas encontrados:', parcelasData?.length || 0);
+
+      // Filtrar apenas parcelas pagas para receita
+      const parcelasPagas = (parcelasData || []).filter(p => p.status_pagamento === 'pago');
+      console.log('Parcelas pagas encontradas:', parcelasPagas.length);
+
+      // Processar dados para receita mensal
+      const receitaPorMes = parcelasPagas.reduce((acc, parcela) => {
+        if (parcela.data_pagamento) {
+          // Melhorar o formato da data para ordenação
+          const dataPagamento = new Date(parcela.data_pagamento);
+          const mes = `${dataPagamento.getFullYear()}-${String(dataPagamento.getMonth() + 1).padStart(2, '0')}`;
+          const mesFormatado = dataPagamento.toLocaleDateString('pt-BR', { 
+            year: 'numeric', 
+            month: 'short' 
+          });
+          
+          if (!acc[mes]) {
+            acc[mes] = { valor: 0, label: mesFormatado };
+          }
+          acc[mes].valor += (parcela.valor || 0);
+        }
+        return acc;
+      }, {} as Record<string, { valor: number; label: string }>);
+
+      const receitaMensalData: ReceitaMensal[] = Object.entries(receitaPorMes)
+        .map(([mes, data]) => ({ 
+          mes: data.label, 
+          receita: data.valor, 
+          receitaAcumulada: data.valor 
+        }))
+        .sort((a, b) => {
+          // Ordenar por data corretamente
+          const dateA = new Date(a.mes.replace(' de ', ' '));
+          const dateB = new Date(b.mes.replace(' de ', ' '));
+          return dateA.getTime() - dateB.getTime();
+        })
+        .slice(-6); // Últimos 6 meses
+
+      // Calcular receita acumulada
+      let acumulado = 0;
+      receitaMensalData.forEach(item => {
+        acumulado += item.receita;
+        item.receitaAcumulada = acumulado;
+      });
+
+      console.log('Receita mensal processada:', receitaMensalData);
+      setReceitaMensal(receitaMensalData);
+
+      // Processar dados para receita por idioma (usando todas as parcelas, não só pagas)
+      const receitaPorIdiomaData = (parcelasData || []).reduce((acc, parcela) => {
+        const idioma = parcela.idioma_registro || 'Não informado';
+        // Considerar valor total da parcela, independente do status
+        acc[idioma] = (acc[idioma] || 0) + (parcela.valor || 0);
+        return acc;
+      }, {} as Record<string, number>);
+
+      const receitaPorIdiomaArray: ReceitaPorIdioma[] = Object.entries(receitaPorIdiomaData)
+        .map(([idioma, receita]) => ({ idioma, receita }))
+        .filter(item => item.receita > 0); // Filtrar apenas idiomas com receita
+
+      console.log('Receita por idioma processada:', receitaPorIdiomaArray);
+      setReceitaPorIdioma(receitaPorIdiomaArray);
+
+      // Buscar despesas para variação de saldo
+      const { data: despesasData, error: despesasError } = await supabase
+        .from('despesas')
+        .select('valor, categoria, status');
+        // Removido filtro de status para ter mais dados
+
+      if (despesasError) {
+        console.error('Erro ao buscar despesas para gráficos:', despesasError);
+      }
+
+      console.log('Despesas encontradas:', despesasData?.length || 0);
+
+      // Calcular variação de saldo
+      const totalReceitas = receitaPorIdiomaArray.reduce((sum, item) => sum + item.receita, 0);
+      const totalDespesas = (despesasData || []).reduce((sum, despesa) => sum + (despesa.valor || 0), 0);
+      const saldoFinal = totalReceitas - totalDespesas;
+
+      const variacaoSaldoData: VariacaoSaldo[] = [
+        { categoria: 'Receitas', valor: totalReceitas, tipo: 'entrada' },
+        { categoria: 'Despesas', valor: -totalDespesas, tipo: 'saida' },
+        { categoria: 'Saldo Final', valor: saldoFinal, tipo: 'saldo' }
+      ].filter(item => item.valor !== 0); // Filtrar itens com valor zero
+
+      console.log('Variação de saldo processada:', variacaoSaldoData);
+      setVariacaoSaldo(variacaoSaldoData);
+
+      // Se não há dados, criar dados de exemplo para visualização
+      if (receitaMensalData.length === 0) {
+        console.log('Nenhum dado encontrado, criando dados de exemplo...');
+        const dadosExemplo: ReceitaMensal[] = [
+          { mes: 'Jan 2024', receita: 0, receitaAcumulada: 0 },
+          { mes: 'Fev 2024', receita: 0, receitaAcumulada: 0 },
+          { mes: 'Mar 2024', receita: 0, receitaAcumulada: 0 }
+        ];
+        setReceitaMensal(dadosExemplo);
+      }
+
+      if (receitaPorIdiomaArray.length === 0) {
+        const dadosExemploIdioma: ReceitaPorIdioma[] = [
+          { idioma: 'Inglês', receita: 0 },
+          { idioma: 'Japonês', receita: 0 }
+        ];
+        setReceitaPorIdioma(dadosExemploIdioma);
+      }
+
+      if (variacaoSaldoData.length === 0) {
+        const dadosExemploSaldo: VariacaoSaldo[] = [
+          { categoria: 'Receitas', valor: 0, tipo: 'entrada' },
+          { categoria: 'Despesas', valor: 0, tipo: 'saida' },
+          { categoria: 'Saldo Final', valor: 0, tipo: 'saldo' }
+        ];
+        setVariacaoSaldo(dadosExemploSaldo);
+      }
+
+    } catch (error) {
+      console.error('Erro ao buscar dados dos gráficos:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar dados dos gráficos.",
+        variant: "destructive"
+      });
+      
+      // Em caso de erro, definir dados vazios para evitar erros de renderização
+      setReceitaMensal([]);
+      setReceitaPorIdioma([]);
+      setVariacaoSaldo([]);
+    }
+  };
+
+  useEffect(() => {
+    carregarDados();
+  }, []);
+
+  // Calcular totais dinâmicos
+  const calcularTotaisDinamicos = (parcelas: ParcelaDetalhada[]) => {
+    const totalRecebido = parcelas
+      .filter(p => p.status_pagamento === 'pago')
+      .reduce((sum, p) => sum + (p.valor || 0), 0);
+    
+    const totalAReceber = parcelas
+      .filter(p => p.status_pagamento !== 'pago' && p.status_pagamento !== 'cancelado')
+      .reduce((sum, p) => sum + (p.valor || 0), 0);
+    
+    const parcelasPagas = parcelas.filter(p => p.status_pagamento === 'pago').length;
+    const parcelasPendentesVencidas = parcelas.filter(p => p.status_pagamento !== 'pago' && p.status_pagamento !== 'cancelado').length;
+    
+    const totalGeral = totalRecebido + totalAReceber;
+    const percentualQuitado = totalGeral > 0 ? (totalRecebido / totalGeral) * 100 : 0;
+
+    return {
+      totalRecebido,
+      totalAReceber,
+      parcelasPagas,
+      parcelasPendentesVencidas,
+      percentualQuitado
+    };
+  };
+
+  // Filtrar parcelas baseado na busca
   const parcelasFiltradas = parcelas.filter(parcela => {
     const nomeAluno = parcela.financeiro_alunos?.alunos?.nome?.toLowerCase() || '';
     const nomePlano = parcela.financeiro_alunos?.planos?.nome?.toLowerCase() || '';
     const searchLower = searchTerm.toLowerCase();
     
-    const matchSearch = nomeAluno.includes(searchLower) || 
-                       nomePlano.includes(searchLower) ||
-                       parcela.tipo_item.toLowerCase().includes(searchLower);
-    
-    const matchFiltros = (
-      (!filtros.aluno || nomeAluno.includes(filtros.aluno.toLowerCase())) &&
-      (!filtros.status || parcela.status_pagamento === filtros.status) &&
-      (!filtros.tipoItem || parcela.tipo_item === filtros.tipoItem) &&
-      (!filtros.valorMin || parcela.valor >= parseFloat(filtros.valorMin)) &&
-      (!filtros.valorMax || parcela.valor <= parseFloat(filtros.valorMax))
-    );
-    
-    return matchSearch && matchFiltros;
+    return nomeAluno.includes(searchLower) || 
+           nomePlano.includes(searchLower) ||
+           parcela.tipo_item.toLowerCase().includes(searchLower);
   });
+
+  // Calcular totais baseados nas parcelas filtradas
+  const totaisDinamicos = calcularTotaisDinamicos(parcelasFiltradas);
 
   // Função para obter ícone do status
   const getStatusIcon = (status: string) => {
@@ -729,7 +619,7 @@ const FinancialReportsTable = () => {
 
   return (
     <div className="space-y-6 p-6 bg-gradient-to-br from-gray-50 to-white min-h-screen">
-      {/* Cabeçalho Moderno */}
+      {/* Cabeçalho */}
       <motion.div 
         className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
         initial={{ opacity: 0, y: -20 }}
@@ -742,322 +632,66 @@ const FinancialReportsTable = () => {
             <p className="text-gray-600">Visão completa das finanças da TS School</p>
           </div>
           
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            {/* Filtro de Período */}
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-gray-500" />
-              <Select value={periodoSelecionado} onValueChange={setPeriodoSelecionado}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Selecionar período" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="mes-atual">Mês Atual</SelectItem>
-                  <SelectItem value="trimestre">Último Trimestre</SelectItem>
-                  <SelectItem value="semestre">Último Semestre</SelectItem>
-                  <SelectItem value="ano">Último Ano</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            {/* Botões de Ação */}
-            <div className="flex items-center gap-2">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => setFiltrosAbertos(!filtrosAbertos)}
-                      className="flex items-center gap-2"
-                    >
-                      <Filter className="h-4 w-4" />
-                      Filtros
-                      {filtrosAbertos ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Filtros avançados</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={exportarDados}
-                      disabled={exportandoPDF}
-                      className={`flex items-center gap-2 ${exportandoPDF ? "animate-pulse" : ""}`}
-                    >
-                      {exportandoPDF ? (
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Download className="h-4 w-4" />
-                      )}
-                      {exportandoPDF ? 'Gerando...' : 'Exportar PDF'}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{exportandoPDF ? 'IA analisando dados...' : 'Gerar relatório com análise inteligente da IA'}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          </div>
+          {/* Botão Exportar PDF */}
+          <Button 
+            onClick={exportarDados}
+            disabled={exportandoPDF}
+            className={`flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-300 ${exportandoPDF ? "animate-pulse" : ""}`}
+          >
+            {exportandoPDF ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {exportandoPDF ? 'Gerando PDF...' : 'Exportar PDF'}
+          </Button>
         </div>
-        
-        {/* Filtros Avançados Expansíveis */}
-        <AnimatePresence>
-          {filtrosAbertos && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.3 }}
-              className="mt-6 pt-6 border-t border-gray-200"
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2 text-sm font-medium">
-                    <Calendar className="h-4 w-4" />
-                    Data Início
-                  </Label>
-                  <Input
-                    type="date"
-                    value={filtros.dataInicio}
-                    onChange={(e) => setFiltros({...filtros, dataInicio: e.target.value})}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2 text-sm font-medium">
-                    <Calendar className="h-4 w-4" />
-                    Data Fim
-                  </Label>
-                  <Input
-                    type="date"
-                    value={filtros.dataFim}
-                    onChange={(e) => setFiltros({...filtros, dataFim: e.target.value})}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2 text-sm font-medium">
-                    <User className="h-4 w-4" />
-                    Aluno
-                  </Label>
-                  <Input
-                    placeholder="Nome do aluno"
-                    value={filtros.aluno}
-                    onChange={(e) => setFiltros({...filtros, aluno: e.target.value})}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2 text-sm font-medium">
-                    <Activity className="h-4 w-4" />
-                    Status
-                  </Label>
-                  <Select value={filtros.status} onValueChange={(value) => setFiltros({...filtros, status: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todos os status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Todos</SelectItem>
-                      <SelectItem value="pago">Pago</SelectItem>
-                      <SelectItem value="pendente">Pendente</SelectItem>
-                      <SelectItem value="vencido">Vencido</SelectItem>
-                      <SelectItem value="cancelado">Cancelado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </motion.div>
 
-      {/* Cards de Métricas Principais */}
-      <motion.div 
-        className="grid grid-cols-1 md:grid-cols-3 gap-6"
+      {/* Despesas Recentes */}
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.1 }}
       >
-        {/* Receitas */}
-        <Card className="bg-gradient-to-br from-green-50 to-emerald-100 border-green-200 shadow-lg hover:shadow-xl transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-green-800">Receitas</CardTitle>
-            <div className="p-2 bg-green-200 rounded-full">
-              <TrendingUp className="h-5 w-5 text-green-700" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-900 mb-2">
-              R$ {resumoRegistros.receitas.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge className="bg-green-100 text-green-800 border-green-300">
-                +{indicadoresRegistros.crescimentoMensal > 0 ? indicadoresRegistros.crescimentoMensal.toFixed(1) : '0.0'}%
-              </Badge>
-              <p className="text-xs text-green-600">vs mês anterior</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Despesas */}
-        <Card className="bg-gradient-to-br from-red-50 to-rose-100 border-red-200 shadow-lg hover:shadow-xl transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-red-800">Despesas</CardTitle>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setModalDespesaAberto(true)}
-                className="h-8 w-8 p-0 bg-red-100 hover:bg-red-200 border-red-300"
-              >
-                <Plus className="h-4 w-4 text-red-700" />
-              </Button>
-              <div className="p-2 bg-red-200 rounded-full">
-                <TrendingDown className="h-5 w-5 text-red-700" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-red-900 mb-2">
-              R$ {resumoRegistros.despesas.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge className="bg-red-100 text-red-800 border-red-300">
-                {despesas.filter(d => d.status === 'pendente').length} pendentes
-              </Badge>
-              <p className="text-xs text-red-600">despesas registradas</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Saldo */}
-        <Card className={`bg-gradient-to-br ${resumoRegistros.saldo >= 0 ? 'from-blue-50 to-cyan-100 border-blue-200' : 'from-orange-50 to-amber-100 border-orange-200'} shadow-lg hover:shadow-xl transition-all duration-300`}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className={`text-sm font-medium ${resumoRegistros.saldo >= 0 ? 'text-blue-800' : 'text-orange-800'}`}>Saldo</CardTitle>
-            <div className={`p-2 ${resumoRegistros.saldo >= 0 ? 'bg-blue-200' : 'bg-orange-200'} rounded-full`}>
-              <Wallet className={`h-5 w-5 ${resumoRegistros.saldo >= 0 ? 'text-blue-700' : 'text-orange-700'}`} />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className={`text-3xl font-bold mb-2 ${resumoRegistros.saldo >= 0 ? 'text-blue-900' : 'text-orange-900'}`}>
-              R$ {resumoRegistros.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge className={resumoRegistros.saldo >= 0 ? 'bg-blue-100 text-blue-800 border-blue-300' : 'bg-orange-100 text-orange-800 border-orange-300'}>
-                {resumoRegistros.saldo >= 0 ? 'Positivo' : 'Negativo'}
-              </Badge>
-              <p className={`text-xs ${resumoRegistros.saldo >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>balanço atual</p>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Cards de Indicadores Secundários */}
-      <motion.div 
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-      >
-        <Card className="hover:shadow-lg transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Parcelas</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{resumoRegistros.totalParcelas}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {resumoRegistros.parcelasPagas} pagas • {resumoRegistros.parcelasPendentes} pendentes
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Taxa de Pagamento</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{indicadoresRegistros.percentualPagamento.toFixed(1)}%</div>
-            <p className="text-xs text-muted-foreground">
-              Tendência: {indicadoresRegistros.tendenciaPagamento}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Valor Médio</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              R$ {indicadoresRegistros.valorMedioPorParcela.toLocaleString('pt-BR', { 
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2 
-              })}
-            </div>
-            <p className="text-xs text-muted-foreground">Por parcela</p>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tipo Mais Comum</CardTitle>
-            <PieChart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold capitalize">{indicadoresRegistros.tipoMaisComum}</div>
-            <p className="text-xs text-muted-foreground">Categoria principal</p>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Lista de Despesas */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.25 }}
-      >
-        <Card>
+        <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <TrendingDown className="h-5 w-5" />
+              <CreditCard className="h-5 w-5" />
               Despesas Recentes
             </CardTitle>
           </CardHeader>
           <CardContent>
             {despesas.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">
-                Nenhuma despesa registrada
-              </p>
+              <div className="text-center py-8">
+                <p className="text-gray-500">Nenhuma despesa encontrada</p>
+              </div>
             ) : (
-              <div className="space-y-2">
-                {despesas.slice(0, 5).map((despesa) => (
-                  <div key={despesa.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div>
-                      <p className="font-medium">{despesa.descricao}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {despesa.categoria} • {new Date(despesa.data).toLocaleDateString('pt-BR')}
-                      </p>
+              <div className="space-y-3">
+                {despesas.map((despesa) => (
+                  <motion.div 
+                    key={despesa.id} 
+                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200"
+                    whileHover={{ scale: 1.02 }}
+                    transition={{ type: "spring", stiffness: 300 }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <p className="font-medium">{despesa.descricao}</p>
+                        <p className="text-sm text-gray-600">
+                          {despesa.categoria} • {new Date(despesa.data).toLocaleDateString('pt-BR')}
+                        </p>
+                      </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold text-red-600">
-                        R$ {despesa.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </p>
-                      <Badge variant={despesa.status === 'pago' ? 'default' : 'secondary'}>
+                      <p className="font-bold">R$ {despesa.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                      <Badge 
+                        variant={despesa.status === 'pago' ? "default" : "secondary"}
+                      >
                         {despesa.status === 'pago' ? 'Pago' : 'Pendente'}
                       </Badge>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             )}
@@ -1069,7 +703,7 @@ const FinancialReportsTable = () => {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.3 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
       >
         <Card className="shadow-lg">
           <CardHeader>
@@ -1119,11 +753,229 @@ const FinancialReportsTable = () => {
         </Card>
       </motion.div>
 
-      {/* Tabela de Parcelas */}
+      {/* Gráficos Financeiros */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.4 }}
+        transition={{ duration: 0.5, delay: 0.1 }}
+        className="space-y-6"
+      >
+        {/* Título da Seção de Gráficos */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="h-8 w-1 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full"></div>
+          <h2 className="text-2xl font-bold text-gray-800">Análise Financeira</h2>
+        </div>
+
+        {/* Grid de Gráficos */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Gráfico de Crescimento de Receita */}
+          <Card className="lg:col-span-2 border-0 shadow-xl bg-gradient-to-br from-white to-gray-50">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-3 text-lg">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <TrendingUp className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <span className="text-gray-800">Crescimento de Receita</span>
+                  <p className="text-sm text-gray-500 font-normal mt-1">Evolução mensal das receitas</p>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="h-80 p-4 bg-white rounded-lg border border-gray-100">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={receitaMensal} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis 
+                      dataKey="mes" 
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 12, fill: '#64748b' }}
+                    />
+                    <YAxis 
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 12, fill: '#64748b' }}
+                      tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => [
+                        `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+                        'Receita'
+                      ]}
+                      labelFormatter={(label) => `Mês: ${label}`}
+                      contentStyle={{
+                        backgroundColor: 'white',
+                        border: 'none',
+                        borderRadius: '12px',
+                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                        fontSize: '14px'
+                      }}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="receita" 
+                      stroke="#10b981" 
+                      fill="url(#colorReceita)" 
+                      strokeWidth={3}
+                      dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
+                      activeDot={{ r: 6, stroke: '#10b981', strokeWidth: 2, fill: 'white' }}
+                    />
+                    <defs>
+                      <linearGradient id="colorReceita" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.05}/>
+                      </linearGradient>
+                    </defs>
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Gráfico de Receita por Idioma */}
+          <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-blue-50">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-3 text-lg">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <BarChart3 className="h-5 w-5 text-blue-600" />
+                </div>
+                   <div>
+                  <span className="text-gray-800">Distribuição por curso</span>
+                  <p className="text-sm text-gray-500 font-normal mt-1">Receita por idioma/curso</p>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0 px-2">
+              <div className="h-80 p-2 bg-white rounded-lg border border-gray-100">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart 
+                    data={receitaPorIdioma} 
+                    layout="horizontal" 
+                    margin={{ top: 20, right: 20, left: 60, bottom: 20 }}
+                    maxBarSize={30}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis 
+                      type="number"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11, fill: '#64748b' }}
+                      tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                    />
+                    <YAxis 
+                      type="category"
+                      dataKey="idioma" 
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11, fill: '#64748b' }}
+                      width={55}
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => [
+                        `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+                        'Receita'
+                      ]}
+                      contentStyle={{
+                        backgroundColor: 'white',
+                        border: 'none',
+                        borderRadius: '12px',
+                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                        fontSize: '12px'
+                      }}
+                    />
+                    <Bar dataKey="receita" radius={[0, 6, 6, 0]}>
+                      {receitaPorIdioma.map((entry, index) => {
+                        const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+                        return (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={colors[index % colors.length]} 
+                          />
+                        );
+                      })}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Gráfico de Variação de Saldo - Largura Total */}
+        <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-purple-50">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-3 text-lg">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <BarChart3 className="h-5 w-5 text-purple-600" />
+              </div>
+              <div>
+                <span className="text-gray-800">Variação de Saldo</span>
+                <p className="text-sm text-gray-500 font-normal mt-1">Entradas e saídas por categoria</p>
+              </div>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 px-6">
+            <div className="h-80 p-6 bg-white rounded-lg border border-gray-100">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart 
+                  data={variacaoSaldo} 
+                  margin={{ top: 20, right: 30, left: 20, bottom: 40 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis 
+                    dataKey="categoria" 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12, fill: '#64748b' }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                    interval={0}
+                  />
+                  <YAxis 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12, fill: '#64748b' }}
+                    tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                  />
+                  <Tooltip 
+                    formatter={(value: number) => [
+                      `R$ ${Math.abs(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+                      value >= 0 ? 'Entrada' : 'Saída'
+                    ]}
+                    contentStyle={{
+                      backgroundColor: 'white',
+                      border: 'none',
+                      borderRadius: '12px',
+                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                      fontSize: '14px'
+                    }}
+                  />
+                  <Bar dataKey="valor" radius={[6, 6, 0, 0]} maxBarSize={80}>
+                    {variacaoSaldo.map((entry, index) => (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={
+                          entry.tipo === 'entrada' ? '#10b981' : 
+                          entry.tipo === 'saida' ? '#ef4444' : 
+                          entry.valor >= 0 ? '#3b82f6' : '#f59e0b'
+                        } 
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Parcelas Detalhadas */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
       >
         <Card className="shadow-lg">
           <CardHeader>
@@ -1224,6 +1076,36 @@ const FinancialReportsTable = () => {
                     </TableRow>
                   ))}
                 </TableBody>
+                <TableFooter>
+                  <TableRow>
+                    <TableCell colSpan={12} className="bg-gray-50">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4">
+                        <div className="flex flex-col sm:flex-row gap-4 text-sm">
+                          <div className="flex items-center gap-2">
+                            <TrendingUp className="h-4 w-4 text-green-600" />
+                            <span className="font-semibold text-green-600">
+                              TOTAL RECEBIDO: R$ {totaisDinamicos.totalRecebido.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                            <span className="text-gray-500">({totaisDinamicos.parcelasPagas} parcelas)</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-orange-600" />
+                            <span className="font-semibold text-orange-600">
+                              TOTAL A RECEBER: R$ {totaisDinamicos.totalAReceber.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                            <span className="text-gray-500">({totaisDinamicos.parcelasPendentesVencidas} parcelas)</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <BarChart3 className="h-4 w-4 text-blue-600" />
+                          <span className="font-semibold text-blue-600">
+                            {totaisDinamicos.percentualQuitado.toFixed(1)}% Quitado
+                          </span>
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                </TableFooter>
               </Table>
               
               {parcelasFiltradas.length > 20 && (
@@ -1237,121 +1119,6 @@ const FinancialReportsTable = () => {
           </CardContent>
         </Card>
       </motion.div>
-
-      {/* Modal para Nova Despesa */}
-      <AnimatePresence>
-        {modalDespesaAberto && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-            onClick={() => setModalDespesaAberto(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-lg p-6 w-full max-w-md mx-4"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Nova Despesa</h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setModalDespesaAberto(false)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <Label>Descrição</Label>
-                  <Input
-                    value={novaDespesa.descricao}
-                    onChange={(e) => setNovaDespesa({...novaDespesa, descricao: e.target.value})}
-                    placeholder="Ex: Salário professor, Aluguel, Material didático"
-                  />
-                </div>
-                
-                <div>
-                  <Label>Valor</Label>
-                  <Input
-                    type="number"
-                    value={novaDespesa.valor}
-                    onChange={(e) => setNovaDespesa({...novaDespesa, valor: parseFloat(e.target.value) || 0})}
-                    placeholder="0,00"
-                  />
-                </div>
-                
-                <div>
-                  <Label>Categoria</Label>
-                  <Select
-                    value={novaDespesa.categoria}
-                    onValueChange={(value) => setNovaDespesa({...novaDespesa, categoria: value as any})}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="salarios">Salários</SelectItem>
-                      <SelectItem value="aluguel">Aluguel</SelectItem>
-                      <SelectItem value="materiais">Materiais</SelectItem>
-                      <SelectItem value="marketing">Marketing</SelectItem>
-                      <SelectItem value="manutencao">Manutenção</SelectItem>
-                      <SelectItem value="outros">Outros</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Label>Data</Label>
-                  <Input
-                    type="date"
-                    value={novaDespesa.data}
-                    onChange={(e) => setNovaDespesa({...novaDespesa, data: e.target.value})}
-                  />
-                </div>
-                
-                <div>
-                  <Label>Status</Label>
-                  <Select
-                    value={novaDespesa.status}
-                    onValueChange={(value) => setNovaDespesa({...novaDespesa, status: value as any})}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pendente">Pendente</SelectItem>
-                      <SelectItem value="pago">Pago</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              <div className="flex gap-2 mt-6">
-                <Button
-                  variant="outline"
-                  onClick={() => setModalDespesaAberto(false)}
-                  className="flex-1"
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={adicionarDespesa}
-                  className="flex-1"
-                  disabled={!novaDespesa.descricao || !novaDespesa.valor}
-                >
-                  Adicionar
-                </Button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };

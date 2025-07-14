@@ -206,18 +206,7 @@ const Financial = () => {
                 Despesas
               </motion.span>
             </TabsTrigger>
-            <TabsTrigger 
-              value="renovacao" 
-              className="flex-1 data-[state=active]:bg-gradient-to-r data-[state=active]:from-red-600 data-[state=active]:to-gray-800 data-[state=active]:text-white data-[state=active]:shadow-lg text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-all duration-300 font-medium rounded-md"
-            >
-              <motion.span
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                transition={{ duration: 0.2 }}
-              >
-                Renovações
-              </motion.span>
-            </TabsTrigger>
+            {/* Aba de renovações removida */}
             <TabsTrigger 
               value="relatorios" 
               className="flex-1 data-[state=active]:bg-gradient-to-r data-[state=active]:from-red-600 data-[state=active]:to-gray-800 data-[state=active]:text-white data-[state=active]:shadow-lg text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-all duration-300 font-medium rounded-md"
@@ -264,19 +253,14 @@ const Financial = () => {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3, delay: 0.1 }}
             >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold">Gestão de Despesas</h2>
+              </div>
               <DespesasTable />
             </motion.div>
           </TabsContent>
 
-          <TabsContent value="renovacao" className="space-y-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3, delay: 0.1 }}
-            >
-              <RenewalAlertsTable />
-            </motion.div>
-          </TabsContent>
+          {/* TabsContent de renovação removido */}
 
           <TabsContent value="relatorios" className="space-y-4">
             <motion.div
