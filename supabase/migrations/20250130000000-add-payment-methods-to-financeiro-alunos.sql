@@ -40,3 +40,25 @@ comment on column financeiro_alunos.numero_parcelas_matricula is 'Número de par
 create index idx_financeiro_alunos_forma_pagamento_plano on financeiro_alunos(forma_pagamento_plano);
 create index idx_financeiro_alunos_forma_pagamento_material on financeiro_alunos(forma_pagamento_material);
 create index idx_financeiro_alunos_forma_pagamento_matricula on financeiro_alunos(forma_pagamento_matricula);
+
+-- Atualizar constraints para incluir cartao_credito e cartao_debito
+alter table financeiro_alunos 
+drop constraint if exists financeiro_alunos_forma_pagamento_plano_check;
+
+alter table financeiro_alunos 
+add constraint financeiro_alunos_forma_pagamento_plano_check 
+check (forma_pagamento_plano in ('boleto', 'cartao_credito', 'cartao_debito', 'pix', 'dinheiro', 'transferencia', 'outro'));
+
+alter table financeiro_alunos 
+drop constraint if exists financeiro_alunos_forma_pagamento_material_check;
+
+alter table financeiro_alunos 
+add constraint financeiro_alunos_forma_pagamento_material_check 
+check (forma_pagamento_material in ('boleto', 'cartao_credito', 'cartao_debito', 'pix', 'dinheiro', 'transferencia', 'outro'));
+
+alter table financeiro_alunos 
+drop constraint if exists financeiro_alunos_forma_pagamento_matricula_check;
+
+alter table financeiro_alunos 
+add constraint financeiro_alunos_forma_pagamento_matricula_check 
+check (forma_pagamento_matricula in ('boleto', 'cartao_credito', 'cartao_debito', 'pix', 'dinheiro', 'transferencia', 'outro'));

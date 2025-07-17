@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Archive, AlertTriangle, CheckCircle, Clock, XCircle, CreditCard, Calendar } from 'lucide-react';
+import { Archive, AlertTriangle, CheckCircle, Clock, XCircle, CreditCard, Calendar, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { MoverParaHistoricoForm, EstatisticasParcelas, ParcelaAluno } from '../types/historico';
@@ -78,6 +78,10 @@ export const MoverParaHistoricoModal: React.FC<MoverParaHistoricoModalProps> = (
         return <Calendar className="h-4 w-4 text-purple-600" />;
       case 'matrícula':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'cancelamento':
+        return <XCircle className="h-4 w-4 text-red-600" />;
+      case 'outros':
+        return <FileText className="h-4 w-4 text-orange-600" />;
       default:
         return <CreditCard className="h-4 w-4 text-gray-600" />;
     }

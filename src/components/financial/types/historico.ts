@@ -7,7 +7,8 @@ export interface ParcelaHistorico {
   data_vencimento: string;
   data_pagamento?: string | null;
   status_pagamento: 'pago' | 'pendente' | 'vencido' | 'cancelado' | null;
-  tipo_item: 'plano' | 'material' | 'matrícula';
+  tipo_item: 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'outros';
+  descricao_item?: string | null;
   tipo_arquivamento?: 'renovacao' | 'cancelamento' | 'conclusao' | null;
   comprovante?: string | null;
   observacoes?: string | null;
@@ -47,7 +48,8 @@ export interface ParcelaAluno {
   data_vencimento: string;
   data_pagamento?: string;
   status_pagamento: 'pago' | 'pendente' | 'vencido' | 'cancelado';
-  tipo_item: 'plano' | 'material' | 'matrícula';
+  tipo_item: 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'outros';
+  descricao_item?: string | null;
   comprovante?: string;
   observacoes?: string | null;
 }

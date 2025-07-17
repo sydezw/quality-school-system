@@ -10,7 +10,7 @@ type ParcelaBase = Tables<'parcelas_alunos'>;
 export interface ParcelaComDetalhes extends ParcelaBase {
   aluno_nome?: string;
   plano_nome?: string;
-  forma_pagamento?: string;
+  status_calculado?: StatusCalculado;
 }
 
 // Tipo para inserção de nova parcela
@@ -23,10 +23,11 @@ type AtualizarParcelaInput = TablesUpdate<'parcelas_alunos'>;
 export type StatusCalculado = 'pago' | 'pendente' | 'vencido' | 'cancelado';
 
 // Filtros para busca
+// Filtros para busca
 export interface FiltrosParcelas {
   termo?: string; // Busca apenas por aluno.nome
   status?: StatusCalculado | 'todos';
-  tipo?: 'plano' | 'material' | 'matrícula' | 'todos';
+  tipo?: 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'outros' | 'todos';
   dataVencimentoInicio?: string; // Date em formato string
   dataVencimentoFim?: string; // Date em formato string
   idioma?: 'Inglês' | 'Japonês' | 'todos';

@@ -20,7 +20,7 @@ export const useStudents = () => {
   const { toast } = useToast();
 
   // Memoizar a função de busca para evitar re-criações
-  const fetchStudents = useCallback(async (includeArchived = false) => {
+  const fetchStudents = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -49,9 +49,10 @@ export const useStudents = () => {
           responsaveis(nome, telefone)
         `);
       
-      if (!includeArchived) {
-        query = query.in('status', ['Ativo', 'Trancado']);
-      }
+      // Remover o filtro de status - mostrar todos os alunos
+      // if (!includeArchived) {
+      //   query = query.in('status', ['Ativo', 'Trancado']);
+      // }
       
       const { data, error } = await query.order('nome');
       

@@ -172,12 +172,29 @@ const DatePicker: React.FC<DatePickerProps> = ({
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const inputVal = e.target.value;
-    setInputValue(inputVal);
+    let inputVal = e.target.value;
+    
+    // Remove tudo que não é número
+    const numbersOnly = inputVal.replace(/\D/g, '');
+    
+    // Aplica a formatação automática
+    let formattedValue = '';
+    if (numbersOnly.length > 0) {
+      if (numbersOnly.length <= 2) {
+        formattedValue = numbersOnly;
+      } else if (numbersOnly.length <= 4) {
+        formattedValue = `${numbersOnly.slice(0, 2)}/${numbersOnly.slice(2)}`;
+      } else {
+        formattedValue = `${numbersOnly.slice(0, 2)}/${numbersOnly.slice(2, 4)}/${numbersOnly.slice(4, 8)}`;
+      }
+    }
+    
+    setInputValue(formattedValue);
 
-    if (inputVal.length === 10) {
+    // Tenta fazer o parse da data quando tiver 10 caracteres (dd/MM/yyyy)
+    if (formattedValue.length === 10) {
       try {
-        const parsed = parse(inputVal, dateFormat, new Date());
+        const parsed = parse(formattedValue, dateFormat, new Date());
         if (isValid(parsed)) {
           onChange(parsed);
           setCurrentDate(parsed);
@@ -185,7 +202,7 @@ const DatePicker: React.FC<DatePickerProps> = ({
       } catch {
         // Invalid date format
       }
-    } else if (inputVal === "") {
+    } else if (formattedValue === "") {
       onChange(null);
     }
   };

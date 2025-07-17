@@ -47,6 +47,7 @@ export const EditarParcelaHistoricoModal: React.FC<EditarParcelaHistoricoModalPr
           valor: editandoParcela.valor,
           data_vencimento: editandoParcela.data_vencimento,
           status_pagamento: editandoParcela.status_pagamento,
+          descricao_item: editandoParcela.descricao_item || null,
           observacoes: editandoParcela.observacoes || null
         })
         .eq('id', editandoParcela.id);
@@ -91,7 +92,7 @@ export const EditarParcelaHistoricoModal: React.FC<EditarParcelaHistoricoModalPr
               <Label htmlFor="edit-hist-tipo">Tipo de Item</Label>
               <Select 
                 value={editandoParcela.tipo_item} 
-                onValueChange={(value: 'plano' | 'material' | 'matrícula') => 
+                onValueChange={(value: 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'outros') => 
                   setEditandoParcela(prev => prev ? {...prev, tipo_item: value} : null)
                 }
               >
@@ -102,6 +103,8 @@ export const EditarParcelaHistoricoModal: React.FC<EditarParcelaHistoricoModalPr
                   <SelectItem value="plano">Plano</SelectItem>
                   <SelectItem value="material">Material</SelectItem>
                   <SelectItem value="matrícula">Matrícula</SelectItem>
+                  <SelectItem value="cancelamento">Cancelamento</SelectItem>
+                  <SelectItem value="outros">Outros</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -144,6 +147,18 @@ export const EditarParcelaHistoricoModal: React.FC<EditarParcelaHistoricoModalPr
                 )}
               />
             </div>
+          </div>
+          
+          <div>
+            <Label htmlFor="edit-hist-descricao">Descrição do Item</Label>
+            <Input
+              id="edit-hist-descricao"
+              value={editandoParcela.descricao_item || ''}
+              onChange={(e) => setEditandoParcela(prev => 
+                prev ? {...prev, descricao_item: e.target.value} : null
+              )}
+              placeholder="Descrição do item..."
+            />
           </div>
           
           <div>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import StudentDialog from '@/components/students/StudentDialog';
 import StudentTable from '@/components/students/StudentTable';
@@ -9,6 +9,8 @@ import { Database } from '@/integrations/supabase/types';
 import { Plus, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 // Definir o tipo Student baseado na tabela alunos do banco
 type Student = Database['public']['Tables']['alunos']['Row'] & {
@@ -29,6 +31,12 @@ const Students = () => {
   const [isFinancialDialogOpen, setIsFinancialDialogOpen] = useState(false);
   const [selectedStudentForPlan, setSelectedStudentForPlan] = useState<Student | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  
+  // Remover o estado showInactive e o useEffect relacionado
+  // const [showInactive, setShowInactive] = useState(false);
+  // useEffect(() => {
+  //   fetchStudents(showInactive);
+  // }, [showInactive, fetchStudents]);
 
   const handleSubmit = async (data: any) => {
     try {
@@ -183,6 +191,16 @@ const Students = () => {
               className="max-w-sm"
             />
           </div>
+          
+          {/* Remover o toggle para alunos inativos */}
+          {/* <div className="flex items-center space-x-2">
+            <Switch
+              id="show-inactive"
+              checked={showInactive}
+              onCheckedChange={setShowInactive}
+            />
+            <Label htmlFor="show-inactive">Mostrar inativos</Label>
+          </div> */}
           
           {/* Componente de Filtros */}
           <StudentFilters

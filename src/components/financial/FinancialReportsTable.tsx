@@ -4,6 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Calendar,
   Clock,
   CheckCircle,
@@ -14,7 +21,9 @@ import {
   TrendingUp,
   BarChart3,
   Download,
-  RefreshCw
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
@@ -29,6 +38,7 @@ import {
   TableRow,
   TableFooter,
 } from "@/components/ui/table";
+
 import {
   AreaChart,
   Area,
@@ -51,7 +61,8 @@ interface ParcelaDetalhada {
   data_vencimento: string;
   data_pagamento: string | null;
   status_pagamento: string;
-  tipo_item: 'plano' | 'material' | 'matrícula';
+  tipo_item: 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'outros';
+  descricao_item?: string | null;
   idioma_registro: 'Inglês' | 'Japonês';
   aluno_nome?: string;
   plano_nome?: string;
@@ -75,12 +86,12 @@ interface ProximoVencimentoRegistro {
 }
 
 interface Despesa {
-  id: number;
+  id: string;
   descricao: string;
   valor: number;
-  categoria: 'salarios' | 'aluguel' | 'materiais' | 'marketing' | 'manutencao' | 'outros';
+  categoria: 'salário' | 'aluguel' | 'material' | 'manutenção';
   data: string;
-  status: 'pago' | 'pendente';
+  status: 'Pago' | 'Pendente';
 }
 
 // Novas interfaces para os gráficos
@@ -111,6 +122,10 @@ const FinancialReportsTable = () => {
   const [parcelas, setParcelas] = useState<ParcelaDetalhada[]>([]);
   const [despesas, setDespesas] = useState<Despesa[]>([]);
   const [proximosVencimentosRegistros, setProximosVencimentosRegistros] = useState<ProximoVencimentoRegistro[]>([]);
+  
+  // Estados para paginação da tabela de registros
+  const [currentPageRegistros, setCurrentPageRegistros] = useState(1);
+  const [registrosPorPagina, setRegistrosPorPagina] = useState(10);
   
   // Novos estados para os gráficos
   const [receitaMensal, setReceitaMensal] = useState<ReceitaMensal[]>([]);
@@ -491,9 +506,9 @@ const FinancialReportsTable = () => {
       const saldoFinal = totalReceitas - totalDespesas;
 
       const variacaoSaldoData: VariacaoSaldo[] = [
-        { categoria: 'Receitas', valor: totalReceitas, tipo: 'entrada' },
-        { categoria: 'Despesas', valor: -totalDespesas, tipo: 'saida' },
-        { categoria: 'Saldo Final', valor: saldoFinal, tipo: 'saldo' }
+        { categoria: 'Receitas', valor: totalReceitas, tipo: 'entrada' as const },
+        { categoria: 'Despesas', valor: -totalDespesas, tipo: 'saida' as const },
+        { categoria: 'Saldo Final', valor: saldoFinal, tipo: 'saldo' as const }
       ].filter(item => item.valor !== 0); // Filtrar itens com valor zero
 
       console.log('Variação de saldo processada:', variacaoSaldoData);
@@ -571,16 +586,94 @@ const FinancialReportsTable = () => {
     };
   };
 
-  // Filtrar parcelas baseado na busca
+  // Filtrar parcelas baseado no termo de busca
   const parcelasFiltradas = parcelas.filter(parcela => {
+    if (!searchTerm) return true;
+    
+    const termo = searchTerm.toLowerCase();
     const nomeAluno = parcela.financeiro_alunos?.alunos?.nome?.toLowerCase() || '';
     const nomePlano = parcela.financeiro_alunos?.planos?.nome?.toLowerCase() || '';
-    const searchLower = searchTerm.toLowerCase();
+    const tipoItem = parcela.tipo_item?.toLowerCase() || '';
+    const descricaoItem = parcela.descricao_item?.toLowerCase() || '';
     
-    return nomeAluno.includes(searchLower) || 
-           nomePlano.includes(searchLower) ||
-           parcela.tipo_item.toLowerCase().includes(searchLower);
+    return nomeAluno.includes(termo) || 
+           nomePlano.includes(termo) || 
+           tipoItem.includes(termo) ||
+           descricaoItem.includes(termo);
   });
+
+  // Cálculos de paginação para registros
+  const totalPagesRegistros = Math.ceil(parcelasFiltradas.length / registrosPorPagina);
+  const startItemRegistros = (currentPageRegistros - 1) * registrosPorPagina + 1;
+  const endItemRegistros = Math.min(currentPageRegistros * registrosPorPagina, parcelasFiltradas.length);
+  const parcelasExibidas = parcelasFiltradas.slice(
+    (currentPageRegistros - 1) * registrosPorPagina,
+    currentPageRegistros * registrosPorPagina
+  );
+
+  // DEBUG: Logs para diagnosticar
+  console.log('=== DEBUG PAGINAÇÃO ===');
+  console.log('Total parcelas filtradas:', parcelasFiltradas.length);
+  console.log('Registros por página:', registrosPorPagina);
+  console.log('Página atual:', currentPageRegistros);
+  console.log('Total de páginas:', totalPagesRegistros);
+  console.log('Parcelas exibidas:', parcelasExibidas.length);
+  console.log('Condição paginação (totalPages > 1):', totalPagesRegistros > 1);
+  console.log('Condição alternativa (parcelas > registrosPorPagina):', parcelasFiltradas.length > registrosPorPagina);
+  console.log('=== FIM DEBUG ===');
+
+  // Páginas visíveis para paginação
+  const getVisiblePagesRegistros = () => {
+    if (totalPagesRegistros <= 1) return [];
+    
+    const delta = 2;
+    const range = [];
+    const rangeWithDots = [];
+
+    // Calcular o range de páginas ao redor da página atual
+    const start = Math.max(2, currentPageRegistros - delta);
+    const end = Math.min(totalPagesRegistros - 1, currentPageRegistros + delta);
+    
+    for (let i = start; i <= end; i++) {
+      range.push(i);
+    }
+
+    // Sempre incluir a primeira página
+    if (start > 2) {
+      rangeWithDots.push(1, '...');
+    } else {
+      rangeWithDots.push(1);
+    }
+
+    // Adicionar o range do meio (excluindo primeira e última se já incluídas)
+    range.forEach(page => {
+      if (page !== 1 && page !== totalPagesRegistros) {
+        rangeWithDots.push(page);
+      }
+    });
+
+    // Sempre incluir a última página se houver mais de uma
+    if (end < totalPagesRegistros - 1) {
+      rangeWithDots.push('...', totalPagesRegistros);
+    } else if (totalPagesRegistros > 1) {
+      rangeWithDots.push(totalPagesRegistros);
+    }
+
+    // Remover duplicatas e ordenar
+    return [...new Set(rangeWithDots)].sort((a, b) => {
+      if (typeof a === 'number' && typeof b === 'number') return a - b;
+      if (typeof a === 'number') return -1;
+      if (typeof b === 'number') return 1;
+      return 0;
+    });
+  };
+
+  const visiblePagesRegistros = getVisiblePagesRegistros();
+
+  // Reset página quando busca muda ou itens por página muda
+  useEffect(() => {
+    setCurrentPageRegistros(1);
+  }, [searchTerm, registrosPorPagina]);
 
   // Calcular totais baseados nas parcelas filtradas
   const totaisDinamicos = calcularTotaisDinamicos(parcelasFiltradas);
@@ -686,9 +779,9 @@ const FinancialReportsTable = () => {
                     <div className="text-right">
                       <p className="font-bold">R$ {despesa.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                       <Badge 
-                        variant={despesa.status === 'pago' ? "default" : "secondary"}
+                        variant={despesa.status === 'Pago' ? "default" : "secondary"}
                       >
-                        {despesa.status === 'pago' ? 'Pago' : 'Pendente'}
+                        {despesa.status === 'Pago' ? 'Pago' : 'Pendente'}
                       </Badge>
                     </div>
                   </motion.div>
@@ -1020,6 +1113,7 @@ const FinancialReportsTable = () => {
                     <TableHead>Valor</TableHead>
                     <TableHead>Vencimento</TableHead>
                     <TableHead>Tipo</TableHead>
+                    <TableHead>Descrição do Item</TableHead>
                     {detalhesAbertos && (
                       <>
                         <TableHead>Idioma</TableHead>
@@ -1029,7 +1123,7 @@ const FinancialReportsTable = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {parcelasFiltradas.slice(0, 20).map((parcela) => (
+                  {parcelasExibidas.map((parcela) => (
                     <TableRow key={parcela.id} className="hover:bg-gray-50 transition-colors duration-200">
                       <TableCell>
                         <div className="flex justify-center">
@@ -1057,6 +1151,17 @@ const FinancialReportsTable = () => {
                         <Badge className={getStatusColor(parcela.tipo_item)}>
                           {parcela.tipo_item}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-xs">
+                        <div className="text-sm text-gray-600">
+                          {parcela.descricao_item ? (
+                            <div className="truncate" title={parcela.descricao_item}>
+                              {parcela.descricao_item}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 italic">-</span>
+                          )}
+                        </div>
                       </TableCell>
                       {detalhesAbertos && (
                         <>
@@ -1107,15 +1212,134 @@ const FinancialReportsTable = () => {
                   </TableRow>
                 </TableFooter>
               </Table>
-              
-              {parcelasFiltradas.length > 20 && (
-                <div className="text-center py-4">
-                  <p className="text-sm text-gray-500">
-                    Mostrando 20 de {parcelasFiltradas.length} parcelas
-                  </p>
-                </div>
-              )}
             </div>
+
+            {/* Contador de Registros */}
+            {parcelasFiltradas.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+                className="flex justify-center mt-4"
+              >
+                <div className="bg-gradient-to-r from-red-600 to-gray-800 rounded-full px-6 py-3 shadow-lg">
+                  <span className="text-white font-medium text-sm flex items-center space-x-2">
+                    <CreditCard className="h-4 w-4" />
+                    <span>{parcelasFiltradas.length} registros encontrados</span>
+                  </span>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Paginação dos Registros - CONDIÇÃO MODIFICADA */}
+            {(totalPagesRegistros > 1 || parcelasFiltradas.length > 10) && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
+                className="mt-4"
+              >
+                <Card className="shadow-md border-0 bg-gradient-to-r from-gray-50 to-white">
+                  <CardContent className="p-6">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                      {/* Informações de exibição */}
+                      <div className="flex items-center space-x-4 text-gray-600">
+                        <span className="text-sm">
+                          Mostrando {startItemRegistros} a {endItemRegistros} de {parcelasFiltradas.length} registros
+                        </span>
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                          Página {currentPageRegistros} de {totalPagesRegistros}
+                        </span>
+                      </div>
+
+                      {/* Controles de paginação - só mostrar se houver mais de 1 página */}
+                      {totalPagesRegistros > 1 && (
+                        <div className="flex items-center space-x-2">
+                          {/* Botão Anterior */}
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setCurrentPageRegistros(prev => Math.max(1, prev - 1))}
+                            disabled={currentPageRegistros === 1}
+                            className={`p-2 rounded-lg transition-all duration-200 flex items-center space-x-1 ${
+                              currentPageRegistros === 1
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                : 'bg-white text-gray-700 hover:bg-red-50 hover:text-red-600 border border-gray-200 shadow-sm'
+                            }`}
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                            <span className="text-sm font-medium">Anterior</span>
+                          </motion.button>
+
+                          {/* Números das páginas */}
+                          <div className="flex items-center space-x-1">
+                            {visiblePagesRegistros.map((page, index) => (
+                              page === '...' ? (
+                                <span key={`dots-${index}`} className="px-2 text-gray-400">...</span>
+                              ) : (
+                                <motion.button
+                                  key={page}
+                                  whileHover={{ scale: 1.1 }}
+                                  whileTap={{ scale: 0.9 }}
+                                  onClick={() => setCurrentPageRegistros(page as number)}
+                                  className={`w-10 h-10 rounded-lg font-medium text-sm transition-all duration-200 ${
+                                    currentPageRegistros === page
+                                      ? 'bg-gradient-to-r from-red-600 to-gray-800 text-white shadow-lg'
+                                      : 'bg-white text-gray-700 hover:bg-red-50 hover:text-red-600 border border-gray-200'
+                                  }`}
+                                >
+                                  {page}
+                                </motion.button>
+                              )
+                            ))}
+                          </div>
+
+                          {/* Botão Próximo */}
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setCurrentPageRegistros(prev => Math.min(totalPagesRegistros, prev + 1))}
+                            disabled={currentPageRegistros === totalPagesRegistros}
+                            className={`p-2 rounded-lg transition-all duration-200 flex items-center space-x-1 ${
+                              currentPageRegistros === totalPagesRegistros
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                : 'bg-white text-gray-700 hover:bg-red-50 hover:text-red-600 border border-gray-200 shadow-sm'
+                            }`}
+                          >
+                            <span className="text-sm font-medium">Próximo</span>
+                            <ChevronRight className="h-4 w-4" />
+                          </motion.button>
+                        </div>
+                      )}
+
+                      {/* Seletor de itens por página - sempre mostrar */}
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm text-gray-600">Itens por página:</span>
+                        <Select
+                          value={registrosPorPagina.toString()}
+                          onValueChange={(value) => {
+                            console.log('Mudando itens por página para:', value);
+                            setRegistrosPorPagina(Number(value));
+                            setCurrentPageRegistros(1);
+                          }}
+                        >
+                          <SelectTrigger className="w-20 h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="5">5</SelectItem>
+                            <SelectItem value="10">10</SelectItem>
+                            <SelectItem value="20">20</SelectItem>
+                            <SelectItem value="50">50</SelectItem>
+                            <SelectItem value="100">100</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
           </CardContent>
         </Card>
       </motion.div>

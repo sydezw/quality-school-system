@@ -23,7 +23,7 @@ interface Plan {
   permite_parcelamento: boolean;
   observacoes: string | null;
   ativo: boolean;
-  idioma: 'Inglês' | 'Japonês'; // Mudança aqui: de string para union type
+  idioma: 'Inglês' | 'Japonês';
 }
 
 interface PlanFormProps {
@@ -37,12 +37,15 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
   const [formData, setFormData] = useState({
     nome: '',
     descricao: '',
-    numero_aulas: '', // Alterado de 1 para string vazia
+    numero_aulas: '',
     frequencia_aulas: 'semanal',
     idioma: 'Inglês' as 'Inglês' | 'Japonês',
     carga_horaria_total: '',
     valor_total: '',
     valor_por_aula: '',
+    modo_duracao: 'minutos' as 'minutos' | 'horas',
+    horas_por_aula: '0',
+    minutos_por_aula: '50',
     horario_por_aula: '',
     permite_cancelamento: false,
     permite_parcelamento: false,
@@ -52,36 +55,36 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
 
   const { toast } = useToast();
 
-  // Função para formatar carga horária em formato HH:MM
-  const formatCargaHoraria = (value: string): string => {
-    const numericValue = parseFloat(value);
-    if (isNaN(numericValue)) return '';
-    
-    const parteInteira = Math.floor(numericValue);
-    const parteDecimal = numericValue - parteInteira;
-    
-    // Se não há parte decimal, exibe apenas o número inteiro
-    if (parteDecimal === 0) {
-      return parteInteira.toString();
-    }
-    
-    // Converte a parte decimal para dois dígitos (ex: 0.25 -> 25, 0.5 -> 50)
-    const decimalFormatted = Math.round(parteDecimal * 100).toString().padStart(2, '0');
-    
-    return `${parteInteira}:${decimalFormatted}`;
+  const convertToDecimal = (horas: string, minutos: string): number => {
+    const h = parseInt(horas) || 0;
+    const m = parseInt(minutos) || 0;
+    return h + (m / 60);
+  };
+
+  const convertFromDecimal = (decimal: number): { horas: string, minutos: string } => {
+    const horas = Math.floor(decimal);
+    const minutos = Math.round((decimal - horas) * 60);
+    return {
+      horas: horas.toString(),
+      minutos: minutos.toString()
+    };
   };
 
   useEffect(() => {
     if (plan) {
+      const { horas, minutos } = convertFromDecimal(plan.horario_por_aula || 0);
       setFormData({
         nome: plan.nome,
         descricao: plan.descricao,
-        numero_aulas: plan.numero_aulas,
+        numero_aulas: plan.numero_aulas.toString(),
         frequencia_aulas: plan.frequencia_aulas,
-        idioma: plan.idioma || 'Inglês', // Novo campo
+        idioma: plan.idioma || 'Inglês',
         carga_horaria_total: plan.carga_horaria_total?.toString() || '',
         valor_total: plan.valor_total?.toString() || '',
         valor_por_aula: plan.valor_por_aula?.toString() || '',
+        modo_duracao: 'minutos',
+        horas_por_aula: horas,
+        minutos_por_aula: minutos,
         horario_por_aula: plan.horario_por_aula?.toString() || '',
         permite_cancelamento: plan.permite_cancelamento,
         permite_parcelamento: plan.permite_parcelamento,
@@ -91,13 +94,28 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
     }
   }, [plan]);
 
-  // Cálculos automáticos em tempo real
+  useEffect(() => {
+    const horas = parseInt(formData.horas_por_aula) || 0;
+    const minutos = parseInt(formData.minutos_por_aula) || 0;
+    
+    let decimal;
+    if (formData.modo_duracao === 'minutos') {
+      decimal = minutos / 60;
+    } else {
+      decimal = horas + (minutos / 60);
+    }
+    
+    const horarioDecimal = decimal.toFixed(2);
+    if (formData.horario_por_aula !== horarioDecimal) {
+      setFormData(prev => ({ ...prev, horario_por_aula: horarioDecimal }));
+    }
+  }, [formData.horas_por_aula, formData.minutos_por_aula, formData.modo_duracao]);
+
   useEffect(() => {
     const valorTotal = parseFloat(formData.valor_total) || 0;
-    const numeroAulas = formData.numero_aulas || 0;
+    const numeroAulas = parseInt(formData.numero_aulas) || 0;
     const horarioPorAula = parseFloat(formData.horario_por_aula) || 0;
 
-    // Calcular valor por aula automaticamente
     if (valorTotal > 0 && numeroAulas > 0) {
       const valorPorAula = (valorTotal / numeroAulas).toFixed(2);
       if (formData.valor_por_aula !== valorPorAula) {
@@ -105,8 +123,6 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
       }
     }
 
-    // Calcular carga horária total automaticamente
-    // Agora horarioPorAula está em horas, então multiplicamos diretamente
     if (numeroAulas > 0 && horarioPorAula > 0) {
       const cargaHorariaTotal = (numeroAulas * horarioPorAula).toFixed(1);
       if (formData.carga_horaria_total !== cargaHorariaTotal) {
@@ -120,10 +136,9 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
     setLoading(true);
 
     try {
-      // Validações
       const valorTotal = parseFloat(formData.valor_total) || 0;
-      const numeroAulas = parseInt(formData.numero_aulas.toString()) || 0; // Conversão segura
-      const horarioPorAula = parseFloat(formData.horario_por_aula) || 0;
+      const numeroAulas = parseInt(formData.numero_aulas.toString()) || 0;
+      const horarioPorAula = convertToDecimal(formData.horas_por_aula, formData.minutos_por_aula);
 
       if (valorTotal <= 0) {
         toast({
@@ -148,14 +163,13 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
       if (horarioPorAula <= 0) {
         toast({
           title: "Erro de Validação",
-          description: "Horário por Aula deve ser maior que zero.",
+          description: "Duração da aula deve ser maior que zero.",
           variant: "destructive",
         });
         setLoading(false);
         return;
       }
 
-      // Recalcular valores no servidor para garantir consistência
       const valorPorAula = valorTotal / numeroAulas;
       const cargaHorariaTotal = numeroAulas * horarioPorAula;
 
@@ -163,8 +177,8 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
         nome: formData.nome,
         descricao: formData.descricao,
         numero_aulas: numeroAulas,
-        frequencia_aulas: formData.frequencia_aulas,
-        idioma: formData.idioma, // Novo campo
+        frequencia_aulas: JSON.stringify(formData.frequencia_aulas),
+        idioma: formData.idioma,
         carga_horaria_total: cargaHorariaTotal,
         valor_total: valorTotal,
         valor_por_aula: valorPorAula,
@@ -241,7 +255,9 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
             </SelectContent>
           </Select>
         </div>
+      </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label htmlFor="numero_aulas">Número de Aulas</Label>
           <Input
@@ -253,6 +269,115 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
             placeholder="Digite o número de aulas"
             required
           />
+        </div>
+
+        <div>
+          <Label>Duração da Aula</Label>
+          
+          <div className="flex gap-2 mt-1 mb-2">
+            <label className={`flex items-center space-x-1 text-xs px-2 py-1 rounded cursor-pointer transition-colors ${
+              formData.modo_duracao === 'minutos' 
+                ? 'bg-red-100 text-red-700 border border-red-300' 
+                : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
+            }`}>
+              <input
+                type="radio"
+                name="modo_duracao"
+                value="minutos"
+                checked={formData.modo_duracao === 'minutos'}
+                onChange={(e) => {
+                  handleInputChange('modo_duracao', 'minutos');
+                  if (formData.modo_duracao === 'horas') {
+                    const totalMinutos = (parseInt(formData.horas_por_aula) || 0) * 60 + (parseInt(formData.minutos_por_aula) || 0);
+                    if (totalMinutos > 0) {
+                      handleInputChange('minutos_por_aula', totalMinutos.toString());
+                      handleInputChange('horas_por_aula', '0');
+                    }
+                  }
+                }}
+                className="w-3 h-3 accent-red-500"
+              />
+              <span>Minutos</span>
+            </label>
+            <label className={`flex items-center space-x-1 text-xs px-2 py-1 rounded cursor-pointer transition-colors ${
+              formData.modo_duracao === 'horas' 
+                ? 'bg-red-100 text-red-700 border border-red-300' 
+                : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
+            }`}>
+              <input
+                type="radio"
+                name="modo_duracao"
+                value="horas"
+                checked={formData.modo_duracao === 'horas'}
+                onChange={(e) => {
+                  handleInputChange('modo_duracao', 'horas');
+                  if (formData.modo_duracao === 'minutos') {
+                    const totalMinutos = parseInt(formData.minutos_por_aula) || 0;
+                    if (totalMinutos > 0) {
+                      const horas = Math.floor(totalMinutos / 60);
+                      const minutos = totalMinutos % 60;
+                      handleInputChange('horas_por_aula', horas.toString());
+                      handleInputChange('minutos_por_aula', minutos.toString());
+                    }
+                  }
+                }}
+                className="w-3 h-3 accent-red-500"
+              />
+              <span>H + Min</span>
+            </label>
+          </div>
+
+          {formData.modo_duracao === 'minutos' ? (
+            <Input
+              type="number"
+              min="1"
+              max="480"
+              value={formData.minutos_por_aula}
+              onChange={(e) => {
+                handleInputChange('minutos_por_aula', e.target.value);
+                handleInputChange('horas_por_aula', '0');
+              }}
+              placeholder="Ex: 50, 90, 120..."
+            />
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                type="number"
+                min="0"
+                max="8"
+                value={formData.horas_por_aula}
+                onChange={(e) => handleInputChange('horas_por_aula', e.target.value)}
+                placeholder="0h"
+              />
+              <Input
+                type="number"
+                min="0"
+                max="59"
+                value={formData.minutos_por_aula}
+                onChange={(e) => handleInputChange('minutos_por_aula', e.target.value)}
+                placeholder="0min"
+              />
+            </div>
+          )}
+          
+          <p className="text-xs text-gray-500 mt-1">
+            {(() => {
+              const horas = parseInt(formData.horas_por_aula) || 0;
+              const minutos = parseInt(formData.minutos_por_aula) || 0;
+              const totalMinutos = (horas * 60) + minutos;
+              
+              if (totalMinutos === 0) return "0 min";
+              
+              if (formData.modo_duracao === 'minutos') {
+                const h = Math.floor(totalMinutos / 60);
+                const m = totalMinutos % 60;
+                return h > 0 ? `${totalMinutos} min (${h}h ${m}min)` : `${totalMinutos} min`;
+              } else {
+                return horas > 0 && minutos > 0 ? `${horas}h ${minutos}min` : 
+                       horas > 0 ? `${horas}h` : `${minutos} min`;
+              }
+            })()} • {parseFloat(formData.horario_por_aula || '0').toFixed(2)}h
+          </p>
         </div>
       </div>
 
@@ -270,52 +395,31 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label htmlFor="frequencia_aulas">Frequência das Aulas</Label>
-          <Select
-            value={formData.frequencia_aulas}
-            onValueChange={(value) => handleInputChange('frequencia_aulas', value)}
-          >
+          <Select value={formData.frequencia_aulas} onValueChange={(value) => handleInputChange('frequencia_aulas', value)}>
             <SelectTrigger>
               <SelectValue placeholder="Selecione a frequência" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="diaria">Diária</SelectItem>
               <SelectItem value="semanal">Semanal</SelectItem>
               <SelectItem value="quinzenal">Quinzenal</SelectItem>
               <SelectItem value="mensal">Mensal</SelectItem>
-              <SelectItem value="bimestral">Bimestral</SelectItem>
-              <SelectItem value="trimestral">Trimestral</SelectItem>
-              <SelectItem value="semestral">Semestral</SelectItem>
-              <SelectItem value="anual">Anual</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <div>
-          <Label htmlFor="horario_por_aula">Horário por Aula (horas)</Label>
+          <Label htmlFor="carga_horaria_total">Carga Horária Total (horas)</Label>
           <Input
-            id="horario_por_aula"
+            id="carga_horaria_total"
             type="number"
-            min="0.1"
-            step="0.1"
-            value={formData.horario_por_aula || ''}
-            onChange={(e) => handleInputChange('horario_por_aula', parseFloat(e.target.value) || null)}
-            placeholder="Ex: 1.5"
+            min="0"
+            step="0.5"
+            value={formData.carga_horaria_total || ''}
+            readOnly
+            className="bg-gray-50"
+            placeholder="Calculado automaticamente"
           />
         </div>
-      </div>
-
-      <div>
-        <Label htmlFor="carga_horaria_total">Carga Horária Total (horas)</Label>
-        <Input
-          id="carga_horaria_total"
-          type="number"
-          min="0"
-          step="0.5"
-          value={formData.carga_horaria_total || ''}
-          readOnly
-          className="bg-gray-50"
-          placeholder="Calculado automaticamente"
-        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -335,15 +439,15 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
         <div>
           <Label htmlFor="valor_por_aula">Valor por Aula (R$)</Label>
           <Input
-          id="valor_por_aula"
-          type="number"
-          min="0"
-          step="0.01"
-          value={formData.valor_por_aula || ''}
-          readOnly
-          className="bg-gray-50"
-          placeholder="Calculado automaticamente"
-        />
+            id="valor_por_aula"
+            type="number"
+            min="0"
+            step="0.01"
+            value={formData.valor_por_aula || ''}
+            readOnly
+            className="bg-gray-50"
+            placeholder="Calculado automaticamente"
+          />
         </div>
       </div>
 

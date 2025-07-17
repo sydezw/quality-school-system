@@ -15,17 +15,18 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, FileText, ChevronLeft, ChevronRight } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useParcelas } from '@/hooks/useParcelas';
-import { Search, Filter, Calendar, CreditCard, CheckCircle, XCircle, Clock, AlertTriangle, Trash2, Plus, Users, RefreshCw } from 'lucide-react';
+import { Search, Filter, Calendar, CreditCard, CheckCircle, XCircle, Clock, AlertTriangle, Trash2, Plus, Users, RefreshCw, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import FinancialPlanDialog from './FinancialPlanDialog';
 import { Student } from '@/types/shared';
+import { formatarFormaPagamento } from '@/utils/formatters';
 
 interface Parcela {
   id: number;
@@ -35,7 +36,8 @@ interface Parcela {
   data_vencimento: string;
   data_pagamento: string | null;
   status_pagamento: string;
-  tipo_item: 'plano' | 'material' | 'matrícula';
+  tipo_item: 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'outros';
+  descricao_item?: string | null;
   idioma_registro: 'Inglês' | 'Japonês';
   comprovante: string | null;
   observacoes?: string | null;
@@ -51,14 +53,21 @@ const ParcelasTable: React.FC = () => {
   // Estados dos filtros - alterados para arrays
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilters, setStatusFilters] = useState<string[]>(['pago', 'pendente', 'vencido', 'cancelado']);
-  const [tipoFilters, setTipoFilters] = useState<string[]>(['plano', 'material', 'matrícula']);
-  const [dataVencimentoInicio, setDataVencimentoInicio] = useState('');
-  const [dataVencimentoFim, setDataVencimentoFim] = useState('');
+  const [tipoFilters, setTipoFilters] = useState<string[]>(['plano', 'material', 'matrícula', 'cancelamento', 'outros']);
+  const [anoInicio, setAnoInicio] = useState('todos');
+  const [anoFim, setAnoFim] = useState('todos');
   const [idiomaFilter, setIdiomaFilter] = useState<'todos' | 'Inglês' | 'Japonês'>('todos');
+  
+  // Estados para paginação
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   
   // Estados para o modal de criação de plano
   const [isFinancialPlanDialogOpen, setIsFinancialPlanDialogOpen] = useState(false);
   const [selectedStudentForPlan, setSelectedStudentForPlan] = useState<Student | null>(null);
+  
+  // Estado para controlar se os filtros avançados estão expandidos
+  const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
   
   const { toast } = useToast();
 
@@ -153,7 +162,7 @@ const ParcelasTable: React.FC = () => {
   };
 
   // Filtragem local atualizada para múltipla seleção
-  const parcelas = useMemo(() => {
+  const parcelasFiltradas = useMemo(() => {
     return todasParcelas.filter((parcela) => {
       // Filtro por nome do aluno
       const filtroNome = !searchTerm || 
@@ -169,18 +178,83 @@ const ParcelasTable: React.FC = () => {
       // Filtro por idioma
       const filtroIdioma = idiomaFilter === 'todos' || parcela.idioma_registro === idiomaFilter;
       
-      // Filtro por data de vencimento
-      const dataVencimento = new Date(parcela.data_vencimento);
-      const filtroDataInicio = !dataVencimentoInicio || 
-        dataVencimento >= new Date(dataVencimentoInicio);
-      const filtroDataFim = !dataVencimentoFim || 
-        dataVencimento <= new Date(dataVencimentoFim);
+      // Filtro por ano de vencimento
+      const anoVencimento = new Date(parcela.data_vencimento).getFullYear();
+      const filtroAnoInicio = anoInicio === 'todos' || anoVencimento >= parseInt(anoInicio);
+      const filtroAnoFim = anoFim === 'todos' || anoVencimento <= parseInt(anoFim);
       
       return filtroNome && filtroStatus && filtroTipo && filtroIdioma && 
-             filtroDataInicio && filtroDataFim;
+             filtroAnoInicio && filtroAnoFim;
     });
   }, [todasParcelas, searchTerm, statusFilters, tipoFilters, idiomaFilter, 
-      dataVencimentoInicio, dataVencimentoFim, calcularStatusAutomatico]);
+      anoInicio, anoFim, calcularStatusAutomatico]);
+
+  // Cálculos de paginação
+  const totalPages = itemsPerPage === 0 ? 1 : Math.ceil(parcelasFiltradas.length / itemsPerPage);
+  const startItem = itemsPerPage === 0 ? 1 : (currentPage - 1) * itemsPerPage + 1;
+  const endItem = itemsPerPage === 0 ? parcelasFiltradas.length : Math.min(currentPage * itemsPerPage, parcelasFiltradas.length);
+  const parcelas = itemsPerPage === 0 ? parcelasFiltradas : parcelasFiltradas.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // DEBUG: Logs para diagnosticar
+  console.log('=== DEBUG PAGINAÇÃO PARCELAS ===');
+  console.log('Total parcelas filtradas:', parcelasFiltradas.length);
+  console.log('Itens por página:', itemsPerPage === 0 ? 'Todos' : itemsPerPage);
+  console.log('Página atual:', currentPage);
+  console.log('Total de páginas:', totalPages);
+  console.log('Parcelas exibidas:', parcelas.length);
+  console.log('Condição paginação (totalPages > 1):', totalPages > 1);
+  console.log('=== FIM DEBUG ===');
+
+  // Páginas visíveis para paginação
+  const getVisiblePages = () => {
+    if (totalPages <= 1 || itemsPerPage === 0) return [];
+    
+    const delta = 2;
+    const range = [];
+    const rangeWithDots = [];
+
+    const start = Math.max(2, currentPage - delta);
+    const end = Math.min(totalPages - 1, currentPage + delta);
+    
+    for (let i = start; i <= end; i++) {
+      range.push(i);
+    }
+
+    if (start > 2) {
+      rangeWithDots.push(1, '...');
+    } else {
+      rangeWithDots.push(1);
+    }
+
+    range.forEach(page => {
+      if (page !== 1 && page !== totalPages) {
+        rangeWithDots.push(page);
+      }
+    });
+
+    if (end < totalPages - 1) {
+      rangeWithDots.push('...', totalPages);
+    } else if (totalPages > 1) {
+      rangeWithDots.push(totalPages);
+    }
+
+    return [...new Set(rangeWithDots)].sort((a, b) => {
+      if (typeof a === 'number' && typeof b === 'number') return a - b;
+      if (typeof a === 'number') return -1;
+      if (typeof b === 'number') return 1;
+      return 0;
+    });
+  };
+
+  const visiblePages = getVisiblePages();
+
+  // Reset página quando filtros mudam
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilters, tipoFilters, idiomaFilter, anoInicio, anoFim, itemsPerPage]);
 
   // Carregar parcelas apenas na inicialização
   useEffect(() => {
@@ -189,6 +263,28 @@ const ParcelasTable: React.FC = () => {
 
   const handleIdiomaChange = (value: string) => {
     setIdiomaFilter(value as 'todos' | 'Inglês' | 'Japonês');
+  };
+
+  const handleAnoInicioChange = (value: string) => {
+    setAnoInicio(value);
+    // Auto-preencher ano fim se estiver vazio
+    if (value !== 'todos' && anoFim === 'todos') {
+      setAnoFim(value);
+    }
+  };
+
+  const handleAnoFimChange = (value: string) => {
+    setAnoFim(value);
+  };
+
+  // Gerar lista de anos disponíveis (últimos 10 anos + próximos 5 anos)
+  const getAnosDisponiveis = () => {
+    const anoAtual = new Date().getFullYear();
+    const anos = [];
+    for (let ano = anoAtual - 10; ano <= anoAtual + 5; ano++) {
+      anos.push(ano.toString());
+    }
+    return anos.reverse(); // Mais recentes primeiro
   };
 
   const getStatusIcon = (status: string) => {
@@ -225,6 +321,10 @@ const ParcelasTable: React.FC = () => {
         return <Calendar className="h-4 w-4 text-purple-600" />;
       case 'matrícula':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'cancelamento':
+        return <XCircle className="h-4 w-4 text-red-600" />;
+      case 'outros':
+        return <FileText className="h-4 w-4 text-orange-600" />;
       default:
         return <CreditCard className="h-4 w-4 text-gray-600" />;
     }
@@ -266,195 +366,229 @@ const ParcelasTable: React.FC = () => {
         >
           <Card className="shadow-lg border-0 bg-gradient-to-r from-red-50 to-gray-100">
             <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-3 text-red-700">
-                <Filter className="h-6 w-6" />
-                Filtros Avançados
+              <CardTitle 
+                className="flex items-center justify-between text-red-700 cursor-pointer"
+                onClick={() => setIsFiltersExpanded(!isFiltersExpanded)}
+              >
+                <div className="flex items-center gap-3">
+                  <Filter className="h-6 w-6" />
+                  Filtros Avançados
+                </div>
+                <motion.div
+                  animate={{ rotate: isFiltersExpanded ? 180 : 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <ChevronDown className="h-5 w-5" />
+                </motion.div>
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-                {/* Busca */}
-                <div className="lg:col-span-2">
-                  <Label htmlFor="search" className="text-sm font-medium text-gray-700">Buscar</Label>
-                  <div className="relative mt-1">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="search"
-                      placeholder="Nome do aluno..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 border-gray-300 focus:border-red-500 focus:ring-red-500"
-                    />
+            <motion.div
+              initial={false}
+              animate={{
+                height: isFiltersExpanded ? "auto" : 0,
+                opacity: isFiltersExpanded ? 1 : 0
+              }}
+              transition={{
+                duration: 0.3,
+                ease: "easeInOut"
+              }}
+              style={{ overflow: "hidden" }}
+            >
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                  {/* Busca */}
+                  <div className="lg:col-span-2">
+                    <Label htmlFor="search" className="text-sm font-medium text-gray-700">Buscar</Label>
+                    <div className="relative mt-1">
+                      <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="search"
+                        placeholder="Nome do aluno..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 border-gray-300 focus:border-red-500 focus:ring-red-500"
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Filtros de Status com Multi-Select */}
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700 mb-2 block">Status</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-between border-gray-300 focus:border-red-500 focus:ring-red-500"
+                        >
+                          <span className="text-sm">
+                            {statusFilters.length === 4 
+                              ? 'Todos os status' 
+                              : statusFilters.length === 0 
+                              ? 'Selecione os status...' 
+                              : `${statusFilters.length} status selecionado${statusFilters.length > 1 ? 's' : ''}`
+                            }
+                          </span>
+                          <ChevronDown className="h-4 w-4 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0">
+                        <div className="p-2 space-y-1">
+                          {[
+                            { value: 'pago', label: 'Pagas', icon: CheckCircle },
+                            { value: 'pendente', label: 'Pendentes', icon: Clock },
+                            { value: 'vencido', label: 'Vencidas', icon: AlertTriangle },
+                            { value: 'cancelado', label: 'Canceladas', icon: XCircle }
+                          ].map((status) => {
+                            const isChecked = statusFilters.includes(status.value);
+                            const IconComponent = status.icon;
+                            return (
+                              <div 
+                                key={status.value}
+                                className="flex items-center space-x-2 p-2 rounded hover:bg-gray-50 cursor-pointer"
+                              >
+                                <Checkbox
+                                  checked={isChecked}
+                                  onCheckedChange={(checked) => handleStatusFilterChange(status.value, checked as boolean)}
+                                />
+                                <IconComponent className="h-4 w-4 text-gray-600" />
+                                <span className="text-sm">{status.label}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  
+                  {/* Filtros de Tipo com Multi-Select */}
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700 mb-2 block">Tipo</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-between border-gray-300 focus:border-red-500 focus:ring-red-500"
+                        >
+                          <span className="text-sm">
+                            {tipoFilters.length === 5 
+                              ? 'Todos os tipos' 
+                              : tipoFilters.length === 0 
+                              ? 'Selecione os tipos...' 
+                              : `${tipoFilters.length} tipo${tipoFilters.length > 1 ? 's' : ''} selecionado${tipoFilters.length > 1 ? 's' : ''}`
+                            }
+                          </span>
+                          <ChevronDown className="h-4 w-4 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0">
+                        <div className="p-2 space-y-1">
+                          {[
+                            { value: 'plano', label: 'Planos', icon: CreditCard },
+                            { value: 'material', label: 'Materiais', icon: Calendar },
+                            { value: 'matrícula', label: 'Matrículas', icon: CheckCircle },
+                            { value: 'cancelamento', label: 'Cancelamentos', icon: XCircle },
+                            { value: 'outros', label: 'Outros', icon: FileText }
+                          ].map((tipo) => {
+                            const isChecked = tipoFilters.includes(tipo.value);
+                            const IconComponent = tipo.icon;
+                            return (
+                              <div 
+                                key={tipo.value}
+                                className="flex items-center space-x-2 p-2 rounded hover:bg-gray-50 cursor-pointer"
+                              >
+                                <Checkbox
+                                  checked={isChecked}
+                                  onCheckedChange={(checked) => handleTipoFilterChange(tipo.value, checked as boolean)}
+                                />
+                                <IconComponent className="h-4 w-4 text-gray-600" />
+                                <span className="text-sm">{tipo.label}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  
+                  {/* Filtro de Idioma */}
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Idioma</Label>
+                    <Select value={idiomaFilter} onValueChange={handleIdiomaChange}>
+                      <SelectTrigger className="mt-1 border-gray-300 focus:border-red-500 focus:ring-red-500">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        <SelectItem value="Inglês">Inglês</SelectItem>
+                        <SelectItem value="Japonês">Japonês</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Ano Início */}
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Ano Início</Label>
+                    <Select value={anoInicio} onValueChange={handleAnoInicioChange}>
+                      <SelectTrigger className="mt-1 border-gray-300 focus:border-red-500 focus:ring-red-500">
+                        <SelectValue placeholder="Selecione o ano" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos os anos</SelectItem>
+                        {getAnosDisponiveis().map((ano) => (
+                          <SelectItem key={ano} value={ano}>
+                            {ano}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Ano Fim */}
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Ano Fim</Label>
+                    <Select value={anoFim} onValueChange={handleAnoFimChange}>
+                      <SelectTrigger className="mt-1 border-gray-300 focus:border-red-500 focus:ring-red-500">
+                        <SelectValue placeholder="Selecione o ano" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos os anos</SelectItem>
+                        {getAnosDisponiveis().map((ano) => (
+                          <SelectItem key={ano} value={ano}>
+                            {ano}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 
-                {/* Filtros de Status com Multi-Select */}
-                <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Status</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-between border-gray-300 focus:border-red-500 focus:ring-red-500"
-                      >
-                        <span className="text-sm">
-                          {statusFilters.length === 4 
-                            ? 'Todos os status' 
-                            : statusFilters.length === 0 
-                            ? 'Selecione os status...' 
-                            : `${statusFilters.length} status selecionado${statusFilters.length > 1 ? 's' : ''}`
-                          }
-                        </span>
-                        <ChevronDown className="h-4 w-4 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <div className="p-2 space-y-1">
-                        {[
-                          { value: 'pago', label: 'Pagas', icon: CheckCircle },
-                          { value: 'pendente', label: 'Pendentes', icon: Clock },
-                          { value: 'vencido', label: 'Vencidas', icon: AlertTriangle },
-                          { value: 'cancelado', label: 'Canceladas', icon: XCircle }
-                        ].map((status) => {
-                          const isChecked = statusFilters.includes(status.value);
-                          const IconComponent = status.icon;
-                          return (
-                            <div 
-                              key={status.value}
-                              className="flex items-center space-x-2 p-2 rounded hover:bg-gray-50 cursor-pointer"
-                            >
-                              <Checkbox
-                                checked={isChecked}
-                                onCheckedChange={(checked) => handleStatusFilterChange(status.value, checked as boolean)}
-                              />
-                              <IconComponent className="h-4 w-4 text-gray-600" />
-                              <span className="text-sm">{status.label}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                
-                {/* Filtros de Tipo com Multi-Select */}
-                <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Tipo</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-between border-gray-300 focus:border-red-500 focus:ring-red-500"
-                      >
-                        <span className="text-sm">
-                          {tipoFilters.length === 3 
-                            ? 'Todos os tipos' 
-                            : tipoFilters.length === 0 
-                            ? 'Selecione os tipos...' 
-                            : `${tipoFilters.length} tipo${tipoFilters.length > 1 ? 's' : ''} selecionado${tipoFilters.length > 1 ? 's' : ''}`
-                          }
-                        </span>
-                        <ChevronDown className="h-4 w-4 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <div className="p-2 space-y-1">
-                        {[
-                          { value: 'plano', label: 'Planos', icon: CreditCard },
-                          { value: 'material', label: 'Materiais', icon: Calendar },
-                          { value: 'matrícula', label: 'Matrículas', icon: CheckCircle }
-                        ].map((tipo) => {
-                          const isChecked = tipoFilters.includes(tipo.value);
-                          const IconComponent = tipo.icon;
-                          return (
-                            <div 
-                              key={tipo.value}
-                              className="flex items-center space-x-2 p-2 rounded hover:bg-gray-50 cursor-pointer"
-                            >
-                              <Checkbox
-                                checked={isChecked}
-                                onCheckedChange={(checked) => handleTipoFilterChange(tipo.value, checked as boolean)}
-                              />
-                              <IconComponent className="h-4 w-4 text-gray-600" />
-                              <span className="text-sm">{tipo.label}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                
-                {/* Filtro de Idioma */}
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Idioma</Label>
-                  <Select value={idiomaFilter} onValueChange={handleIdiomaChange}>
-                    <SelectTrigger className="mt-1 border-gray-300 focus:border-red-500 focus:ring-red-500">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todos">Todos</SelectItem>
-                      <SelectItem value="Inglês">Inglês</SelectItem>
-                      <SelectItem value="Japonês">Japonês</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {/* Data Início */}
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Data Início</Label>
-                  <Input
-                    type="date"
-                    value={dataVencimentoInicio}
-                    onChange={(e) => {
-                      const novaDataInicio = e.target.value;
-                      setDataVencimentoInicio(novaDataInicio);
-                      // Auto-preencher data fim se estiver vazia
-                      if (novaDataInicio && !dataVencimentoFim) {
-                        setDataVencimentoFim(novaDataInicio);
-                      }
-                    }}
-                    className="mt-1 border-gray-300 focus:border-red-500 focus:ring-red-500"
-                  />
-                </div>
-                
-                {/* Data Fim */}
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Data Fim</Label>
-                  <Input
-                    type="date"
-                    value={dataVencimentoFim}
-                    onChange={(e) => setDataVencimentoFim(e.target.value)}
-                    className="mt-1 border-gray-300 focus:border-red-500 focus:ring-red-500"
-                  />
-                </div>
-              </div>
-              
-              {/* Botão Limpar Filtros */}
-              {(searchTerm || statusFilters.length < 4 || tipoFilters.length < 3 || dataVencimentoInicio || dataVencimentoFim || idiomaFilter !== 'todos') && (
-                <motion.div 
-                  className="mt-4 flex justify-end"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setSearchTerm('');
-                      setStatusFilters(['pago', 'pendente', 'vencido', 'cancelado']);
-                      setTipoFilters(['plano', 'material', 'matrícula']);
-                      setDataVencimentoInicio('');
-                      setDataVencimentoFim('');
-                      setIdiomaFilter('todos');
-                    }}
-                    className="text-gray-600 hover:text-gray-800 border-gray-300 hover:border-gray-400"
+                {/* Botão Limpar Filtros */}
+                {(searchTerm || statusFilters.length < 4 || tipoFilters.length < 5 || anoInicio !== 'todos' || anoFim !== 'todos' || idiomaFilter !== 'todos') && (
+                  <motion.div 
+                    className="mt-4 flex justify-end"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.3 }}
                   >
-                    Limpar Filtros
-                  </Button>
-                </motion.div>
-              )}
-            </CardContent>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setSearchTerm('');
+                        setStatusFilters(['pago', 'pendente', 'vencido', 'cancelado']);
+                        setTipoFilters(['plano', 'material', 'matrícula', 'cancelamento', 'outros']);
+                        setAnoInicio('todos');
+                        setAnoFim('todos');
+                        setIdiomaFilter('todos');
+                      }}
+                      className="flex items-center gap-2 text-red-600 border-red-300 hover:bg-red-50"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Limpar Filtros
+                    </Button>
+                  </motion.div>
+                )}
+              </CardContent>
+            </motion.div>
           </Card>
         </motion.div>
 
@@ -565,7 +699,7 @@ const ParcelasTable: React.FC = () => {
                   </div>
                   <p className="text-gray-500 text-lg font-medium">Nenhuma parcela encontrada</p>
                   <p className="text-sm text-gray-400 mt-2">
-                    {searchTerm || statusFilters.length < 4 || tipoFilters.length < 3 || dataVencimentoInicio || dataVencimentoFim
+                    {searchTerm || statusFilters.length < 4 || tipoFilters.length < 5 || anoInicio || anoFim
                       ? 'Tente ajustar os filtros de busca.'
                       : 'Nenhuma parcela foi criada ainda.'}
                   </p>
@@ -584,6 +718,7 @@ const ParcelasTable: React.FC = () => {
                         <TableHead className="font-bold text-gray-700 w-32">Valor</TableHead>
                         <TableHead className="font-bold text-gray-700 w-32">Vencimento</TableHead>
                         <TableHead className="font-bold text-gray-700 w-32">Forma Pagamento</TableHead>
+                        <TableHead className="font-bold text-gray-700 min-w-[150px]">Descrição do Item</TableHead>
                         <TableHead className="font-bold text-gray-700 w-32">Status</TableHead>
                         <TableHead className="font-bold text-gray-700 min-w-[200px]">Observações</TableHead>
                         <TableHead className="font-bold text-gray-700 text-center w-32">Ações</TableHead>
@@ -632,7 +767,18 @@ const ParcelasTable: React.FC = () => {
                                 </div>
                               </TableCell>
                               <TableCell className="text-base text-gray-700">
-                                {parcela.forma_pagamento || '-'}
+                                {formatarFormaPagamento(parcela.forma_pagamento) || '-'}
+                              </TableCell>
+                              <TableCell className="max-w-xs">
+                                <div className="text-sm text-gray-600">
+                                  {parcela.descricao_item ? (
+                                    <div className="truncate" title={parcela.descricao_item}>
+                                      {parcela.descricao_item}
+                                    </div>
+                                  ) : (
+                                    <span className="text-gray-400 italic">-</span>
+                                  )}
+                                </div>
                               </TableCell>
                               <TableCell>
                                 <motion.div
@@ -706,6 +852,141 @@ const ParcelasTable: React.FC = () => {
           </Card>
         </motion.div>
 
+        {/* Contador de Registros */}
+        {parcelasFiltradas.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="flex justify-center mt-4"
+          >
+            <div className="bg-gradient-to-r from-red-600 to-gray-800 rounded-full px-6 py-3 shadow-lg">
+              <span className="text-white font-medium text-sm flex items-center space-x-2">
+                <CreditCard className="h-4 w-4" />
+                <span>{parcelasFiltradas.length} registros encontrados</span>
+              </span>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Paginação */}
+        {(totalPages > 1 || parcelasFiltradas.length > 5) && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className="mt-4"
+          >
+            <Card className="shadow-md border-0 bg-gradient-to-r from-gray-50 to-white">
+              <CardContent className="p-6">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  {/* Informações de exibição */}
+                  <div className="flex items-center space-x-4 text-gray-600">
+                    <span className="text-sm">
+                      Mostrando {startItem} a {endItem} de {parcelasFiltradas.length} registros
+                    </span>
+                    {itemsPerPage > 0 && (
+                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                        Página {currentPage} de {totalPages}
+                      </span>
+                    )}
+                    {itemsPerPage === 0 && (
+                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                        Visualizando todos os registros
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Controles de paginação - só mostrar se houver mais de 1 página e não estiver mostrando todos */}
+                  {totalPages > 1 && itemsPerPage > 0 && (
+                    <div className="flex items-center space-x-2">
+                      {/* Botão Anterior */}
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        className={`p-2 rounded-lg transition-all duration-200 flex items-center space-x-1 ${
+                          currentPage === 1
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-white text-gray-700 hover:bg-red-50 hover:text-red-600 border border-gray-200 shadow-sm'
+                        }`}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        <span className="text-sm font-medium">Anterior</span>
+                      </motion.button>
+
+                      {/* Números das páginas */}
+                      <div className="flex items-center space-x-1">
+                        {visiblePages.map((page, index) => (
+                          page === '...' ? (
+                            <span key={`dots-${index}`} className="px-2 text-gray-400">...</span>
+                          ) : (
+                            <motion.button
+                              key={page}
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              onClick={() => setCurrentPage(page as number)}
+                              className={`w-10 h-10 rounded-lg font-medium text-sm transition-all duration-200 ${
+                                currentPage === page
+                                  ? 'bg-gradient-to-r from-red-600 to-gray-800 text-white shadow-lg'
+                                  : 'bg-white text-gray-700 hover:bg-red-50 hover:text-red-600 border border-gray-200'
+                              }`}
+                            >
+                              {page}
+                            </motion.button>
+                          )
+                        ))}
+                      </div>
+
+                      {/* Botão Próximo */}
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                        className={`p-2 rounded-lg transition-all duration-200 flex items-center space-x-1 ${
+                          currentPage === totalPages
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-white text-gray-700 hover:bg-red-50 hover:text-red-600 border border-gray-200 shadow-sm'
+                        }`}
+                      >
+                        <span className="text-sm font-medium">Próximo</span>
+                        <ChevronRight className="h-4 w-4" />
+                      </motion.button>
+                    </div>
+                  )}
+
+                  {/* Seletor de itens por página - sempre mostrar */}
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-600">Itens por página:</span>
+                    <Select
+                      value={itemsPerPage.toString()}
+                      onValueChange={(value) => {
+                        console.log('Mudando itens por página para:', value === '0' ? 'Todos' : value);
+                        setItemsPerPage(Number(value));
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <SelectTrigger className="w-20 h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5">5</SelectItem>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                        <SelectItem value="0">Todos</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
         {/* Estatísticas Financeiras */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -726,7 +1007,7 @@ const ParcelasTable: React.FC = () => {
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-white/90 uppercase tracking-wide truncate">Total a Receber</p>
                       <p className="text-sm font-bold text-white truncate">
-                        R$ {parcelas.reduce((total, parcela) => total + parcela.valor, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        R$ {parcelasFiltradas.reduce((total, parcela) => total + parcela.valor, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </p>
                     </div>
                   </div>
@@ -749,16 +1030,16 @@ const ParcelasTable: React.FC = () => {
                       </p>
                       <div className="flex items-center gap-1">
                         <p className="text-sm font-bold text-white truncate">
-                          R$ {parcelas
+                          R$ {parcelasFiltradas
                             .filter(p => calcularStatusAutomatico(p) === 'pago')
                             .reduce((total, parcela) => total + parcela.valor, 0)
                             .toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </p>
                         <span className="text-xs font-medium text-white/80 bg-white/20 px-1 py-0.5 rounded">
-                          {parcelas.length > 0 
+                          {parcelasFiltradas.length > 0 
                             ? Math.round(
-                                (parcelas.filter(p => calcularStatusAutomatico(p) === 'pago').length /
-                                  parcelas.length) * 100
+                                (parcelasFiltradas.filter(p => calcularStatusAutomatico(p) === 'pago').length /
+                                  parcelasFiltradas.length) * 100
                               )
                             : 0}
                           %

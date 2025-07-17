@@ -61,6 +61,10 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
         return <Calendar className="h-4 w-4 text-purple-600" />;
       case 'matrícula':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'cancelamento':
+        return <XCircle className="h-4 w-4 text-red-600" />;
+      case 'outros':
+        return <FileText className="h-4 w-4 text-orange-600" />;
       default:
         return <CreditCard className="h-4 w-4 text-gray-600" />;
     }
@@ -280,6 +284,7 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                       </Select>
                     </div>
                     
+                    // Na seção de filtros, atualizar o Select de tipo_item:
                     <div>
                       <Label htmlFor="filtro-tipo-item" className="text-sm font-medium text-gray-700">Tipo de Item</Label>
                       <Select 
@@ -294,6 +299,8 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                           <SelectItem value="plano">Plano</SelectItem>
                           <SelectItem value="material">Material</SelectItem>
                           <SelectItem value="matrícula">Matrícula</SelectItem>
+                          <SelectItem value="cancelamento">Cancelamento</SelectItem>
+                          <SelectItem value="outros">Outros</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -384,6 +391,12 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                             <TableHead className="font-semibold text-white">Status</TableHead>
                             <TableHead className="font-semibold text-white">
                               <div className="flex items-center space-x-2">
+                                <FileText className="h-4 w-4" />
+                                <span>Descrição do Item</span>
+                              </div>
+                            </TableHead>
+                            <TableHead className="font-semibold text-white">
+                              <div className="flex items-center space-x-2">
                                 <Archive className="h-4 w-4" />
                                 <span>Tipo Arquivamento</span>
                               </div>
@@ -408,7 +421,7 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                           <AnimatePresence>
                             {parcelasFiltradas.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={10} className="py-16">
+                                <TableCell colSpan={11} className="py-16">
                                   <motion.div 
                                     className="flex flex-col items-center justify-center space-y-4"
                                     initial={{ opacity: 0, scale: 0.9 }}
@@ -473,6 +486,17 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                                         {parcela.status_pagamento.charAt(0).toUpperCase() + parcela.status_pagamento.slice(1)}
                                       </Badge>
                                     </motion.div>
+                                  </TableCell>
+                                  <TableCell className="py-4 max-w-xs">
+                                    <div className="text-sm text-gray-600">
+                                      {parcela.descricao_item ? (
+                                        <div className="truncate" title={parcela.descricao_item}>
+                                          {parcela.descricao_item}
+                                        </div>
+                                      ) : (
+                                        <span className="text-gray-400 italic">-</span>
+                                      )}
+                                    </div>
                                   </TableCell>
                                   <TableCell className="py-4">
                                     <Badge variant="outline" className="capitalize">

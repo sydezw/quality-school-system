@@ -125,7 +125,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
     try {
       const { data, error } = await supabase
         .from('planos')
-        .select('id, nome, valor_total, valor_por_aula, numero_aulas, descricao, carga_horaria_total, frequencia_aulas')
+        .select('id, nome, valor_total, valor_por_aula, numero_aulas, descricao, carga_horaria_total, frequencia_aulas, idioma')
         .eq('ativo', true)
         .order('nome');
 
@@ -812,10 +812,12 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="boleto">Boleto</SelectItem>
-                            <SelectItem value="cartao">Cartão</SelectItem>
+                            <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
+                            <SelectItem value="cartao_debito">Cartão de Débito</SelectItem>
                             <SelectItem value="pix">PIX</SelectItem>
                             <SelectItem value="dinheiro">Dinheiro</SelectItem>
                             <SelectItem value="transferencia">Transferência</SelectItem>
+                            <SelectItem value="outro">Outro</SelectItem>
                           </SelectContent>
                         </Select>
                       )}
@@ -867,10 +869,12 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="boleto">Boleto</SelectItem>
-                            <SelectItem value="cartao">Cartão</SelectItem>
+                            <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
+                            <SelectItem value="cartao_debito">Cartão de Débito</SelectItem>
                             <SelectItem value="pix">PIX</SelectItem>
                             <SelectItem value="dinheiro">Dinheiro</SelectItem>
                             <SelectItem value="transferencia">Transferência</SelectItem>
+                            <SelectItem value="outro">Outro</SelectItem>
                           </SelectContent>
                         </Select>
                       )}
@@ -922,10 +926,12 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="boleto">Boleto</SelectItem>
-                            <SelectItem value="cartao">Cartão</SelectItem>
+                            <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
+                            <SelectItem value="cartao_debito">Cartão de Débito</SelectItem>
                             <SelectItem value="pix">PIX</SelectItem>
                             <SelectItem value="dinheiro">Dinheiro</SelectItem>
                             <SelectItem value="transferencia">Transferência</SelectItem>
+                            <SelectItem value="outro">Outro</SelectItem>
                           </SelectContent>
                         </Select>
                       )}

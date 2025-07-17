@@ -85,6 +85,9 @@ export type Database = {
       }
       alunos: {
         Row: {
+          bairro: string | null
+          cep: string | null
+          cidade: string | null
           cpf: string | null
           created_at: string
           data_cancelamento: string | null
@@ -93,8 +96,10 @@ export type Database = {
           data_nascimento: string | null
           email: string | null
           endereco: string | null
+          estado: string | null
           id: string
           idioma: Database["public"]["Enums"]["idioma"] | null
+          nivel: string | null
           nome: string
           numero_endereco: string | null
           responsavel_id: string | null
@@ -104,6 +109,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
           cpf?: string | null
           created_at?: string
           data_cancelamento?: string | null
@@ -112,8 +120,10 @@ export type Database = {
           data_nascimento?: string | null
           email?: string | null
           endereco?: string | null
+          estado?: string | null
           id?: string
           idioma?: Database["public"]["Enums"]["idioma"] | null
+          nivel?: string | null
           nome: string
           numero_endereco?: string | null
           responsavel_id?: string | null
@@ -123,6 +133,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
           cpf?: string | null
           created_at?: string
           data_cancelamento?: string | null
@@ -131,8 +144,10 @@ export type Database = {
           data_nascimento?: string | null
           email?: string | null
           endereco?: string | null
+          estado?: string | null
           id?: string
           idioma?: Database["public"]["Enums"]["idioma"] | null
+          nivel?: string | null
           nome?: string
           numero_endereco?: string | null
           responsavel_id?: string | null
@@ -538,7 +553,7 @@ export type Database = {
       }
       financeiro_alunos: {
         Row: {
-          aluno_id: string | null
+          aluno_id: string
           ativo_ou_encerrado: Database["public"]["Enums"]["ativo_ou_encerrado"]
           created_at: string | null
           data_primeiro_vencimento: string
@@ -548,6 +563,7 @@ export type Database = {
           forma_pagamento_plano: string | null
           id: string
           idioma_registro: Database["public"]["Enums"]["idioma_registro_financeiro"]
+          migrado: Database["public"]["Enums"]["migrado"]
           numero_parcelas_material: number | null
           numero_parcelas_matricula: number | null
           numero_parcelas_plano: number | null
@@ -562,7 +578,7 @@ export type Database = {
           valor_total: number
         }
         Insert: {
-          aluno_id?: string | null
+          aluno_id: string
           ativo_ou_encerrado?: Database["public"]["Enums"]["ativo_ou_encerrado"]
           created_at?: string | null
           data_primeiro_vencimento: string
@@ -572,6 +588,7 @@ export type Database = {
           forma_pagamento_plano?: string | null
           id?: string
           idioma_registro?: Database["public"]["Enums"]["idioma_registro_financeiro"]
+          migrado?: Database["public"]["Enums"]["migrado"]
           numero_parcelas_material?: number | null
           numero_parcelas_matricula?: number | null
           numero_parcelas_plano?: number | null
@@ -586,7 +603,7 @@ export type Database = {
           valor_total: number
         }
         Update: {
-          aluno_id?: string | null
+          aluno_id?: string
           ativo_ou_encerrado?: Database["public"]["Enums"]["ativo_ou_encerrado"]
           created_at?: string | null
           data_primeiro_vencimento?: string
@@ -596,6 +613,7 @@ export type Database = {
           forma_pagamento_plano?: string | null
           id?: string
           idioma_registro?: Database["public"]["Enums"]["idioma_registro_financeiro"]
+          migrado?: Database["public"]["Enums"]["migrado"]
           numero_parcelas_material?: number | null
           numero_parcelas_matricula?: number | null
           numero_parcelas_plano?: number | null
@@ -1014,6 +1032,8 @@ export type Database = {
           criado_em: string | null
           data_pagamento: string | null
           data_vencimento: string
+          descricao_item: string | null
+          forma_pagamento: string | null
           id: number
           idioma_registro: Database["public"]["Enums"]["idioma_registro_financeiro"]
           numero_parcela: number
@@ -1029,6 +1049,8 @@ export type Database = {
           criado_em?: string | null
           data_pagamento?: string | null
           data_vencimento: string
+          descricao_item?: string | null
+          forma_pagamento?: string | null
           id?: number
           idioma_registro: Database["public"]["Enums"]["idioma_registro_financeiro"]
           numero_parcela: number
@@ -1044,6 +1066,8 @@ export type Database = {
           criado_em?: string | null
           data_pagamento?: string | null
           data_vencimento?: string
+          descricao_item?: string | null
+          forma_pagamento?: string | null
           id?: number
           idioma_registro?: Database["public"]["Enums"]["idioma_registro_financeiro"]
           numero_parcela?: number
@@ -1062,6 +1086,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      parcelas_migracao_raw: {
+        Row: {
+          aluno_nome: string | null
+          data_pagamento: string | null
+          data_vencimento: string
+          descricao_item: string | null
+          forma_pagamento: string
+          id: number
+          idioma: Database["public"]["Enums"]["idioma_registro_financeiro"]
+          observacoes: string | null
+          status_pagamento: Database["public"]["Enums"]["status_pagamento"]
+          tipo_item: Database["public"]["Enums"]["tipo_item"]
+          valor: number
+        }
+        Insert: {
+          aluno_nome?: string | null
+          data_pagamento?: string | null
+          data_vencimento: string
+          descricao_item?: string | null
+          forma_pagamento: string
+          id?: number
+          idioma?: Database["public"]["Enums"]["idioma_registro_financeiro"]
+          observacoes?: string | null
+          status_pagamento?: Database["public"]["Enums"]["status_pagamento"]
+          tipo_item?: Database["public"]["Enums"]["tipo_item"]
+          valor: number
+        }
+        Update: {
+          aluno_nome?: string | null
+          data_pagamento?: string | null
+          data_vencimento?: string
+          descricao_item?: string | null
+          forma_pagamento?: string
+          id?: number
+          idioma?: Database["public"]["Enums"]["idioma_registro_financeiro"]
+          observacoes?: string | null
+          status_pagamento?: Database["public"]["Enums"]["status_pagamento"]
+          tipo_item?: Database["public"]["Enums"]["tipo_item"]
+          valor?: number
+        }
+        Relationships: []
       }
       pesquisas_satisfacao: {
         Row: {
@@ -1390,6 +1456,7 @@ export type Database = {
         Row: {
           cpf: string | null
           created_at: string
+          email: string | null
           endereco: string | null
           id: string
           nome: string
@@ -1401,6 +1468,7 @@ export type Database = {
         Insert: {
           cpf?: string | null
           created_at?: string
+          email?: string | null
           endereco?: string | null
           id?: string
           nome: string
@@ -1412,6 +1480,7 @@ export type Database = {
         Update: {
           cpf?: string | null
           created_at?: string
+          email?: string | null
           endereco?: string | null
           id?: string
           nome?: string
@@ -1641,8 +1710,9 @@ export type Database = {
       cargo_usuario: "Secretária" | "Gerente" | "Admin"
       categoria_despesa: "salário" | "aluguel" | "material" | "manutenção"
       competencia: "Listening" | "Speaking" | "Writing" | "Reading"
-      idioma: "Inglês" | "Japonês"
+      idioma: "Inglês" | "Japonês" | "Inglês/Japonês"
       idioma_registro_financeiro: "Inglês" | "Japonês"
+      migrado: "sim" | "nao"
       nivel:
         | "Book 1"
         | "Book 2"
@@ -1679,7 +1749,7 @@ export type Database = {
         | "diploma_professor"
         | "comprovante_experiencia"
         | "documento_pessoal"
-      tipo_item: "plano" | "material" | "matrícula"
+      tipo_item: "plano" | "material" | "matrícula" | "cancelamento" | "outros"
       tipo_notificacao: "boleto" | "presenca" | "lembrete" | "geral"
     }
     CompositeTypes: {
@@ -1815,8 +1885,9 @@ export const Constants = {
       cargo_usuario: ["Secretária", "Gerente", "Admin"],
       categoria_despesa: ["salário", "aluguel", "material", "manutenção"],
       competencia: ["Listening", "Speaking", "Writing", "Reading"],
-      idioma: ["Inglês", "Japonês"],
+      idioma: ["Inglês", "Japonês", "Inglês/Japonês"],
       idioma_registro_financeiro: ["Inglês", "Japonês"],
+      migrado: ["sim", "nao"],
       nivel: [
         "Book 1",
         "Book 2",
@@ -1856,7 +1927,7 @@ export const Constants = {
         "comprovante_experiencia",
         "documento_pessoal",
       ],
-      tipo_item: ["plano", "material", "matrícula"],
+      tipo_item: ["plano", "material", "matrícula", "cancelamento", "outros"],
       tipo_notificacao: ["boleto", "presenca", "lembrete", "geral"],
     },
   },

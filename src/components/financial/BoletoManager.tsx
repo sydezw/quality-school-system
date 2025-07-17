@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useEffect } from 'react';
 import DatePicker from '@/components/shared/DatePicker';
 import { format } from 'date-fns';
+import { formatarFormaPagamento } from '@/utils/formatters';
 
 interface Student {
   id: string;
@@ -246,6 +247,8 @@ const BoletoManager = ({ filtroStatus = 'todos', alunoSelecionado }: BoletoManag
                             <SelectItem value="plano">Plano</SelectItem>
                             <SelectItem value="material">Material</SelectItem>
                             <SelectItem value="matricula">Matrícula</SelectItem>
+                            <SelectItem value="cancelamento">Cancelamento</SelectItem>
+                            <SelectItem value="outros">Outros</SelectItem>
                           </SelectContent>
                         </Select>
                       )}
@@ -360,7 +363,7 @@ const BoletoManager = ({ filtroStatus = 'todos', alunoSelecionado }: BoletoManag
                         {boleto.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-base">{boleto.metodo_pagamento || '-'}</TableCell>
+                    <TableCell className="text-base">{formatarFormaPagamento(boleto.metodo_pagamento) || '-'}</TableCell>
                     <TableCell>
                       {boleto.status !== 'Pago' && (
                         <Button

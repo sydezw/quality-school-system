@@ -30,11 +30,12 @@ export const StudentFilters = ({ filters, onFilterChange }: StudentFiltersProps)
   const fetchFilterOptions = async () => {
     try {
       // Buscar status distintos
+      // Remover a limitação de status
       const { data: statusData, error: statusError } = await supabase
         .from('alunos')
         .select('status')
-        .not('status', 'is', null)
-        .in('status', ['Ativo', 'Trancado']);
+        .not('status', 'is', null);
+        // Remover: .in('status', ['Ativo', 'Trancado']);
 
       if (statusError) throw statusError;
 

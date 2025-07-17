@@ -40,3 +40,16 @@ export const formatPhone = (value: string) => {
 
 // Alias para compatibilidade
 export const formatPhoneNumber = formatPhone;
+
+export const formatarFormaPagamento = (forma: string): string => {
+  const formas: Record<string, string> = {
+    'boleto': 'Boleto',
+    'cartao_credito': 'Cartão de Crédito',
+    'cartao_debito': 'Cartão de Débito', 
+    'pix': 'PIX',
+    'dinheiro': 'Dinheiro',
+    'transferencia': 'Transferência',
+    'outro': 'Outro'
+  };
+  return formas[forma] || forma;
+};

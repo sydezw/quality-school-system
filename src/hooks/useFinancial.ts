@@ -111,8 +111,8 @@ export const useFinancial = () => {
     try {
       const { data, error } = await supabase
         .from('alunos')
-        .select('id, nome')
-        .eq('status', 'Ativo')
+        .select('id, nome, status')  // Incluir status para referência
+        // .eq('status', 'Ativo')  // ← Remover este filtro
         .order('nome');
 
       if (error) throw error;
@@ -400,4 +400,19 @@ export const useFinancial = () => {
     // Toast
     toast
   };
+};
+
+const fetchStudents = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('alunos')
+      .select('id, nome, status')  // Incluir status para referência
+      // .eq('status', 'Ativo')  // ← Remover este filtro
+      .order('nome');
+
+    if (error) throw error;
+    setState(prev => ({ ...prev, students: data || [] }));
+  } catch (error) {
+    console.error('Erro ao buscar alunos:', error);
+  }
 };
