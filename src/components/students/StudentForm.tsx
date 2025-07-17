@@ -82,7 +82,7 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
       telefone: '',
       email: '',
       endereco: '',
-      numero: '',
+      numero_endereco: '',
       // complemento: '', // REMOVIDO
       bairro: '',
       cidade: '',
@@ -122,7 +122,7 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
         telefone: editingStudent.telefone || '',
         email: editingStudent.email || '',
         endereco: editingStudent.endereco || '',
-        numero: editingStudent.numero || '',
+        numero_endereco: editingStudent.numero || '',
         bairro: editingStudent.bairro || '',
         cidade: editingStudent.cidade || '',
         estado: editingStudent.estado || '',
@@ -156,7 +156,7 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
       setValue('idioma', editingStudent.idioma || '');
       setValue('turma_id', editingStudent.turma_id || '');
       setValue('responsavel_id', editingStudent.responsavel_id || '');
-      setValue('status', editingStudent.status || 'Ativo');
+      setValue('status', (editingStudent.status as "Ativo" | "Inativo" | "Suspenso" | "Trancado") || 'Ativo');
       
       setSelectedIdioma(editingStudent.idioma || '');
     }
@@ -170,14 +170,17 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
       const formattedData = {
         ...data,
         cpf: data.cpf ? formatCPF(data.cpf) : '',
-        cep: data.cep ? formatCEP(data.cep) : '',
-        numero: data.numero || '' // Garantir que o campo numero seja enviado
+        cep: (data as any).cep ? formatCEP((data as any).cep) : '',
+        numero_endereco: data.numero_endereco || '' // Ensure the address number is sent
       };
       
       await onSubmit(formattedData);
       
-      // Fechar o formulário após sucesso
-      onCancel();
+      // Mostrar mensagem de sucesso sem fechar automaticamente
+      toast({
+        title: "Sucesso!",
+        description: "Aluno atualizado com sucesso! Você pode continuar editando ou fechar o modal.",
+      });
       
     } catch (error) {
       console.error('Erro ao salvar:', error);

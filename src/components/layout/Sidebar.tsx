@@ -13,7 +13,6 @@ import {
   Calendar,
   FileText,
   Package,
-  Building2,
   FileSignature,
   UserCheck,
   CreditCard
@@ -25,7 +24,6 @@ const menuItems = [
     { icon: Users, label: 'Alunos', path: '/students' },
     { icon: GraduationCap, label: 'Professores', path: '/teachers' },
     { icon: BookCopy, label: 'Turmas', path: '/classes' },
-    { icon: Building2, label: 'Salas', path: '/rooms' },
     { icon: FileText, label: 'Contratos', path: '/contracts' },
     { icon: FileSignature, label: 'Gerador de Contratos', path: '/contract-generator' },
     { icon: CreditCard, label: 'Planos', path: '/plans' },

@@ -18,27 +18,17 @@ interface Class {
   id: string;
   nome: string;
   idioma: string;
-  nivel: string; // Adicionar este campo
   dias_da_semana: string;
   horario: string;
   professor_id: string | null;
-  sala_id: string | null;
   materiais_ids?: string[];
   professores?: { nome: string };
-  salas?: { nome: string };
 }
 
 interface Teacher {
   id: string;
   nome: string;
   idiomas: string;
-}
-
-interface Room {
-  id: string;
-  nome: string;
-  capacidade: number;
-  tipo: string;
 }
 
 interface Material {
@@ -52,7 +42,6 @@ interface Material {
 const Classes = () => {
   const [classes, setClasses] = useState<Class[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [rooms, setRooms] = useState<Room[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [selectedMaterials, setSelectedMaterials] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,11 +53,9 @@ const Classes = () => {
     defaultValues: {
       nome: '',
       idioma: '',
-      nivel: '',
       dias_da_semana: '',
       horario: '',
-      professor_id: 'none',
-      sala_id: 'none'
+      professor_id: 'none'
     }
   });
 
@@ -77,7 +64,6 @@ const Classes = () => {
   useEffect(() => {
     fetchClasses();
     fetchTeachers();
-    fetchRooms();
     fetchMaterials();
   }, []);
 
@@ -87,8 +73,7 @@ const Classes = () => {
         .from('turmas')
         .select(`
           *,
-          professores (nome),
-          salas (nome)
+          professores (nome)
         `)
         .order('nome');
   
@@ -121,20 +106,6 @@ const Classes = () => {
     }
   };
 
-  const fetchRooms = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('salas')
-        .select('*')
-        .order('nome');
-
-      if (error) throw error;
-      setRooms(data || []);
-    } catch (error) {
-      console.error('Erro ao buscar salas:', error);
-    }
-  };
-
   const fetchMaterials = async () => {
     try {
       const { data, error } = await supabase
@@ -153,7 +124,7 @@ const Classes = () => {
   const onSubmit = async (data: any) => {
     try {
       // Validar campos obrigatórios
-      if (!data.nome || !data.idioma || !data.nivel || !data.dias_da_semana || !data.horario) {
+      if (!data.nome || !data.idioma || !data.dias_da_semana || !data.horario) {
         toast({
           title: "Erro",
           description: "Por favor, preencha todos os campos obrigatórios.",
@@ -166,11 +137,9 @@ const Classes = () => {
       const submitData = {
         nome: data.nome,
         idioma: data.idioma,
-        nivel: data.nivel, // Adicionar este campo
         dias_da_semana: data.dias_da_semana,
         horario: data.horario,
         professor_id: data.professor_id === 'none' ? null : data.professor_id,
-        sala_id: data.sala_id === 'none' ? null : data.sala_id,
         materiais_ids: selectedMaterials
       };
 
@@ -188,7 +157,15 @@ const Classes = () => {
       } else {
         const { error } = await supabase
           .from('turmas')
-          .insert([submitData]);
+          .insert({
+            nome: submitData.nome,
+            idioma: submitData.idioma,
+            dias_da_semana: submitData.dias_da_semana,
+            horario: submitData.horario,
+            professor_id: submitData.professor_id,
+            materiais_ids: submitData.materiais_ids,
+            nivel: 'Book 1' // Adding required nivel field with default value
+          });
 
         if (error) throw error;
         toast({
@@ -316,11 +293,9 @@ const Classes = () => {
     reset({
       nome: classItem.nome,
       idioma: classItem.idioma,
-      nivel: classItem.nivel,
       dias_da_semana: classItem.dias_da_semana,
       horario: classItem.horario,
-      professor_id: classItem.professor_id || 'none',
-      sala_id: classItem.sala_id || 'none',
+      professor_id: classItem.professor_id || 'none'
     });
     
     // Carregar materiais selecionados
@@ -333,11 +308,9 @@ const Classes = () => {
     reset({
       nome: '',
       idioma: '',
-      nivel: '',
       dias_da_semana: '',
       horario: '',
-      professor_id: 'none',
-      sala_id: 'none'
+      professor_id: 'none'
     });
     setSelectedMaterials([]);
     setIsDialogOpen(true);
@@ -361,6 +334,10 @@ const Classes = () => {
 
   const filteredTeachers = teachers.filter(teacher => 
     !selectedIdioma || teacher.idiomas.includes(selectedIdioma)
+  );
+
+  const filteredMaterials = materials.filter(material =>
+    !selectedIdioma || material.idioma === selectedIdioma
   );
 
   if (loading) {
@@ -400,96 +377,51 @@ const Classes = () => {
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Informações Básicas</h3>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="nome" className="text-sm font-medium text-gray-700">
-                      Nome da Turma *
-                    </Label>
-                    <Input
-                      id="nome"
-                      {...register('nome', { 
-                        required: 'Nome é obrigatório',
-                        minLength: { value: 2, message: 'Nome deve ter pelo menos 2 caracteres' }
-                      })}
-                      placeholder="Ex: Book 1 - Manhã"
-                      className="mt-1"
-                    />
-                    {errors.nome && (
-                      <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
-                        <span className="text-red-500">⚠</span>
-                        {errors.nome.message}
-                      </p>
-                    )}
-                  </div>
-                
-                  <div>
-                    <Label htmlFor="idioma" className="text-sm font-medium text-gray-700">
-                      Idioma *
-                    </Label>
-                    <Select 
-                      onValueChange={(value) => {
-                        setValue('idioma', value);
-                        setSelectedMaterials([]); // Reset materials when language changes
-                      }} 
-                      value={watch('idioma')}
-                    >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Selecione o idioma" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Inglês">
-                          <div className="flex items-center gap-2">
-                            <span className="w-3 h-3 bg-blue-500 rounded-full"></span>
-                            Inglês
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="Japonês">
-                          <div className="flex items-center gap-2">
-                            <span className="w-3 h-3 bg-red-500 rounded-full"></span>
-                            Japonês
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {errors.idioma && (
-                      <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
-                        <span className="text-red-500">⚠</span>
-                        {errors.idioma.message}
-                      </p>
-                    )}
-                  </div>
+                <div>
+                  <Label htmlFor="nome" className="text-sm font-medium text-gray-700">
+                    Nome da Turma *
+                  </Label>
+                  <Input
+                    id="nome"
+                    {...register('nome', { 
+                      required: 'Nome é obrigatório',
+                      minLength: { value: 2, message: 'Nome deve ter pelo menos 2 caracteres' }
+                    })}
+                    placeholder="Ex: Book 1 - Manhã"
+                    className="mt-1"
+                  />
+                  {errors.nome && (
+                    <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
+                      <span className="text-red-500">⚠</span>
+                      {errors.nome.message}
+                    </p>
+                  )}
+                </div>
 
-                  <div>
-                    <Label htmlFor="nivel" className="text-sm font-medium text-gray-700">
-                      Nível *
-                    </Label>
-                    <Select 
-                      onValueChange={(value) => setValue('nivel', value)} 
-                      value={watch('nivel')}
-                    >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Selecione o nível" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Book 1">Book 1</SelectItem>
-                        <SelectItem value="Book 2">Book 2</SelectItem>
-                        <SelectItem value="Book 3">Book 3</SelectItem>
-                        <SelectItem value="Book 4">Book 4</SelectItem>
-                        <SelectItem value="Book 5">Book 5</SelectItem>
-                        <SelectItem value="Book 6">Book 6</SelectItem>
-                        <SelectItem value="Book 7">Book 7</SelectItem>
-                        <SelectItem value="Book 8">Book 8</SelectItem>
-                        <SelectItem value="Book 9">Book 9</SelectItem>
-                        <SelectItem value="Book 10">Book 10</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {errors.nivel && (
-                      <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
-                        <span className="text-red-500">⚠</span>
-                        {errors.nivel.message}
-                      </p>
-                    )}
-                  </div>
+                <div>
+                  <Label htmlFor="idioma" className="text-sm font-medium text-gray-700">
+                    Idioma *
+                  </Label>
+                  <Select 
+                    onValueChange={(value) => setValue('idioma', value)} 
+                    value={watch('idioma')}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Selecione o idioma" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Inglês">🇺🇸 Inglês</SelectItem>
+                      <SelectItem value="Japonês">🇯🇵 Japonês</SelectItem>
+                      <SelectItem value="Espanhol">🇪🇸 Espanhol</SelectItem>
+                      <SelectItem value="Francês">🇫🇷 Francês</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.idioma && (
+                    <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
+                      <span className="text-red-500">⚠</span>
+                      {errors.idioma.message}
+                    </p>
+                  )}
                 </div>
               </div>
               
@@ -505,50 +437,47 @@ const Classes = () => {
                 </div>
                 
                 <div className="border rounded-lg p-4 bg-gray-50">
-                  {!selectedIdioma ? (
+                  {filteredMaterials.length === 0 ? (
                     <div className="text-center py-8">
                       <BookCopy className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-500">Selecione um idioma para ver os materiais disponíveis</p>
-                    </div>
-                  ) : materials.filter(m => m.idioma === selectedIdioma).length === 0 ? (
-                    <div className="text-center py-8">
-                      <BookCopy className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-500">Nenhum material disponível para {selectedIdioma}</p>
+                      <p className="text-sm text-gray-500">
+                        {selectedIdioma ? `Nenhum material disponível para ${selectedIdioma}` : 'Selecione um idioma para ver os materiais'}
+                      </p>
                     </div>
                   ) : (
                     <div className="max-h-48 overflow-y-auto space-y-3">
-                      {materials
-                        .filter(material => material.idioma === selectedIdioma)
-                        .map((material) => (
-                          <div key={material.id} className="flex items-start space-x-3 p-2 rounded-md hover:bg-white transition-colors">
-                            <Checkbox
-                              id={`material-${material.id}`}
-                              checked={selectedMaterials.includes(material.id)}
-                              onCheckedChange={() => handleMaterialToggle(material.id)}
-                              className="mt-1"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <Label 
-                                htmlFor={`material-${material.id}`} 
-                                className="text-sm font-medium cursor-pointer block"
+                      {filteredMaterials.map((material) => (
+                        <div key={material.id} className="flex items-start space-x-3 p-2 rounded-md hover:bg-white transition-colors">
+                          <Checkbox
+                            id={`material-${material.id}`}
+                            checked={selectedMaterials.includes(material.id)}
+                            onCheckedChange={() => handleMaterialToggle(material.id)}
+                            className="mt-1"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <Label 
+                              htmlFor={`material-${material.id}`} 
+                              className="text-sm font-medium cursor-pointer block"
+                            >
+                              {material.nome}
+                            </Label>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge variant="outline" className="text-xs">
+                                {material.idioma}
+                              </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                {material.nivel}
+                              </Badge>
+                              <Badge 
+                                variant={material.status === 'ativo' ? 'default' : 'secondary'}
+                                className="text-xs"
                               >
-                                {material.nome}
-                              </Label>
-                              <div className="flex items-center gap-2 mt-1">
-                                <Badge variant="outline" className="text-xs">
-                                  {material.nivel}
-                                </Badge>
-                                <Badge 
-                                  variant={material.status === 'ativo' ? 'default' : 'secondary'}
-                                  className="text-xs"
-                                >
-                                  {material.status}
-                                </Badge>
-                              </div>
+                                {material.status}
+                              </Badge>
                             </div>
                           </div>
-                        ))
-                      }
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -726,80 +655,43 @@ const Classes = () => {
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Recursos</h3>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="professor_id" className="text-sm font-medium text-gray-700">
-                      Professor
-                    </Label>
-                    <Select 
-                      onValueChange={(value) => setValue('professor_id', value)} 
-                      value={watch('professor_id')}
-                    >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Selecione um professor" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">
+                <div>
+                  <Label htmlFor="professor_id" className="text-sm font-medium text-gray-700">
+                    Professor
+                  </Label>
+                  <Select 
+                    onValueChange={(value) => setValue('professor_id', value)} 
+                    value={watch('professor_id')}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Selecione um professor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400">👤</span>
+                          Sem professor
+                        </div>
+                      </SelectItem>
+                      {filteredTeachers.map((teacher) => (
+                        <SelectItem key={teacher.id} value={teacher.id}>
                           <div className="flex items-center gap-2">
-                            <span className="text-gray-400">👤</span>
-                            Sem professor
+                            <span className="text-green-600">👨‍🏫</span>
+                            {teacher.nome}
+                            <Badge variant="outline" className="text-xs ml-2">
+                              {teacher.idiomas}
+                            </Badge>
                           </div>
                         </SelectItem>
-                        {filteredTeachers.map((teacher) => (
-                          <SelectItem key={teacher.id} value={teacher.id}>
-                            <div className="flex items-center gap-2">
-                              <span className="text-green-600">👨‍🏫</span>
-                              {teacher.nome}
-                              <Badge variant="outline" className="text-xs ml-2">
-                                {teacher.idiomas}
-                              </Badge>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {selectedIdioma && filteredTeachers.length === 0 && (
-                      <p className="text-sm text-amber-600 mt-1 flex items-center gap-1">
-                        <span className="text-amber-500">⚠</span>
-                        Nenhum professor disponível para {selectedIdioma}
-                      </p>
-                    )}
-                  </div>
-                
-                  <div>
-                    <Label htmlFor="sala_id" className="text-sm font-medium text-gray-700">
-                      Sala
-                    </Label>
-                    <Select 
-                      onValueChange={(value) => setValue('sala_id', value)} 
-                      value={watch('sala_id')}
-                    >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Selecione uma sala" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">
-                          <div className="flex items-center gap-2">
-                            <span className="text-gray-400">🏢</span>
-                            Sem sala
-                          </div>
-                        </SelectItem>
-                        {rooms.map((room) => (
-                          <SelectItem key={room.id} value={room.id}>
-                            <div className="flex items-center justify-between w-full">
-                              <div className="flex items-center gap-2">
-                                <span className="text-blue-600">🏫</span>
-                                {room.nome}
-                              </div>
-                              <Badge variant="outline" className="text-xs">
-                                Cap: {room.capacidade}
-                              </Badge>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedIdioma && filteredTeachers.length === 0 && (
+                    <p className="text-sm text-amber-600 mt-1 flex items-center gap-1">
+                      <span className="text-amber-500">⚠</span>
+                      Nenhum professor disponível para {selectedIdioma}
+                    </p>
+                  )}
                 </div>
               </div>
               
@@ -848,11 +740,9 @@ const Classes = () => {
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>Idioma</TableHead>
-                <TableHead>Nível</TableHead>
                 <TableHead>Materiais</TableHead>
                 <TableHead>Horário</TableHead>
                 <TableHead>Professor</TableHead>
-                <TableHead>Sala</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -863,11 +753,6 @@ const Classes = () => {
                   <TableCell>
                     <Badge className={`text-sm ${getIdiomaColor(classItem.idioma)}`}>
                       {classItem.idioma}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-sm">
-                      {classItem.nivel}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -884,11 +769,6 @@ const Classes = () => {
                   <TableCell className="text-base">
                     {classItem.professores?.nome || (
                       <span className="text-gray-400 italic">Sem professor</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-base">
-                    {classItem.salas?.nome || (
-                      <span className="text-gray-400 italic">Sem sala</span>
                     )}
                   </TableCell>
                   <TableCell>

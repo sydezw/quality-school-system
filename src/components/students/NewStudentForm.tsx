@@ -98,13 +98,12 @@ const NewStudentForm = ({ classes, onSubmit, onCancel }: NewStudentFormProps): J
       
       toast({
         title: "Sucesso!",
-        description: "Aluno cadastrado com sucesso!",
+        description: "Aluno cadastrado com sucesso! Você pode continuar configurando o responsável ou fechar o modal.",
       });
       
-      // Fechar modal após 2 segundos
+      // Apenas remover a animação após um tempo, sem navegar automaticamente
       setTimeout(() => {
         setShowSuccessAnimation(false);
-        onCancel();
       }, 2000);
       
     } catch (error) {

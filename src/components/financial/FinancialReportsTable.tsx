@@ -23,7 +23,8 @@ import {
   Download,
   RefreshCw,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  CalendarDays
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,18 +40,7 @@ import {
   TableFooter,
 } from "@/components/ui/table";
 
-import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell
-} from 'recharts';
+import Chart from 'react-apexcharts';
 
 // Interfaces
 interface ParcelaDetalhada {
@@ -119,6 +109,7 @@ const FinancialReportsTable = () => {
   const [exportandoPDF, setExportandoPDF] = useState(false);
   const [detalhesAbertos, setDetalhesAbertos] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [anoFiltro, setAnoFiltro] = useState<string>('todos');
   const [parcelas, setParcelas] = useState<ParcelaDetalhada[]>([]);
   const [despesas, setDespesas] = useState<Despesa[]>([]);
   const [proximosVencimentosRegistros, setProximosVencimentosRegistros] = useState<ProximoVencimentoRegistro[]>([]);
@@ -250,29 +241,32 @@ const FinancialReportsTable = () => {
   const exportarDados = async () => {
     setExportandoPDF(true);
     try {
-      // Calcular estatísticas completas
-      const totalParcelas = parcelas.length;
-      const parcelasPagas = parcelas.filter(p => p.status_pagamento === 'pago').length;
-      const parcelasVencidas = parcelas.filter(p => {
+      // Usar as parcelas filtradas (que já incluem o filtro de ano e busca)
+      const parcelasParaPDF = parcelasFiltradas;
+      
+      // Calcular estatísticas baseadas nas parcelas filtradas
+      const totalParcelas = parcelasParaPDF.length;
+      const parcelasPagas = parcelasParaPDF.filter(p => p.status_pagamento === 'pago').length;
+      const parcelasVencidas = parcelasParaPDF.filter(p => {
         const hoje = new Date();
         const vencimento = new Date(p.data_vencimento);
         return p.status_pagamento !== 'pago' && p.status_pagamento !== 'cancelado' && vencimento < hoje;
       }).length;
-      const parcelasPendentes = parcelas.filter(p => {
+      const parcelasPendentes = parcelasParaPDF.filter(p => {
         const hoje = new Date();
         const vencimento = new Date(p.data_vencimento);
         return p.status_pagamento !== 'pago' && p.status_pagamento !== 'cancelado' && vencimento >= hoje;
       }).length;
       
-      const valorTotalPago = parcelas
+      const valorTotalPago = parcelasParaPDF
         .filter(p => p.status_pagamento === 'pago')
         .reduce((sum, p) => sum + (p.valor || 0), 0);
       
-      const valorTotalRestante = parcelas
+      const valorTotalRestante = parcelasParaPDF
         .filter(p => p.status_pagamento !== 'pago' && p.status_pagamento !== 'cancelado')
         .reduce((sum, p) => sum + (p.valor || 0), 0);
       
-      const valorTotalVencido = parcelas
+      const valorTotalVencido = parcelasParaPDF
         .filter(p => {
           const hoje = new Date();
           const vencimento = new Date(p.data_vencimento);
@@ -282,8 +276,8 @@ const FinancialReportsTable = () => {
       
       const totalDespesas = despesas.reduce((sum, d) => sum + (d.valor || 0), 0);
       
-      // Identificar alunos com maior risco
-      const alunosRisco = parcelas
+      // Identificar alunos com maior risco (baseado nas parcelas filtradas)
+      const alunosRisco = parcelasParaPDF
         .filter(p => {
           const hoje = new Date();
           const vencimento = new Date(p.data_vencimento);
@@ -307,8 +301,9 @@ const FinancialReportsTable = () => {
       // Preparar dados estruturados para o PDF
       const dadosRelatorio = {
         cabecalho: {
-          titulo: "Relatório Financeiro - TS School",
+          titulo: `Relatório Financeiro - TS School${anoFiltro !== 'todos' ? ` (${anoFiltro})` : ''}`,
           dataGeracao: new Date().toLocaleString('pt-BR'),
+          filtroAno: anoFiltro !== 'todos' ? anoFiltro : 'Todos os anos',
           logo: "TS School" // Placeholder para logo
         },
         resumoExecutivo: {
@@ -325,16 +320,25 @@ const FinancialReportsTable = () => {
           totalDespesas: totalDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
           saldoLiquido: (valorTotalPago - totalDespesas).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
         },
-        proximosVencimentos: proximosVencimentosRegistros.map(v => ({
-          aluno: v.alunoNome,
-          valor: v.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
-          dataVencimento: new Date(v.dataVencimento).toLocaleDateString('pt-BR'),
-          diasRestantes: v.diasRestantes,
-          tipo: v.tipoItem,
-          parcela: v.numeroParcela,
-          status: v.status,
-          urgente: v.diasRestantes <= 7
-        })),
+        proximosVencimentos: proximosVencimentosRegistros
+          .filter(v => {
+            // Filtrar próximos vencimentos pelo ano se necessário
+            if (anoFiltro !== 'todos') {
+              const anoVencimento = new Date(v.dataVencimento).getFullYear().toString();
+              return anoVencimento === anoFiltro;
+            }
+            return true;
+          })
+          .map(v => ({
+            aluno: v.alunoNome,
+            valor: v.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+            dataVencimento: new Date(v.dataVencimento).toLocaleDateString('pt-BR'),
+            diasRestantes: v.diasRestantes,
+            tipo: v.tipoItem,
+            parcela: v.numeroParcela,
+            status: v.status,
+            urgente: v.diasRestantes <= 7
+          })),
         despesasRecentes: despesas.map(d => ({
           descricao: d.descricao,
           valor: d.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
@@ -364,7 +368,7 @@ const FinancialReportsTable = () => {
             ? 'Entrar em contato com os inadimplentes nos próximos 3 dias úteis para regularização.' 
             : 'Situação financeira estável. Manter acompanhamento regular dos vencimentos.'
         },
-        parcelasDetalhadas: parcelas.slice(0, 50).map(p => ({
+        parcelasDetalhadas: parcelasParaPDF.slice(0, 50).map(p => ({
           aluno: p.financeiro_alunos?.alunos?.nome || 'Nome não informado',
           plano: p.financeiro_alunos?.planos?.nome || 'Plano não informado',
           parcela: p.numero_parcela,
@@ -381,7 +385,7 @@ const FinancialReportsTable = () => {
       
       toast({
         title: "Sucesso",
-        description: "Relatório PDF gerado com sucesso!",
+        description: `Relatório PDF gerado com sucesso!${anoFiltro !== 'todos' ? ` (Ano: ${anoFiltro})` : ''}`,
         variant: "default"
       });
     } catch (error) {
@@ -433,8 +437,7 @@ const FinancialReportsTable = () => {
       // Processar dados para receita mensal
       const receitaPorMes = parcelasPagas.reduce((acc, parcela) => {
         if (parcela.data_pagamento) {
-          // Melhorar o formato da data para ordenação
-          const dataPagamento = new Date(parcela.data_pagamento);
+              const dataPagamento = new Date(parcela.data_pagamento);
           const mes = `${dataPagamento.getFullYear()}-${String(dataPagamento.getMonth() + 1).padStart(2, '0')}`;
           const mesFormatado = dataPagamento.toLocaleDateString('pt-BR', { 
             year: 'numeric', 
@@ -456,12 +459,11 @@ const FinancialReportsTable = () => {
           receitaAcumulada: data.valor 
         }))
         .sort((a, b) => {
-          // Ordenar por data corretamente
           const dateA = new Date(a.mes.replace(' de ', ' '));
           const dateB = new Date(b.mes.replace(' de ', ' '));
           return dateA.getTime() - dateB.getTime();
         })
-        .slice(-6); // Últimos 6 meses
+        .slice(-6);
 
       // Calcular receita acumulada
       let acumulado = 0;
@@ -473,17 +475,16 @@ const FinancialReportsTable = () => {
       console.log('Receita mensal processada:', receitaMensalData);
       setReceitaMensal(receitaMensalData);
 
-      // Processar dados para receita por idioma (usando todas as parcelas, não só pagas)
+      // Processar dados para receita por idioma
       const receitaPorIdiomaData = (parcelasData || []).reduce((acc, parcela) => {
         const idioma = parcela.idioma_registro || 'Não informado';
-        // Considerar valor total da parcela, independente do status
         acc[idioma] = (acc[idioma] || 0) + (parcela.valor || 0);
         return acc;
       }, {} as Record<string, number>);
 
       const receitaPorIdiomaArray: ReceitaPorIdioma[] = Object.entries(receitaPorIdiomaData)
         .map(([idioma, receita]) => ({ idioma, receita }))
-        .filter(item => item.receita > 0); // Filtrar apenas idiomas com receita
+        .filter(item => item.receita > 0);
 
       console.log('Receita por idioma processada:', receitaPorIdiomaArray);
       setReceitaPorIdioma(receitaPorIdiomaArray);
@@ -492,7 +493,6 @@ const FinancialReportsTable = () => {
       const { data: despesasData, error: despesasError } = await supabase
         .from('despesas')
         .select('valor, categoria, status');
-        // Removido filtro de status para ter mais dados
 
       if (despesasError) {
         console.error('Erro ao buscar despesas para gráficos:', despesasError);
@@ -509,7 +509,7 @@ const FinancialReportsTable = () => {
         { categoria: 'Receitas', valor: totalReceitas, tipo: 'entrada' as const },
         { categoria: 'Despesas', valor: -totalDespesas, tipo: 'saida' as const },
         { categoria: 'Saldo Final', valor: saldoFinal, tipo: 'saldo' as const }
-      ].filter(item => item.valor !== 0); // Filtrar itens com valor zero
+      ].filter(item => item.valor !== 0);
 
       console.log('Variação de saldo processada:', variacaoSaldoData);
       setVariacaoSaldo(variacaoSaldoData);
@@ -586,20 +586,31 @@ const FinancialReportsTable = () => {
     };
   };
 
-  // Filtrar parcelas baseado no termo de busca
+  // Filtrar parcelas baseado no termo de busca e ano
   const parcelasFiltradas = parcelas.filter(parcela => {
-    if (!searchTerm) return true;
+    // Filtro por termo de busca
+    if (searchTerm) {
+      const termo = searchTerm.toLowerCase();
+      const nomeAluno = parcela.financeiro_alunos?.alunos?.nome?.toLowerCase() || '';
+      const nomePlano = parcela.financeiro_alunos?.planos?.nome?.toLowerCase() || '';
+      const tipoItem = parcela.tipo_item?.toLowerCase() || '';
+      const descricaoItem = parcela.descricao_item?.toLowerCase() || '';
+      
+      const matchesSearch = nomeAluno.includes(termo) || 
+                           nomePlano.includes(termo) || 
+                           tipoItem.includes(termo) ||
+                           descricaoItem.includes(termo);
+      
+      if (!matchesSearch) return false;
+    }
     
-    const termo = searchTerm.toLowerCase();
-    const nomeAluno = parcela.financeiro_alunos?.alunos?.nome?.toLowerCase() || '';
-    const nomePlano = parcela.financeiro_alunos?.planos?.nome?.toLowerCase() || '';
-    const tipoItem = parcela.tipo_item?.toLowerCase() || '';
-    const descricaoItem = parcela.descricao_item?.toLowerCase() || '';
+    // Filtro por ano
+    if (anoFiltro !== 'todos') {
+      const anoVencimento = new Date(parcela.data_vencimento).getFullYear().toString();
+      if (anoVencimento !== anoFiltro) return false;
+    }
     
-    return nomeAluno.includes(termo) || 
-           nomePlano.includes(termo) || 
-           tipoItem.includes(termo) ||
-           descricaoItem.includes(termo);
+    return true;
   });
 
   // Cálculos de paginação para registros
@@ -611,16 +622,7 @@ const FinancialReportsTable = () => {
     currentPageRegistros * registrosPorPagina
   );
 
-  // DEBUG: Logs para diagnosticar
-  console.log('=== DEBUG PAGINAÇÃO ===');
-  console.log('Total parcelas filtradas:', parcelasFiltradas.length);
-  console.log('Registros por página:', registrosPorPagina);
-  console.log('Página atual:', currentPageRegistros);
-  console.log('Total de páginas:', totalPagesRegistros);
-  console.log('Parcelas exibidas:', parcelasExibidas.length);
-  console.log('Condição paginação (totalPages > 1):', totalPagesRegistros > 1);
-  console.log('Condição alternativa (parcelas > registrosPorPagina):', parcelasFiltradas.length > registrosPorPagina);
-  console.log('=== FIM DEBUG ===');
+
 
   // Páginas visíveis para paginação
   const getVisiblePagesRegistros = () => {
@@ -630,7 +632,6 @@ const FinancialReportsTable = () => {
     const range = [];
     const rangeWithDots = [];
 
-    // Calcular o range de páginas ao redor da página atual
     const start = Math.max(2, currentPageRegistros - delta);
     const end = Math.min(totalPagesRegistros - 1, currentPageRegistros + delta);
     
@@ -645,21 +646,17 @@ const FinancialReportsTable = () => {
       rangeWithDots.push(1);
     }
 
-    // Adicionar o range do meio (excluindo primeira e última se já incluídas)
     range.forEach(page => {
       if (page !== 1 && page !== totalPagesRegistros) {
         rangeWithDots.push(page);
       }
     });
 
-    // Sempre incluir a última página se houver mais de uma
     if (end < totalPagesRegistros - 1) {
       rangeWithDots.push('...', totalPagesRegistros);
     } else if (totalPagesRegistros > 1) {
       rangeWithDots.push(totalPagesRegistros);
     }
-
-    // Remover duplicatas e ordenar
     return [...new Set(rangeWithDots)].sort((a, b) => {
       if (typeof a === 'number' && typeof b === 'number') return a - b;
       if (typeof a === 'number') return -1;
@@ -670,10 +667,10 @@ const FinancialReportsTable = () => {
 
   const visiblePagesRegistros = getVisiblePagesRegistros();
 
-  // Reset página quando busca muda ou itens por página muda
+  // Reset página quando busca muda, ano muda ou itens por página muda
   useEffect(() => {
     setCurrentPageRegistros(1);
-  }, [searchTerm, registrosPorPagina]);
+  }, [searchTerm, anoFiltro, registrosPorPagina]);
 
   // Calcular totais baseados nas parcelas filtradas
   const totaisDinamicos = calcularTotaisDinamicos(parcelasFiltradas);
@@ -702,6 +699,221 @@ const FinancialReportsTable = () => {
     }
   };
 
+  // ApexCharts configurations
+  const areaChartOptions: any = {
+    chart: {
+      type: 'area',
+      height: 320,
+      toolbar: {
+        show: false
+      },
+      zoom: {
+        enabled: false
+      }
+    },
+    colors: ['#10b981'],
+    dataLabels: {
+      enabled: false
+    },
+    stroke: {
+      curve: 'smooth',
+      width: 3
+    },
+    fill: {
+      type: 'gradient',
+      gradient: {
+        shadeIntensity: 1,
+        opacityFrom: 0.4,
+        opacityTo: 0.05,
+        stops: [0, 100]
+      }
+    },
+    grid: {
+      strokeDashArray: 3,
+      borderColor: '#f1f5f9'
+    },
+    xaxis: {
+      categories: receitaMensal.map(item => item.mes),
+      axisBorder: {
+        show: false
+      },
+      axisTicks: {
+        show: false
+      },
+      labels: {
+        style: {
+          fontSize: '12px',
+          colors: '#64748b'
+        }
+      }
+    },
+    yaxis: {
+      axisBorder: {
+        show: false
+      },
+      axisTicks: {
+        show: false
+      },
+      labels: {
+        style: {
+          fontSize: '12px',
+          colors: '#64748b'
+        },
+        formatter: (value: number) => `R$ ${(value / 1000).toFixed(0)}k`
+      }
+    },
+    tooltip: {
+      theme: 'light',
+      style: {
+        fontSize: '14px'
+      },
+      y: {
+        formatter: (value: number) => `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+      }
+    },
+    markers: {
+      size: 4,
+      colors: ['#10b981'],
+      strokeColors: '#10b981',
+      strokeWidth: 2,
+      hover: {
+        size: 6
+      }
+    }
+  };
+
+  const barChartOptions: any = {
+    chart: {
+      type: 'bar',
+      height: 320,
+      toolbar: {
+        show: false
+      }
+    },
+    colors: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'],
+    plotOptions: {
+      bar: {
+        horizontal: true,
+        borderRadius: 6,
+        barHeight: '30px'
+      }
+    },
+    dataLabels: {
+      enabled: false
+    },
+    grid: {
+      strokeDashArray: 3,
+      borderColor: '#f1f5f9'
+    },
+    xaxis: {
+      categories: receitaPorIdioma.map(item => item.idioma),
+      axisBorder: {
+        show: false
+      },
+      axisTicks: {
+        show: false
+      },
+      labels: {
+        style: {
+          fontSize: '11px',
+          colors: '#64748b'
+        },
+        formatter: (value: number) => `${(value / 1000).toFixed(0)}k`
+      }
+    },
+    yaxis: {
+      axisBorder: {
+        show: false
+      },
+      axisTicks: {
+        show: false
+      },
+      labels: {
+        style: {
+          fontSize: '11px',
+          colors: '#64748b'
+        }
+      }
+    },
+    tooltip: {
+      theme: 'light',
+      style: {
+        fontSize: '12px'
+      },
+      y: {
+        formatter: (value: number) => `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+      }
+    }
+  };
+
+  const columnChartOptions: any = {
+    chart: {
+      type: 'bar',
+      height: 320,
+      toolbar: {
+        show: false
+      }
+    },
+    colors: variacaoSaldo.map(item => 
+      item.tipo === 'entrada' ? '#10b981' : 
+      item.tipo === 'saida' ? '#ef4444' : 
+      item.valor >= 0 ? '#3b82f6' : '#f59e0b'
+    ),
+    plotOptions: {
+      bar: {
+        borderRadius: 6,
+        columnWidth: '80px'
+      }
+    },
+    dataLabels: {
+      enabled: false
+    },
+    grid: {
+      strokeDashArray: 3,
+      borderColor: '#f1f5f9'
+    },
+    xaxis: {
+      categories: variacaoSaldo.map(item => item.categoria),
+      axisBorder: {
+        show: false
+      },
+      axisTicks: {
+        show: false
+      },
+      labels: {
+        style: {
+          fontSize: '12px',
+          colors: '#64748b'
+        },
+        rotate: -45
+      }
+    },
+    yaxis: {
+      axisBorder: {
+        show: false
+      },
+      axisTicks: {
+        show: false
+      },
+      labels: {
+        style: {
+          fontSize: '12px',
+          colors: '#64748b'
+        },
+        formatter: (value: number) => `R$ ${(value / 1000).toFixed(0)}k`
+      }
+    },
+    tooltip: {
+      theme: 'light',
+      style: {
+        fontSize: '14px'
+      },
+      y: {
+        formatter: (value: number) => `R$ ${Math.abs(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -726,18 +938,28 @@ const FinancialReportsTable = () => {
           </div>
           
           {/* Botão Exportar PDF */}
-          <Button 
-            onClick={exportarDados}
-            disabled={exportandoPDF}
-            className={`flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-300 ${exportandoPDF ? "animate-pulse" : ""}`}
-          >
-            {exportandoPDF ? (
-              <RefreshCw className="h-4 w-4 animate-spin" />
-            ) : (
-              <Download className="h-4 w-4" />
+          <div className="flex items-center gap-3">
+            {/* Indicador do filtro de ano */}
+            {anoFiltro !== 'todos' && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                <CalendarDays className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium text-blue-700">PDF: {anoFiltro}</span>
+              </div>
             )}
-            {exportandoPDF ? 'Gerando PDF...' : 'Exportar PDF'}
-          </Button>
+            
+            <Button 
+              onClick={exportarDados}
+              disabled={exportandoPDF}
+              className={`flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-300 ${exportandoPDF ? "animate-pulse" : ""}`}
+            >
+              {exportandoPDF ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              {exportandoPDF ? 'Gerando PDF...' : `Exportar PDF${anoFiltro !== 'todos' ? ` (${anoFiltro})` : ''}`}
+            </Button>
+          </div>
         </div>
       </motion.div>
 
@@ -876,52 +1098,15 @@ const FinancialReportsTable = () => {
             </CardHeader>
             <CardContent className="pt-0">
               <div className="h-80 p-4 bg-white rounded-lg border border-gray-100">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={receitaMensal} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis 
-                      dataKey="mes" 
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 12, fill: '#64748b' }}
-                    />
-                    <YAxis 
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 12, fill: '#64748b' }}
-                      tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
-                    />
-                    <Tooltip 
-                      formatter={(value: number) => [
-                        `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-                        'Receita'
-                      ]}
-                      labelFormatter={(label) => `Mês: ${label}`}
-                      contentStyle={{
-                        backgroundColor: 'white',
-                        border: 'none',
-                        borderRadius: '12px',
-                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-                        fontSize: '14px'
-                      }}
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="receita" 
-                      stroke="#10b981" 
-                      fill="url(#colorReceita)" 
-                      strokeWidth={3}
-                      dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
-                      activeDot={{ r: 6, stroke: '#10b981', strokeWidth: 2, fill: 'white' }}
-                    />
-                    <defs>
-                      <linearGradient id="colorReceita" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.05}/>
-                      </linearGradient>
-                    </defs>
-                  </AreaChart>
-                </ResponsiveContainer>
+                <Chart
+                  options={areaChartOptions}
+                  series={[{
+                    name: 'Receita',
+                    data: receitaMensal.map(item => item.receita)
+                  }]}
+                  type="area"
+                  height={320}
+                />
               </div>
             </CardContent>
           </Card>
@@ -941,55 +1126,15 @@ const FinancialReportsTable = () => {
             </CardHeader>
             <CardContent className="pt-0 px-2">
               <div className="h-80 p-2 bg-white rounded-lg border border-gray-100">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart 
-                    data={receitaPorIdioma} 
-                    layout="horizontal" 
-                    margin={{ top: 20, right: 20, left: 60, bottom: 20 }}
-                    maxBarSize={30}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis 
-                      type="number"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 11, fill: '#64748b' }}
-                      tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
-                    />
-                    <YAxis 
-                      type="category"
-                      dataKey="idioma" 
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 11, fill: '#64748b' }}
-                      width={55}
-                    />
-                    <Tooltip 
-                      formatter={(value: number) => [
-                        `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-                        'Receita'
-                      ]}
-                      contentStyle={{
-                        backgroundColor: 'white',
-                        border: 'none',
-                        borderRadius: '12px',
-                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-                        fontSize: '12px'
-                      }}
-                    />
-                    <Bar dataKey="receita" radius={[0, 6, 6, 0]}>
-                      {receitaPorIdioma.map((entry, index) => {
-                        const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
-                        return (
-                          <Cell 
-                            key={`cell-${index}`} 
-                            fill={colors[index % colors.length]} 
-                          />
-                        );
-                      })}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                <Chart
+                  options={barChartOptions}
+                  series={[{
+                    name: 'Receita',
+                    data: receitaPorIdioma.map(item => item.receita)
+                  }]}
+                  type="bar"
+                  height={320}
+                />
               </div>
             </CardContent>
           </Card>
@@ -1010,55 +1155,15 @@ const FinancialReportsTable = () => {
           </CardHeader>
           <CardContent className="pt-0 px-6">
             <div className="h-80 p-6 bg-white rounded-lg border border-gray-100">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart 
-                  data={variacaoSaldo} 
-                  margin={{ top: 20, right: 30, left: 20, bottom: 40 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis 
-                    dataKey="categoria" 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fontSize: 12, fill: '#64748b' }}
-                    angle={-45}
-                    textAnchor="end"
-                    height={60}
-                    interval={0}
-                  />
-                  <YAxis 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fontSize: 12, fill: '#64748b' }}
-                    tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
-                  />
-                  <Tooltip 
-                    formatter={(value: number) => [
-                      `R$ ${Math.abs(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-                      value >= 0 ? 'Entrada' : 'Saída'
-                    ]}
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: 'none',
-                      borderRadius: '12px',
-                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-                      fontSize: '14px'
-                    }}
-                  />
-                  <Bar dataKey="valor" radius={[6, 6, 0, 0]} maxBarSize={80}>
-                    {variacaoSaldo.map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={
-                          entry.tipo === 'entrada' ? '#10b981' : 
-                          entry.tipo === 'saida' ? '#ef4444' : 
-                          entry.valor >= 0 ? '#3b82f6' : '#f59e0b'
-                        } 
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <Chart
+                options={columnChartOptions}
+                series={[{
+                  name: 'Valor',
+                  data: variacaoSaldo.map(item => item.valor)
+                }]}
+                type="bar"
+                height={320}
+              />
             </div>
           </CardContent>
         </Card>
@@ -1078,7 +1183,25 @@ const FinancialReportsTable = () => {
                 Parcelas Detalhadas
               </CardTitle>
               
-              <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+                {/* Filtro de Ano */}
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4 text-gray-500" />
+                  <Select value={anoFiltro} onValueChange={setAnoFiltro}>
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue placeholder="Ano" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="2023">2023</SelectItem>
+                      <SelectItem value="2024">2024</SelectItem>
+                      <SelectItem value="2025">2025</SelectItem>
+                      <SelectItem value="2026">2026</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Campo de busca */}
                 <div className="relative flex-1 sm:w-64">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
@@ -1089,6 +1212,7 @@ const FinancialReportsTable = () => {
                   />
                 </div>
                 
+                {/* Botão de detalhes */}
                 <Button
                   variant="outline"
                   size="sm"

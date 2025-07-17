@@ -7,8 +7,7 @@ import { formatCEP } from "@/utils/formatters";
 import { useToast } from "@/hooks/use-toast";
 import { Control, UseFormSetValue, useWatch } from "react-hook-form";
 import { StudentFormValues } from "@/lib/validators/student";
-import { MapPin, Search, Loader2, Home, Hash, Building2, MapIcon, Sparkles, Navigation } from "lucide-react";
-import { Download } from "lucide-react";
+import { MapPin, Search, Loader2, Home, Hash, Building2, MapIcon, Sparkles, Navigation, Download } from "lucide-react";
 
 interface AddressFieldsProps {
   control: Control<StudentFormValues>;
@@ -71,7 +70,7 @@ const AddressFields = ({ control, setValue }: AddressFieldsProps) => {
   };
 
   const exportAddress = async () => {
-    const [cep, endereco, numero, bairro, cidade, estado] = watchedValues;
+    const [cep, endereco, numero, bairro, cidade, estado] = watchedValues || [];
     
     const addressData = {
       cep: cep || '',
@@ -83,7 +82,7 @@ const AddressFields = ({ control, setValue }: AddressFieldsProps) => {
     };
   
     // Verificar se há dados de endereço para exportar
-    const hasAddressData = Object.values(addressData).some(value => value.trim() !== '');
+    const hasAddressData = Object.values(addressData).some(value => value && value.toString().trim() !== '');
     
     if (!hasAddressData) {
       toast({
@@ -183,8 +182,8 @@ const AddressFields = ({ control, setValue }: AddressFieldsProps) => {
                     variant="outline"
                     size="lg"
                     className="h-14 px-6 border-2 border-emerald-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all duration-300 font-medium"
-                    onClick={() => fetchAddressByCEP(field.value || '')}
-                    disabled={isLoadingCEP || !field.value || field.value.replace(/\D/g, '').length < 8}
+                    onClick={() => fetchAddressByCEP(String(field.value || ''))}
+                    disabled={isLoadingCEP || !field.value || (typeof field.value === 'string' ? field.value.replace(/\D/g, '').length < 8 : true)}
                     title="Buscar endereço pelo CEP"
                   >
                     {isLoadingCEP ? (
@@ -204,7 +203,7 @@ const AddressFields = ({ control, setValue }: AddressFieldsProps) => {
         />
       </div>
 
-      {/* Grid de Campos de Endereço - SEM o campo complemento */}
+      {/* Grid de Campos de Endereço */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Endereço */}
         <div className="lg:col-span-2 bg-white p-6 rounded-xl border-2 border-gray-100 hover:border-emerald-200 transition-all duration-300 shadow-sm hover:shadow-md">
@@ -251,34 +250,6 @@ const AddressFields = ({ control, setValue }: AddressFieldsProps) => {
                     placeholder="123"
                     className="h-12 text-base border-2 border-gray-200 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300 bg-white"
                     {...field}
-                    value={field.value || ''}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        {/* Complemento - REMOVIDO COMPLETAMENTE */}
-        {/* 
-        <div className="bg-white p-6 rounded-xl border-2 border-gray-100 hover:border-emerald-200 transition-all duration-300 shadow-sm hover:shadow-md">
-          <FormField
-            control={control}
-            name="observacoes"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-sm font-bold text-gray-700 flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg">
-                    <Building2 className="h-4 w-4 text-white" />
-                  </div>
-                  Complemento
-                </FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="Apto, Bloco, etc."
-                    className="h-12 text-base border-2 border-gray-200 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300 bg-white"
-                    {...field}
                     value={field.value?.toString() || ''}
                   />
                 </FormControl>
@@ -287,7 +258,6 @@ const AddressFields = ({ control, setValue }: AddressFieldsProps) => {
             )}
           />
         </div>
-        */}
 
         {/* Bairro */}
         <div className="bg-white p-6 rounded-xl border-2 border-gray-100 hover:border-emerald-200 transition-all duration-300 shadow-sm hover:shadow-md">
@@ -307,7 +277,7 @@ const AddressFields = ({ control, setValue }: AddressFieldsProps) => {
                     placeholder="Nome do bairro"
                     className="h-12 text-base border-2 border-gray-200 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300 bg-white"
                     {...field}
-                    value={field.value || ''}
+                    value={field.value?.toString() || ''}
                   />
                 </FormControl>
                 <FormMessage />
@@ -334,7 +304,7 @@ const AddressFields = ({ control, setValue }: AddressFieldsProps) => {
                     placeholder="Nome da cidade"
                     className="h-12 text-base border-2 border-gray-200 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300 bg-white"
                     {...field}
-                    value={field.value || ''}
+                    value={field.value?.toString() || ''}
                   />
                 </FormControl>
                 <FormMessage />
@@ -361,7 +331,7 @@ const AddressFields = ({ control, setValue }: AddressFieldsProps) => {
                     placeholder="SP"
                     className="h-12 text-base border-2 border-gray-200 focus:border-emerald-500 focus:ring-emerald-500/20 transition-all duration-300 bg-white uppercase"
                     {...field}
-                    value={field.value || ''}
+                    value={field.value?.toString() || ''}
                     onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                     maxLength={2}
                   />

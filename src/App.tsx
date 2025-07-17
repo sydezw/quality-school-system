@@ -7,7 +7,7 @@ import { AuthProvider } from './contexts/authcontext';
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import AppLayout from "./components/layout/AppLayout";
-import ProtectedRoute from "./components/guards/protectedroute"; // ← Mudança aqui: ProtectedRoute → protectedroute
+import ProtectedRoute from "./components/guards/protectedroute";
 import Dashboard from "./pages/app/Dashboard";
 import Reports from "./pages/app/Reports";
 import Students from "./pages/app/Students";
@@ -20,7 +20,6 @@ import Documents from "./pages/app/Documents";
 import Contracts from "./pages/app/Contracts";
 import ContractGenerator from "./pages/app/ContractGenerator";
 import Plans from "./pages/app/Plans";
-import Rooms from "./pages/app/Rooms";
 import Birthdays from "./pages/app/Birthdays";
 import ApproveLogins from "./pages/app/ApproveLogins";
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -69,7 +68,6 @@ const App = () => {
                                 <Route path="/contracts" element={<Contracts />} />
                                 <Route path="/contract-generator" element={<ContractGenerator />} />
                                 <Route path="/plans" element={<Plans />} />
-                                <Route path="/rooms" element={<Rooms />} />
                                 <Route path="/birthdays" element={<Birthdays />} />
                                 <Route path="/approve-logins" element={<ApproveLogins />} />
                             </Route>

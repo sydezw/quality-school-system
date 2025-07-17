@@ -168,7 +168,7 @@ const Rooms = () => {
     setValue('nome', room.nome);
     setValue('capacidade', room.capacidade);
     setValue('tipo', room.tipo);
-    setValue('status', room.status || 'ativo');
+    setValue('status', room.status_salas || 'ativo');
     setIsDialogOpen(true);
   };
 
@@ -331,7 +331,7 @@ const Rooms = () => {
 
                 <div>
                   <Label htmlFor="status">Status</Label>
-                  <Select onValueChange={(value) => setValue('status', value)} defaultValue={editingRoom?.status || 'ativo'}>
+                  <Select onValueChange={(value) => setValue('status', value)} defaultValue={editingRoom?.status_salas || 'ativo'}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o status" />
                     </SelectTrigger>
@@ -413,8 +413,8 @@ const Rooms = () => {
                           </TableCell>
                           <TableCell className="text-base">{formatCapacidade(room.capacidade)}</TableCell>
                           <TableCell>
-                            <Badge className={`text-sm ${room.status === 'ativo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                              {room.status || 'ativo'}
+                            <Badge className={`text-sm ${room.status_salas === 'ativo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                              {room.status_salas || 'ativo'}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
