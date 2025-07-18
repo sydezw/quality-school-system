@@ -40,34 +40,39 @@ export const MoverParaHistoricoModal: React.FC<MoverParaHistoricoModalProps> = (
   }, []);
 
   // Função para ícones de status
-  const getStatusIcon = useCallback((status: string) => {
+  const getStatusIcon = (status: string) => {
     switch (status.toLowerCase()) {
       case 'pago':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'pendente':
+        return <Clock className="h-4 w-4 text-yellow-600" />;
+      case 'parcialmente pago':
+        return <AlertTriangle className="h-4 w-4 text-blue-600" />;
+      case 'arquivado':
+        return <Archive className="h-4 w-4 text-gray-600" />;
       case 'vencido':
         return <AlertTriangle className="h-4 w-4 text-red-600" />;
-      case 'cancelado':
-        return <XCircle className="h-4 w-4 text-gray-600" />;
       default:
-        return <Clock className="h-4 w-4 text-yellow-600" />;
+        return <Clock className="h-4 w-4 text-gray-600" />;
     }
-  }, []);
+  };
 
-  // Função para obter cor do status
-  const getStatusColor = useCallback((status: string) => {
+  const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'pago':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'bg-green-100 text-green-800';
       case 'pendente':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        return 'bg-yellow-100 text-yellow-800';
+      case 'parcialmente pago':
+        return 'bg-blue-100 text-blue-800';
+      case 'arquivado':
+        return 'bg-gray-100 text-gray-800';
       case 'vencido':
-        return 'bg-red-100 text-red-800 border-red-200';
-      case 'cancelado':
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-gray-100 text-gray-800';
     }
-  }, []);
+  };
 
   // Função para ícones de tipo
   const getTipoIcon = useCallback((tipo: string) => {
@@ -135,14 +140,106 @@ export const MoverParaHistoricoModal: React.FC<MoverParaHistoricoModalProps> = (
     setLoading(true);
     
     try {
-      // TODO: Implementar a lógica de backend
-      console.log('Movendo para histórico:', {
-        aluno: aluno,
-        form: form
-      });
+      console.log('🔄 Iniciando processo de mover para histórico para aluno:', aluno.nome);
       
-      // Simular delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // 1. Buscar o registro financeiro do aluno
+      const { data: registroFinanceiro, error: registroError } = await supabase
+        .from('financeiro_alunos')
+        .select('id')
+        .eq('aluno_id', aluno.id)
+        .single();
+  
+      if (registroError) throw registroError;
+  
+      console.log('📋 Registro financeiro encontrado:', registroFinanceiro);
+  
+      // 2. Buscar todas as parcelas do aluno
+      const { data: parcelas, error: parcelasError } = await supabase
+        .from('parcelas_alunos')
+        .select('*')
+        .eq('registro_financeiro_id', registroFinanceiro.id);
+  
+      if (parcelasError) throw parcelasError;
+  
+      console.log('💰 Parcelas encontradas:', parcelas?.length || 0);
+  
+      if (parcelas && parcelas.length > 0) {
+        // 3. Preparar dados para inserir no histórico
+        const parcelasHistorico = parcelas.map(parcela => ({
+          aluno_id: aluno.id,
+          registro_financeiro_id: parcela.registro_financeiro_id,
+          numero_parcela: parcela.numero_parcela,
+          valor: parcela.valor,
+          data_vencimento: parcela.data_vencimento,
+          data_pagamento: parcela.data_pagamento,
+          status_pagamento: parcela.status_pagamento,
+          tipo_item: parcela.tipo_item,
+          tipo_arquivamento: form.tipo_arquivamento,
+          comprovante: parcela.comprovante,
+          observacoes: form.observacoes || parcela.observacoes,
+          idioma_registro: parcela.idioma_registro
+        }));
+  
+        console.log('📝 Inserindo parcelas no histórico...');
+        
+        // 4. Inserir no histórico
+        const { error: historicoError } = await supabase
+          .from('historico_parcelas')
+          .insert(parcelasHistorico);
+  
+        if (historicoError) {
+          console.error('❌ Erro ao inserir no histórico:', historicoError);
+          throw historicoError;
+        }
+        
+        console.log('✅ Parcelas inseridas no histórico com sucesso');
+  
+        console.log('🗑️ Deletando parcelas originais...');
+        
+        // 5. Deletar parcelas originais
+        const { error: deleteError } = await supabase
+          .from('parcelas_alunos')
+          .delete()
+          .eq('registro_financeiro_id', registroFinanceiro.id);
+  
+        if (deleteError) {
+          console.error('❌ Erro ao deletar parcelas originais:', deleteError);
+          throw deleteError;
+        }
+        
+        console.log('✅ Parcelas originais deletadas com sucesso');
+      }
+      
+      console.log('🔄 Atualizando registro financeiro...');
+      
+      // 6. Atualizar registro financeiro - ZERAR CAMPOS CONFORME SOLICITADO
+      const updateData = { 
+        // Zerar valores conforme solicitado
+        valor_total: 0,
+        valor_plano: 0,
+        valor_material: 0,
+        valor_matricula: 0,
+        desconto_total: 0,
+        
+        // Status - MANTER migrado como 'nao' pois é função exclusiva de registros ativos
+        status_geral: 'Arquivado',
+        ativo_ou_encerrado: 'ativo' as const // Manter como ativo conforme solicitado
+        // NÃO alterar o campo 'migrado' - deve permanecer como 'nao'
+      };
+      
+      console.log('📊 Dados para atualização:', updateData);
+      
+      const { error: updateError } = await supabase
+        .from('financeiro_alunos')
+        .update(updateData)
+        .eq('id', registroFinanceiro.id);
+
+      if (updateError) {
+        console.error('❌ Erro ao atualizar registro financeiro:', updateError);
+        throw updateError;
+      }
+      
+      console.log('✅ Registro financeiro atualizado com sucesso');
       
       toast({
         title: "Sucesso!",
@@ -153,10 +250,10 @@ export const MoverParaHistoricoModal: React.FC<MoverParaHistoricoModalProps> = (
       onSuccess();
       
     } catch (error) {
-      console.error('Erro ao mover para histórico:', error);
+      console.error('❌ Erro geral ao mover para histórico:', error);
       toast({
         title: "Erro",
-        description: "Erro ao mover parcelas para o histórico. Tente novamente.",
+        description: `Erro ao mover parcelas para o histórico: ${error.message || 'Tente novamente.'}`,
         variant: "destructive"
       });
     } finally {

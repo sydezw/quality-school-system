@@ -1,19 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useForm, Controller } from 'react-hook-form';
+import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { AlertTriangle, Users, CheckCircle, Check, ChevronsUpDown, Loader2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { useForm, Controller } from 'react-hook-form';
-import { cn } from '@/lib/utils';
-import DatePicker from '@/components/shared/DatePicker';
+import { CalendarIcon, Calculator, CreditCard, DollarSign, FileText, GraduationCap, Package, User, CheckCircle, AlertCircle, AlertTriangle, Users, Check, ChevronsUpDown, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import DatePicker from '@/components/shared/DatePicker';
+import { criarParcelasComNumeracaoCorreta } from '@/utils/parcelaNumbering';
 
 interface TornarAtivoModalProps {
   isOpen: boolean;
@@ -221,90 +227,48 @@ export const TornarAtivoModal: React.FC<TornarAtivoModalProps> = ({
     const valorMatricula = parseFloat(formData.valor_matricula) || 0;
     const valorMaterial = parseFloat(formData.valor_material) || 0;
     
-    const parcelas = [];
-    let dataBase = dataVencimentoPrimeira || new Date();
-    let numeroParcela = 1; // Contador sequencial para todas as parcelas
+    const dataBase = dataVencimentoPrimeira || new Date();
 
-    // Parcelas do plano
-    if (valorAPagar > 0) {
-      const numParcelasPlano = parseInt(formData.numero_parcelas_plano) || 1;
-      const valorParcela = valorAPagar / numParcelasPlano;
-      
-      for (let i = 0; i < numParcelasPlano; i++) {
-        const dataVencimento = new Date(dataBase);
-        dataVencimento.setMonth(dataVencimento.getMonth() + i);
-        
-        parcelas.push({
-          registro_financeiro_id: registroFinanceiroId,
-          numero_parcela: numeroParcela++,
-          valor: valorParcela,
-          data_vencimento: dataVencimento.toISOString().split('T')[0],
-          status_pagamento: 'pendente' as const,
-          tipo_item: 'plano' as const,
-          descricao_item: 'Plano de aulas',
-          forma_pagamento: formData.forma_pagamento_plano,
-          idioma_registro: 'Inglês' as const
-        });
-      }
-    }
-
-    // Parcelas da matrícula
-    if (valorMatricula > 0) {
-      const numParcelasMatricula = parseInt(formData.numero_parcelas_matricula) || 1;
-      const valorParcela = valorMatricula / numParcelasMatricula;
-      
-      for (let i = 0; i < numParcelasMatricula; i++) {
-        const dataVencimento = new Date(dataBase);
-        dataVencimento.setMonth(dataVencimento.getMonth() + i);
-        
-        parcelas.push({
-          registro_financeiro_id: registroFinanceiroId,
-          numero_parcela: numeroParcela++,
-          valor: valorParcela,
-          data_vencimento: dataVencimento.toISOString().split('T')[0],
-          status_pagamento: 'pendente' as const,
-          tipo_item: 'matrícula' as const,
-          descricao_item: 'Taxa de matrícula',
-          forma_pagamento: formData.forma_pagamento_matricula,
-          idioma_registro: 'Inglês' as const
-        });
-      }
-    }
-
-    // Parcelas do material
-    if (valorMaterial > 0) {
-      const numParcelasMaterial = parseInt(formData.numero_parcelas_material) || 1;
-      const valorParcela = valorMaterial / numParcelasMaterial;
-      
-      for (let i = 0; i < numParcelasMaterial; i++) {
-        const dataVencimento = new Date(dataBase);
-        dataVencimento.setMonth(dataVencimento.getMonth() + i);
-        
-        parcelas.push({
-          registro_financeiro_id: registroFinanceiroId,
-          numero_parcela: numeroParcela++,
-          valor: valorParcela,
-          data_vencimento: dataVencimento.toISOString().split('T')[0],
-          status_pagamento: 'pendente' as const,
-          tipo_item: 'material' as const,
-          descricao_item: 'Material didático',
-          forma_pagamento: formData.forma_pagamento_material,
-          idioma_registro: 'Inglês' as const
-        });
-      }
-    }
+    // Usar a nova lógica de numeração correta
+    const parcelas = await criarParcelasComNumeracaoCorreta(
+      registroFinanceiroId,
+      {
+        plano: valorAPagar > 0 ? {
+          valor: valorAPagar,
+          numParcelas: parseInt(formData.numero_parcelas_plano) || 1,
+          dataBase,
+          formaPagamento: formData.forma_pagamento_plano,
+          descricao: 'Plano de aulas'
+        } : undefined,
+        matricula: valorMatricula > 0 ? {
+          valor: valorMatricula,
+          numParcelas: parseInt(formData.numero_parcelas_matricula) || 1,
+          dataBase,
+          formaPagamento: formData.forma_pagamento_matricula,
+          descricao: 'Taxa de matrícula'
+        } : undefined,
+        material: valorMaterial > 0 ? {
+          valor: valorMaterial,
+          numParcelas: parseInt(formData.numero_parcelas_material) || 1,
+          dataBase,
+          formaPagamento: formData.forma_pagamento_material,
+          descricao: 'Material didático'
+        } : undefined
+      },
+      'Inglês'
+    );
 
     if (parcelas.length > 0) {
-      console.log('Criando parcelas:', parcelas); // Debug
+      console.log('Criando parcelas com numeração correta:', parcelas);
       const { error } = await supabase
         .from('parcelas_alunos')
         .insert(parcelas);
 
       if (error) {
-        console.error('Erro ao inserir parcelas:', error); // Debug
+        console.error('Erro ao inserir parcelas:', error);
         throw error;
       }
-      console.log('Parcelas criadas com sucesso!'); // Debug
+      console.log('Parcelas criadas com sucesso!');
     }
   };
 

@@ -69,55 +69,75 @@ export const useParcelas = () => {
     setError(null);
     
     try {
-      let query = supabase
-        .from('parcelas_alunos')
-        .select(`
-          *,
-          financeiro_alunos!inner(
-            aluno_id,
-            plano_id,
-            alunos!inner(nome),
-            planos!inner(nome)
-          )
-        `);
+      // Buscar TODAS as parcelas usando paginação em lotes (como no StudentGroupingView)
+      let allParcelas: any[] = [];
+      let from = 0;
+      const batchSize = 1000;
       
-      // Aplicar filtros
-      if (filtros) {
-        // Filtro por nome do aluno (busca parcial, case-insensitive)
-        if (filtros.termo && filtros.termo.trim() !== '') {
-          query = query.ilike('financeiro_alunos.alunos.nome', `%${filtros.termo.trim()}%`);
+      while (true) {
+        let query = supabase
+          .from('parcelas_alunos')
+          .select(`
+            *,
+            financeiro_alunos!inner(
+              aluno_id,
+              plano_id,
+              alunos!inner(nome),
+              planos!inner(nome)
+            )
+          `)
+          .range(from, from + batchSize - 1);
+        
+        // Aplicar filtros
+        if (filtros) {
+          // Filtro por nome do aluno (busca parcial, case-insensitive)
+          if (filtros.termo && filtros.termo.trim() !== '') {
+            query = query.ilike('financeiro_alunos.alunos.nome', `%${filtros.termo.trim()}%`);
+          }
+          
+          // Filtro por tipo de item
+          if (filtros.tipo && filtros.tipo !== 'todos') {
+            query = query.eq('tipo_item', filtros.tipo);
+          }
+          
+          // Filtro por data de vencimento (início)
+          if (filtros.dataVencimentoInicio) {
+            query = query.gte('data_vencimento', filtros.dataVencimentoInicio);
+          }
+          
+          // Filtro por data de vencimento (fim)
+          if (filtros.dataVencimentoFim) {
+            query = query.lte('data_vencimento', filtros.dataVencimentoFim);
+          }
+          
+          // Filtro por idioma
+          if (filtros.idioma && filtros.idioma !== 'todos') {
+            query = query.eq('idioma_registro', filtros.idioma);
+          }
         }
         
-        // Filtro por tipo de item
-        if (filtros.tipo && filtros.tipo !== 'todos') {
-          query = query.eq('tipo_item', filtros.tipo);
-        }
+        // Ordenação por data de vencimento (mais recente primeiro)
+        query = query.order('data_vencimento', { ascending: false });
         
-        // Filtro por data de vencimento (início)
-        if (filtros.dataVencimentoInicio) {
-          query = query.gte('data_vencimento', filtros.dataVencimentoInicio);
-        }
+        const { data, error } = await query;
         
-        // Filtro por data de vencimento (fim)
-        if (filtros.dataVencimentoFim) {
-          query = query.lte('data_vencimento', filtros.dataVencimentoFim);
-        }
+        if (error) throw error;
         
-        // Filtro por idioma
-        if (filtros.idioma && filtros.idioma !== 'todos') {
-          query = query.eq('idioma_registro', filtros.idioma);
-        }
+        if (!data || data.length === 0) break;
+        
+        allParcelas = [...allParcelas, ...data];
+        
+        if (data.length < batchSize) break; // Última página
+        
+        from += batchSize;
       }
       
-      // Ordenação por data de vencimento (mais recente primeiro)
-      query = query.order('data_vencimento', { ascending: false });
-      
-      const { data, error } = await query;
-      
-      if (error) throw error;
+      console.log(`=== DEBUG PARCELAS ===`);
+      console.log(`Total de parcelas carregadas: ${allParcelas.length}`);
+      console.log(`=== FIM DEBUG ===`);
       
       // Processar dados para incluir nomes do aluno e plano
-      let parcelasProcessadas = (data || []).map(parcela => ({
+      let parcelasProcessadas = allParcelas.map(parcela => ({
         ...parcela,
         aluno_nome: parcela.financeiro_alunos?.alunos?.nome,
         plano_nome: parcela.financeiro_alunos?.planos?.nome,

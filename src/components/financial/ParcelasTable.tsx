@@ -1,29 +1,45 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { 
+  Search, 
+  Filter, 
+  ChevronDown, 
+  ChevronUp, 
+  Plus, 
+  CheckCircle, 
+  Clock, 
+  AlertTriangle, 
+  XCircle,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  RefreshCw,
+  Eye,
+  EyeOff,
+  RotateCcw,
+  FilterX
+} from 'lucide-react';
+import { useParcelas } from '@/hooks/useParcelas';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import FinancialPlanForm from './FinancialPlanForm';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ChevronDown, FileText, ChevronLeft, ChevronRight } from "lucide-react";
+import { FileText, Calendar, CreditCard, Trash2, Users } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { useParcelas } from '@/hooks/useParcelas';
-import { Search, Filter, Calendar, CreditCard, CheckCircle, XCircle, Clock, AlertTriangle, Trash2, Plus, Users, RefreshCw, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import FinancialPlanDialog from './FinancialPlanDialog';
 import { Student } from '@/types/shared';
 import { formatarFormaPagamento } from '@/utils/formatters';
@@ -50,12 +66,15 @@ interface Parcela {
 }
 
 const ParcelasTable: React.FC = () => {
-  // Estados dos filtros - alterados para arrays
+  // Estado para controlar se é a primeira vez que o componente é montado
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  
+  // Estados dos filtros - com filtro automático inicial
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilters, setStatusFilters] = useState<string[]>(['pago', 'pendente', 'vencido', 'cancelado']);
+  const [statusFilters, setStatusFilters] = useState<string[]>(['pendente', 'vencido']); // Filtro inicial: apenas pendentes e vencidas
   const [tipoFilters, setTipoFilters] = useState<string[]>(['plano', 'material', 'matrícula', 'cancelamento', 'outros']);
-  const [anoInicio, setAnoInicio] = useState('todos');
-  const [anoFim, setAnoFim] = useState('todos');
+  const [dataInicio, setDataInicio] = useState(new Date().toISOString().split('T')[0]); // Data atual como padrão
+  const [dataFim, setDataFim] = useState('');
   const [idiomaFilter, setIdiomaFilter] = useState<'todos' | 'Inglês' | 'Japonês'>('todos');
   
   // Estados para paginação
@@ -70,6 +89,18 @@ const ParcelasTable: React.FC = () => {
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
   
   const { toast } = useToast();
+
+  // Função para aplicar filtro automático inicial (apenas na primeira vez)
+  useEffect(() => {
+    if (isInitialLoad) {
+      toast({
+        title: "🎯 Filtro automático aplicado",
+        description: "Mostrando apenas parcelas pendentes e vencidas a partir do ano atual.",
+        duration: 4000,
+      });
+      setIsInitialLoad(false);
+    }
+  }, [isInitialLoad, toast]);
 
   // Funções para gerenciar filtros múltiplos
   const handleStatusFilterChange = (status: string, checked: boolean) => {
@@ -161,8 +192,11 @@ const ParcelasTable: React.FC = () => {
     setSelectedStudentForPlan(null);
   };
 
-  // Filtragem local atualizada para múltipla seleção
+  // Filtragem local atualizada para múltipla seleção + filtro de data automático
   const parcelasFiltradas = useMemo(() => {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0); // Zerar horas para comparação apenas de data
+    
     return todasParcelas.filter((parcela) => {
       // Filtro por nome do aluno
       const filtroNome = !searchTerm || 
@@ -178,16 +212,83 @@ const ParcelasTable: React.FC = () => {
       // Filtro por idioma
       const filtroIdioma = idiomaFilter === 'todos' || parcela.idioma_registro === idiomaFilter;
       
-      // Filtro por ano de vencimento
-      const anoVencimento = new Date(parcela.data_vencimento).getFullYear();
-      const filtroAnoInicio = anoInicio === 'todos' || anoVencimento >= parseInt(anoInicio);
-      const filtroAnoFim = anoFim === 'todos' || anoVencimento <= parseInt(anoFim);
+      // Filtro por data de vencimento
+      const dataVencimento = new Date(parcela.data_vencimento);
+      dataVencimento.setHours(0, 0, 0, 0);
+      
+      const filtroDataInicio = !dataInicio || dataVencimento >= new Date(dataInicio);
+      const filtroDataFim = !dataFim || dataVencimento <= new Date(dataFim);
+      
+      // Filtro automático: apenas parcelas a partir de hoje (quando filtro inicial está ativo)
+      const isFilteringCurrentDate = dataInicio === new Date().toISOString().split('T')[0] && 
+                                     !dataFim &&
+                                     statusFilters.length === 2 && 
+                                     statusFilters.includes('pendente') && 
+                                     statusFilters.includes('vencido');
+      
+      const filtroDataAutomatico = !isFilteringCurrentDate || dataVencimento >= hoje;
       
       return filtroNome && filtroStatus && filtroTipo && filtroIdioma && 
-             filtroAnoInicio && filtroAnoFim;
+             filtroDataInicio && filtroDataFim && filtroDataAutomatico;
     });
   }, [todasParcelas, searchTerm, statusFilters, tipoFilters, idiomaFilter, 
-      anoInicio, anoFim, calcularStatusAutomatico]);
+      dataInicio, dataFim, calcularStatusAutomatico]);
+
+  // Função para resetar filtros para o padrão inicial
+  const resetarFiltrosParaPadrao = () => {
+    setSearchTerm('');
+    setStatusFilters(['pendente', 'vencido']);
+    setTipoFilters(['plano', 'material', 'matrícula', 'cancelamento', 'outros']);
+    setDataInicio(new Date().toISOString().split('T')[0]);
+    setDataFim('');
+    setIdiomaFilter('todos');
+    setCurrentPage(1);
+    
+    toast({
+      title: "🔄 Filtros resetados",
+      description: "Filtros voltaram ao padrão inicial (pendentes/vencidas a partir de hoje).",
+      duration: 3000,
+    });
+  };
+
+  // Função para limpar todos os filtros
+  const limparTodosFiltros = () => {
+    setSearchTerm('');
+    setStatusFilters(['pago', 'pendente', 'vencido', 'cancelado']);
+    setTipoFilters(['plano', 'material', 'matrícula', 'cancelamento', 'outros']);
+    setDataInicio('');
+    setDataFim('');
+    setIdiomaFilter('todos');
+    setCurrentPage(1);
+    
+    toast({
+      title: "🧹 Todos os filtros removidos",
+      description: "Mostrando todas as parcelas sem filtros.",
+      duration: 3000,
+    });
+  };
+
+  // Verificar se filtros estão no estado inicial
+  const isFilteringInitialState = () => {
+    return statusFilters.length === 2 && 
+           statusFilters.includes('pendente') && 
+           statusFilters.includes('vencido') &&
+           dataInicio === new Date().toISOString().split('T')[0] &&
+           !dataFim &&
+           idiomaFilter === 'todos' &&
+           !searchTerm &&
+           tipoFilters.length === 5;
+  };
+
+  // Verificar se há filtros aplicados
+  const hasFiltersApplied = () => {
+    return searchTerm || 
+           statusFilters.length < 4 || 
+           tipoFilters.length < 5 || 
+           dataInicio || 
+           dataFim || 
+           idiomaFilter !== 'todos';
+  };
 
   // Cálculos de paginação
   const totalPages = itemsPerPage === 0 ? 1 : Math.ceil(parcelasFiltradas.length / itemsPerPage);
@@ -205,7 +306,7 @@ const ParcelasTable: React.FC = () => {
   console.log('Página atual:', currentPage);
   console.log('Total de páginas:', totalPages);
   console.log('Parcelas exibidas:', parcelas.length);
-  console.log('Condição paginação (totalPages > 1):', totalPages > 1);
+  console.log('Filtro inicial ativo:', isInitialLoad);
   console.log('=== FIM DEBUG ===');
 
   // Páginas visíveis para paginação
@@ -254,7 +355,7 @@ const ParcelasTable: React.FC = () => {
   // Reset página quando filtros mudam
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilters, tipoFilters, idiomaFilter, anoInicio, anoFim, itemsPerPage]);
+  }, [searchTerm, statusFilters, tipoFilters, idiomaFilter, dataInicio, dataFim, itemsPerPage]);
 
   // Carregar parcelas apenas na inicialização
   useEffect(() => {
@@ -265,26 +366,16 @@ const ParcelasTable: React.FC = () => {
     setIdiomaFilter(value as 'todos' | 'Inglês' | 'Japonês');
   };
 
-  const handleAnoInicioChange = (value: string) => {
-    setAnoInicio(value);
-    // Auto-preencher ano fim se estiver vazio
-    if (value !== 'todos' && anoFim === 'todos') {
-      setAnoFim(value);
+  const handleDataInicioChange = (value: string) => {
+    setDataInicio(value);
+    // Auto-preencher data fim se estiver vazia
+    if (value && !dataFim) {
+      setDataFim(value);
     }
   };
 
-  const handleAnoFimChange = (value: string) => {
-    setAnoFim(value);
-  };
-
-  // Gerar lista de anos disponíveis (últimos 10 anos + próximos 5 anos)
-  const getAnosDisponiveis = () => {
-    const anoAtual = new Date().getFullYear();
-    const anos = [];
-    for (let ano = anoAtual - 10; ano <= anoAtual + 5; ano++) {
-      anos.push(ano.toString());
-    }
-    return anos.reverse(); // Mais recentes primeiro
+  const handleDataFimChange = (value: string) => {
+    setDataFim(value);
   };
 
   const getStatusIcon = (status: string) => {
@@ -425,6 +516,8 @@ const ParcelasTable: React.FC = () => {
                               ? 'Todos os status' 
                               : statusFilters.length === 0 
                               ? 'Selecione os status...' 
+                              : statusFilters.length === 2 && statusFilters.includes('pendente') && statusFilters.includes('vencido')
+                              ? 'Pendentes e Vencidas (Padrão)'
                               : `${statusFilters.length} status selecionado${statusFilters.length > 1 ? 's' : ''}`
                             }
                           </span>
@@ -525,68 +618,80 @@ const ParcelasTable: React.FC = () => {
                     </Select>
                   </div>
                   
-                  {/* Ano Início */}
+                  {/* Filtro de Data Início */}
                   <div>
-                    <Label className="text-sm font-medium text-gray-700">Ano Início</Label>
-                    <Select value={anoInicio} onValueChange={handleAnoInicioChange}>
-                      <SelectTrigger className="mt-1 border-gray-300 focus:border-red-500 focus:ring-red-500">
-                        <SelectValue placeholder="Selecione o ano" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="todos">Todos os anos</SelectItem>
-                        {getAnosDisponiveis().map((ano) => (
-                          <SelectItem key={ano} value={ano}>
-                            {ano}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="dataInicio" className="text-sm font-medium text-gray-700">Data Início</Label>
+                    <Input
+                      id="dataInicio"
+                      type="date"
+                      value={dataInicio}
+                      onChange={(e) => handleDataInicioChange(e.target.value)}
+                      className="mt-1 border-gray-300 focus:border-red-500 focus:ring-red-500"
+                    />
                   </div>
                   
-                  {/* Ano Fim */}
+                  {/* Filtro de Data Fim */}
                   <div>
-                    <Label className="text-sm font-medium text-gray-700">Ano Fim</Label>
-                    <Select value={anoFim} onValueChange={handleAnoFimChange}>
-                      <SelectTrigger className="mt-1 border-gray-300 focus:border-red-500 focus:ring-red-500">
-                        <SelectValue placeholder="Selecione o ano" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="todos">Todos os anos</SelectItem>
-                        {getAnosDisponiveis().map((ano) => (
-                          <SelectItem key={ano} value={ano}>
-                            {ano}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="dataFim" className="text-sm font-medium text-gray-700">Data Fim</Label>
+                    <Input
+                      id="dataFim"
+                      type="date"
+                      value={dataFim}
+                      onChange={(e) => handleDataFimChange(e.target.value)}
+                      className="mt-1 border-gray-300 focus:border-red-500 focus:ring-red-500"
+                    />
                   </div>
                 </div>
                 
-                {/* Botão Limpar Filtros */}
-                {(searchTerm || statusFilters.length < 4 || tipoFilters.length < 5 || anoInicio !== 'todos' || anoFim !== 'todos' || idiomaFilter !== 'todos') && (
-                  <motion.div 
-                    className="mt-4 flex justify-end"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setSearchTerm('');
-                        setStatusFilters(['pago', 'pendente', 'vencido', 'cancelado']);
-                        setTipoFilters(['plano', 'material', 'matrícula', 'cancelamento', 'outros']);
-                        setAnoInicio('todos');
-                        setAnoFim('todos');
-                        setIdiomaFilter('todos');
-                      }}
-                      className="flex items-center gap-2 text-red-600 border-red-300 hover:bg-red-50"
+                {/* Indicador de Filtro Automático e Botões de Reset */}
+                <div className="mt-4 flex items-center justify-between">
+                  {/* Indicador de filtro automático */}
+                  {isFilteringInitialState() && (
+                    <motion.div 
+                      className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg"
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.3 }}
                     >
-                      <RotateCcw className="h-4 w-4" />
-                      Limpar Filtros
-                    </Button>
-                  </motion.div>
-                )}
+                      <Eye className="h-4 w-4 text-blue-600" />
+                      <span className="text-sm text-blue-700 font-medium">
+                        Filtro automático ativo: Pendentes/Vencidas da data atual
+                      </span>
+                    </motion.div>
+                  )}
+                  
+                  {/* Botões de Reset */}
+                  {hasFiltersApplied() && (
+                    <motion.div 
+                      className="flex gap-2 ml-auto"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      {!isFilteringInitialState() && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={resetarFiltrosParaPadrao}
+                          className="flex items-center gap-2 text-blue-600 border-blue-300 hover:bg-blue-50"
+                        >
+                          <FilterX className="h-4 w-4" />
+                          Filtro Padrão
+                        </Button>
+                      )}
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={limparTodosFiltros}
+                        className="flex items-center gap-2 text-red-600 border-red-300 hover:bg-red-50"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Limpar Todos
+                      </Button>
+                    </motion.div>
+                  )}
+                </div>
               </CardContent>
             </motion.div>
           </Card>
@@ -699,7 +804,7 @@ const ParcelasTable: React.FC = () => {
                   </div>
                   <p className="text-gray-500 text-lg font-medium">Nenhuma parcela encontrada</p>
                   <p className="text-sm text-gray-400 mt-2">
-                    {searchTerm || statusFilters.length < 4 || tipoFilters.length < 5 || anoInicio || anoFim
+                    {searchTerm || statusFilters.length < 4 || tipoFilters.length < 5 || dataInicio || dataFim
                       ? 'Tente ajustar os filtros de busca.'
                       : 'Nenhuma parcela foi criada ainda.'}
                   </p>
@@ -1055,12 +1160,18 @@ const ParcelasTable: React.FC = () => {
       </motion.div>
       
       {/* Modal de criação de plano financeiro */}
-      <FinancialPlanDialog
-        isOpen={isFinancialPlanDialogOpen}
-        onOpenChange={setIsFinancialPlanDialogOpen}
-        selectedStudent={selectedStudentForPlan}
-        onSuccess={handlePlanSuccess}
-      />
+      <Dialog open={isFinancialPlanDialogOpen} onOpenChange={setIsFinancialPlanDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Criar Plano de Pagamento</DialogTitle>
+          </DialogHeader>
+          <FinancialPlanForm
+            preSelectedStudent={selectedStudentForPlan}
+            onSuccess={handlePlanSuccess}
+            onCancel={() => setIsFinancialPlanDialogOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

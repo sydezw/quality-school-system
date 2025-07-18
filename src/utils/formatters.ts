@@ -53,3 +53,27 @@ export const formatarFormaPagamento = (forma: string): string => {
   };
   return formas[forma] || forma;
 };
+
+// Função para formatar valores monetários
+export const formatCurrency = (value: number): string => {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  }).format(value);
+};
+
+// Função para formatar datas
+export const formatDate = (dateString: string): string => {
+  if (!dateString) return '';
+  
+  try {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }).format(date);
+  } catch (error) {
+    return dateString;
+  }
+};

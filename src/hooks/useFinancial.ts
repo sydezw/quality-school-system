@@ -289,14 +289,16 @@ export const useFinancial = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pago': 
+      case 'pago':
       case 'Pago': return 'bg-green-100 text-green-800';
       case 'pendente':
       case 'Pendente': return 'bg-yellow-100 text-yellow-800';
+      case 'parcialmente pago':
+      case 'Parcialmente Pago': return 'bg-blue-100 text-blue-800';
+      case 'arquivado':
+      case 'Arquivado': return 'bg-gray-100 text-gray-800';
       case 'vencido':
       case 'Vencido': return 'bg-red-100 text-red-800';
-      case 'cancelado':
-      case 'Cancelado': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };

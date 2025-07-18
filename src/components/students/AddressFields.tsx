@@ -19,10 +19,16 @@ const AddressFields = ({ control, setValue }: AddressFieldsProps) => {
   const { toast } = useToast();
 
   // Usar useWatch para capturar os valores atuais do formulário
+  const cep = useWatch({ control, name: 'cep' });
+  const endereco = useWatch({ control, name: 'endereco' });
+  const numero = useWatch({ control, name: 'numero' });
+  const bairro = useWatch({ control, name: 'bairro' });
+  const cidade = useWatch({ control, name: 'cidade' });
+  const estado = useWatch({ control, name: 'estado' });
+
   const watchedValues = useWatch({
-    control,
-    name: ['cep', 'endereco', 'numero', 'bairro', 'cidade', 'estado']
-  });
+    control
+  }) as any;
 
   const fetchAddressByCEP = async (cep: string) => {
     if (!cep || cep.replace(/\D/g, '').length < 8) return;
@@ -70,8 +76,6 @@ const AddressFields = ({ control, setValue }: AddressFieldsProps) => {
   };
 
   const exportAddress = async () => {
-    const [cep, endereco, numero, bairro, cidade, estado] = watchedValues || [];
-    
     const addressData = {
       cep: cep || '',
       endereco: endereco || '',

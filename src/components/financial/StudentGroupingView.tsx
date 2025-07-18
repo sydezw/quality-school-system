@@ -1,29 +1,89 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronDown, ChevronRight, Search, Plus, Edit, Trash2, Users, AlertCircle, DollarSign, TrendingUp, TrendingDown, Calendar, CreditCard, RefreshCw, Filter, Eye, EyeOff, CheckCircle, XCircle, Clock, AlertTriangle, FileText, Archive, History, Receipt, Banknote, Smartphone, Building2, Wallet, ChevronLeft, BarChart3, ChevronUp, X, RotateCcw } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { 
+  Search, 
+  Filter, 
+  ChevronDown, 
+  ChevronUp, 
+  Users, 
+  DollarSign, 
+  Calendar, 
+  CheckCircle, 
+  Clock, 
+  AlertTriangle, 
+  X, 
+  Eye, 
+  Edit, 
+  Trash2, 
+  Plus, 
+  CreditCard, 
+  FileText, 
+  Package, 
+  GraduationCap, 
+  User,
+  Archive,
+  Database,
+  TrendingUp,
+  TrendingDown,
+  BarChart3,
+  PieChart,
+  Activity,
+  Target,
+  Zap,
+  Star,
+  Award,
+  Crown,
+  Sparkles,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
+  EyeOff,
+  XCircle,
+  History,
+  Receipt,
+  Banknote,
+  Smartphone,
+  Building2,
+  Wallet,
+  RotateCcw,
+  Download,
+  AlertCircle
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Checkbox } from '@/components/ui/checkbox';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { motion, AnimatePresence } from 'framer-motion';
-import { MoverParaHistoricoModal } from './modals/MoverParaHistoricoModal';
-import { HistoricoParcelasModal } from './modals/HistoricoParcelasModal';
+import { supabase } from '@/integrations/supabase/client';
+import { formatCurrency, formatDate } from '@/utils/formatters';
+import { useParcelas } from '../../hooks/useParcelas';
+import { useParcelasMigrados } from '@/hooks/useParcelasMigrados';
+import FinancialPlanForm from '@/components/financial/FinancialPlanForm';
+import { HistoricoParcelasModal } from '@/components/financial/modals/HistoricoParcelasModal';
+import { MoverParaHistoricoModal } from '@/components/financial/modals/MoverParaHistoricoModal';
+import { TornarAtivoModal } from '@/components/financial/modals/TornarAtivoModal';
 import { ExcluirRegistroModal } from './modals/ExcluirRegistroModal';
 import FinancialPlanDialog from './FinancialPlanDialog';
-import { useParcelas } from '../../hooks/useParcelas';
-import { TornarAtivoModal } from './modals/TornarAtivoModal';
-import { useParcelasMigrados } from '@/hooks/useParcelasMigrados';
 import { PreviewProximaParcela } from './PreviewProximaParcela';
+import { ordenarParcelasPorTipoENumero, criarNovaParcela, getProximoNumeroParcela } from '@/utils/parcelaNumbering';
 
 interface AlunoFinanceiro {
   id: string;
@@ -33,6 +93,7 @@ interface AlunoFinanceiro {
   valor_plano: number;
   valor_material: number;
   valor_matricula: number;
+  desconto_total?: number;
   status_geral: string;
   data_primeiro_vencimento: string;
   // Parcelas individuais
@@ -73,6 +134,8 @@ interface NovaParcelaForm {
   numero_parcela: number;
   valor: number;
   data_vencimento: string;
+  status_pagamento: 'pago' | 'pendente' | 'vencido' | 'cancelado';
+  idioma_registro: 'Inglês' | 'Japonês';
   descricao_item?: string;
   observacoes?: string;
   forma_pagamento?: string;
@@ -151,6 +214,8 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
       setStatusFilters(prev => prev.filter(s => s !== status));
     }
   };
+
+
 
   const handleTipoFilterChange = (tipo: string, checked: boolean) => {
     if (checked) {
@@ -306,18 +371,8 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
 
 
 
-  // Função para formatar moeda
-  const formatCurrency = useCallback((value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(value);
-  }, []);
-
-  // Função para formatar data
-  const formatDate = useCallback((dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR');
-  }, []);
+  // Função para formatar moeda (removida - usando utilitário)
+  // Função para formatar data (removida - usando utilitário)
 
   // Função para ícones de tipo
   const getTipoIcon = useCallback((tipo: string) => {
@@ -380,6 +435,10 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
         return <CheckCircle className="h-4 w-4" />;
       case 'pendente':
         return <Clock className="h-4 w-4" />;
+      case 'parcialmente pago':
+        return <AlertTriangle className="h-4 w-4" />;
+      case 'arquivado':
+        return <Archive className="h-4 w-4" />;
       case 'vencido':
         return <AlertTriangle className="h-4 w-4" />;
       case 'cancelado':
@@ -396,6 +455,10 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
         return 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200 transition-colors';
       case 'pendente':
         return 'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200 transition-colors';
+      case 'parcialmente pago':
+        return 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200 transition-colors';
+      case 'arquivado':
+        return 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200 transition-colors';
       case 'vencido':
         return 'bg-red-100 text-red-800 border-red-200 hover:bg-red-200 transition-colors';
       case 'cancelado':
@@ -403,7 +466,7 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200 transition-colors';
     }
-  }, []);
+  }, [])
 
   // Função para calcular progresso total
   const calcularProgressoTotal = useCallback((aluno: AlunoFinanceiro) => {
@@ -464,19 +527,53 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
     action();
   }, []);
 
-  // Função para abrir modal de criar parcela
-  const abrirModalCriarParcela = useCallback((alunoId: string, nomeAluno: string, registroFinanceiroId: string) => {
-    setNovaParcela({
-      registro_financeiro_id: registroFinanceiroId,
-      tipo_item: 'plano',
-      numero_parcela: 1,
-      valor: 0,
-      data_vencimento: '',
-      observacoes: '',
-      forma_pagamento: 'boleto'
-    });
-    setIsCreateModalOpen(true);
+  // Função para obter próximo número de parcela
+  const getProximoNumeroParcela = useCallback(async (registroFinanceiroId: string, tipoItem: 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'outros') => {
+    try {
+      const { data: parcelas, error } = await supabase
+        .from('parcelas_alunos')
+        .select('numero_parcela')
+        .eq('registro_financeiro_id', registroFinanceiroId)
+        .eq('tipo_item', tipoItem)
+        .order('numero_parcela', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      return parcelas && parcelas.length > 0 ? parcelas[0].numero_parcela + 1 : 1;
+    } catch (error) {
+      console.error('Erro ao buscar próximo número de parcela:', error);
+      return 1;
+    }
   }, []);
+
+  // Função para abrir modal de criar parcela
+  const abrirModalCriarParcela = useCallback(async (alunoId: string, nomeAluno: string, registroFinanceiroId: string, tipoItem: 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'outros' = 'plano') => {
+    try {
+      // Calcular o próximo número de parcela para o tipo específico
+      const proximoNumero = await getProximoNumeroParcela(registroFinanceiroId, tipoItem);
+      
+      setNovaParcela({
+        registro_financeiro_id: registroFinanceiroId,
+        tipo_item: tipoItem,
+        numero_parcela: proximoNumero,
+        valor: 0,
+        data_vencimento: '',
+        status_pagamento: 'pendente',
+        idioma_registro: 'Inglês',
+        observacoes: '',
+        forma_pagamento: 'boleto'
+      });
+      setIsCreateModalOpen(true);
+    } catch (error) {
+      console.error('Erro ao calcular próximo número de parcela:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao calcular número da parcela",
+        variant: "destructive"
+      });
+    }
+  }, [toast, getProximoNumeroParcela]);
 
   // Função para abrir modal de editar parcela
   const abrirModalEditarParcela = useCallback((parcela: ParcelaAluno) => {
@@ -590,202 +687,199 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
     setSelectedStudentForPlan(null);
   };
 
+  // Função para verificar se o registro está arquivado
+  const isRegistroArquivado = (aluno: any) => {
+    console.log('Verificando aluno:', aluno.nome, 'Status:', aluno.status_geral);
+    return aluno.status_geral === 'Arquivado';
+  };
+
+  // Função para criar plano de pagamento para um aluno específico
+  const handleCreatePlanForStudent = async (aluno: any) => {
+    try {
+      // Verificar se existe um registro financeiro arquivado para reativar
+      const { data: registroArquivado, error } = await supabase
+        .from('financeiro_alunos')
+        .select('*')
+        .eq('aluno_id', aluno.id)
+        .eq('status_geral', 'Arquivado')
+        .single();
+
+      if (registroArquivado && !error) {
+        // Reativar o registro existente
+        const { error: updateError } = await supabase
+          .from('financeiro_alunos')
+          .update({ status_geral: 'Pendente' })
+          .eq('id', registroArquivado.id);
+
+        if (updateError) throw updateError;
+
+        toast({
+          title: "Sucesso",
+          description: "Registro financeiro reativado com sucesso!",
+        });
+
+        // Atualizar dados
+        if (onRefresh) {
+          onRefresh();
+        } else {
+          carregarDados();
+        }
+      } else {
+        // Abrir modal para criar novo plano
+        setSelectedStudentForPlan(aluno);
+        setIsFinancialPlanDialogOpen(true);
+      }
+    } catch (error) {
+      console.error('Erro ao processar plano:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao processar plano de pagamento",
+        variant: "destructive"
+      });
+    }
+  };
 
 
-  // Função para carregar dados
+
+  // Função para carregar dados dos alunos
   const carregarDados = useCallback(async () => {
     try {
       setLoading(true);
       
-      // 1. Buscar dados consolidados de financeiro_alunos com filtro de migração
-      const { data: financialData, error: financialError } = await supabase
+      const migradoValue = tipoRegistro === 'ativos' ? 'nao' : 'sim';
+      
+      const { data: alunosData, error } = await supabase
         .from('financeiro_alunos')
         .select(`
           id,
           aluno_id,
-          valor_total,
+          migrado,
+          plano_id,
           valor_plano,
-          valor_material,
           valor_matricula,
+          valor_material,
+          desconto_total,
           status_geral,
           data_primeiro_vencimento,
-          numero_parcelas_plano,
-          numero_parcelas_material,
-          numero_parcelas_matricula,
           forma_pagamento_plano,
           forma_pagamento_material,
           forma_pagamento_matricula,
-          migrado,
-          alunos!inner(id, nome)
+          numero_parcelas_plano,
+          numero_parcelas_material,
+          numero_parcelas_matricula,
+          alunos (
+            id,
+            nome,
+            status
+          ),
+          planos (
+            id,
+            nome,
+            valor_total
+          ),
+          parcelas_alunos (
+            id,
+            numero_parcela,
+            valor,
+            data_vencimento,
+            data_pagamento,
+            status_pagamento,
+            tipo_item,
+            descricao_item,
+            idioma_registro,
+            forma_pagamento,
+            observacoes,
+            criado_em,
+            atualizado_em,
+            comprovante
+          )
         `)
-        .eq('migrado', tipoRegistro === 'migrados' ? 'sim' : 'nao');
+        .eq('migrado', migradoValue);
 
-      if (financialError) throw financialError;
-
-      // 2. Buscar parcelas apenas dos registros financeiros encontrados
-      const registroIds = (financialData || []).map(r => r.id);
-      
-      console.log('=== DEBUG ASSOCIAÇÃO PARCELAS ===');
-      console.log('Registros financeiros encontrados:', registroIds.length);
-      console.log('IDs dos registros:', registroIds);
-      
-      let parcelasData: any[] = [];
-      let totalParcelas = 0;
-      
-      if (registroIds.length > 0) {
-        // Buscar TODAS as parcelas relacionadas aos registros financeiros (sem limite)
-        let allParcelas: any[] = [];
-        let from = 0;
-        const batchSize = 1000;
-        
-        while (true) {
-          const { data: parcelas, error: parcelasError } = await supabase
-            .from('parcelas_alunos')
-            .select('*, observacoes')
-            .in('registro_financeiro_id', registroIds)
-            .range(from, from + batchSize - 1);
-
-          if (parcelasError) throw parcelasError;
-          
-          if (!parcelas || parcelas.length === 0) break;
-          
-          allParcelas = [...allParcelas, ...parcelas];
-          
-          if (parcelas.length < batchSize) break; // Última página
-          
-          from += batchSize;
-        }
-        
-        parcelasData = allParcelas;
-        
-        console.log('Parcelas encontradas (TODAS):', parcelasData.length);
-        console.log('Primeiras 3 parcelas:', parcelasData.slice(0, 3));
-
-        
-        // Verificar distribuição das parcelas por registro
-        const distribuicaoParcelas = parcelasData.reduce((acc, parcela) => {
-          const regId = parcela.registro_financeiro_id;
-          acc[regId] = (acc[regId] || 0) + 1;
-          return acc;
-        }, {});
-        
-        console.log('Registros COM parcelas:', Object.keys(distribuicaoParcelas).length);
-        console.log('Registros SEM parcelas:', registroIds.length - Object.keys(distribuicaoParcelas).length);
-        
-        // Mostrar apenas alguns exemplos de registros com parcelas
-        const exemploComParcelas = Object.entries(distribuicaoParcelas).slice(0, 3);
-        console.log('Exemplos de registros COM parcelas:', exemploComParcelas);
-        
-        // Verificar tipos dos IDs (apenas uma amostra)
-        if (registroIds.length > 0 && parcelasData.length > 0) {
-          console.log('Tipo do primeiro registro.id:', typeof registroIds[0], '- Valor:', registroIds[0]);
-          console.log('Tipo do primeiro parcela.registro_financeiro_id:', typeof parcelasData[0].registro_financeiro_id, '- Valor:', parcelasData[0].registro_financeiro_id);
-        }
-        
-        // Buscar total de parcelas no banco para comparação
-        const { count: totalCount, error: countError } = await supabase
-          .from('parcelas_alunos')
-          .select('*', { count: 'exact', head: true })
-          .in('registro_financeiro_id', registroIds);
-          
-        if (countError) {
-          console.warn('Erro ao contar parcelas:', countError);
-        } else {
-          totalParcelas = totalCount || 0;
-        }
+      if (error) {
+        console.error('Erro ao carregar dados:', error);
+        throw error;
       }
 
+      const alunosFormatados = alunosData?.map(registro => ({
+        id: registro.alunos?.id || '',
+        nome: registro.alunos?.nome || '',
+        migrado: registro.migrado,
+        plano_id: registro.plano_id,
+        valor_total: (registro.valor_plano || 0) + (registro.valor_material || 0) + (registro.valor_matricula || 0) - (registro.desconto_total || 0),
+        valor_plano: registro.valor_plano,
+        valor_matricula: registro.valor_matricula,
+        valor_material: registro.valor_material,
+        desconto_total: registro.desconto_total,
+        status_geral: registro.status_geral,
+        data_primeiro_vencimento: registro.data_primeiro_vencimento,
+        forma_pagamento_plano: registro.forma_pagamento_plano,
+        forma_pagamento_material: registro.forma_pagamento_material,
+        forma_pagamento_matricula: registro.forma_pagamento_matricula,
+        numero_parcelas_plano: registro.numero_parcelas_plano,
+        numero_parcelas_material: registro.numero_parcelas_material,
+        numero_parcelas_matricula: registro.numero_parcelas_matricula,
+        plano: registro.planos ? {
+          id: registro.planos.id,
+          nome: registro.planos.nome,
+          valor_total: registro.planos.valor_total
+        } : null,
+        // Ordenar parcelas usando a nova função
+        parcelas: ordenarParcelasPorTipoENumero(registro.parcelas_alunos || []),
+        registro_financeiro_id: registro.id
+      })) || [];
+
+      console.log('Alunos carregados:', alunosFormatados.map(a => ({ nome: a.nome, status_geral: a.status_geral })));
+
+      setAlunos(alunosFormatados);
+      
+      // Calcular total de parcelas carregadas
+      const totalParcelas = alunosFormatados.reduce((total, aluno) => 
+        total + aluno.parcelas.length, 0
+      );
       setTotalParcelasCarregadas(totalParcelas);
-
-      // 3. Agrupar dados por aluno
-      const alunosFinanceiros: AlunoFinanceiro[] = (financialData || []).map(registro => {
-        const parcelasAluno = parcelasData.filter(
-          p => p.registro_financeiro_id === registro.id
-        );
-
-        return {
-          id: registro.aluno_id,
-          nome: registro.alunos.nome,
-          valor_total: registro.valor_total,
-          valor_plano: registro.valor_plano,
-          valor_material: registro.valor_material,
-          valor_matricula: registro.valor_matricula,
-          status_geral: registro.status_geral,
-          data_primeiro_vencimento: registro.data_primeiro_vencimento,
-          parcelas: parcelasAluno,
-          registro_financeiro_id: registro.id,
-          numero_parcelas_plano: registro.numero_parcelas_plano,
-          numero_parcelas_material: registro.numero_parcelas_material,
-          numero_parcelas_matricula: registro.numero_parcelas_matricula,
-          forma_pagamento_plano: registro.forma_pagamento_plano,
-          forma_pagamento_material: registro.forma_pagamento_material,
-          forma_pagamento_matricula: registro.forma_pagamento_matricula,
-          migrado: registro.migrado
-        };
-      });
-
-      setAlunos(alunosFinanceiros);
-      
-      const alunosComParcelas = alunosFinanceiros.filter(a => a.parcelas.length > 0).length;
-      const alunosSemParcelas = alunosFinanceiros.length - alunosComParcelas;
-      
-      console.log(`RESUMO: ${alunosFinanceiros.length} alunos carregados`);
-      console.log(`- ${alunosComParcelas} alunos COM parcelas`);
-      console.log(`- ${alunosSemParcelas} alunos SEM parcelas`);
-      console.log(`- ${totalParcelas} parcelas no total`);
-      console.log('=== FIM DEBUG ===');
       
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast({
         title: "Erro",
-        description: "Erro ao carregar dados financeiros",
+        description: "Erro ao carregar dados dos alunos",
         variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
-  }, [toast, tipoRegistro]);
+  }, [tipoRegistro, toast]);
 
-  // Função para criar parcela
-  const criarParcela = useCallback(async () => {
+  // Função para criar nova parcela
+  const criarParcela = async () => {
     if (!novaParcela) return;
 
-    if (!novaParcela.registro_financeiro_id || !novaParcela.tipo_item || !novaParcela.numero_parcela || !novaParcela.valor || !novaParcela.data_vencimento) {
-      toast({
-        title: "Erro",
-        description: "Preencha todos os campos obrigatórios",
-        variant: "destructive"
-      });
-      return;
-    }
-
     try {
-      const { error } = await supabase
-        .from('parcelas_alunos')
-        .insert({
-          registro_financeiro_id: novaParcela.registro_financeiro_id,
-          tipo_item: novaParcela.tipo_item,
-          numero_parcela: novaParcela.numero_parcela,
+      const parcelaCriada = await criarNovaParcela(
+        novaParcela.registro_financeiro_id,
+        novaParcela.tipo_item,
+        {
           valor: novaParcela.valor,
           data_vencimento: novaParcela.data_vencimento,
-          status_pagamento: 'pendente',
-          idioma_registro: 'Inglês',
-          observacoes: novaParcela.observacoes || null,
-          forma_pagamento: novaParcela.forma_pagamento || 'boleto',
-          descricao_item: novaParcela.descricao_item || null
+          status_pagamento: novaParcela.status_pagamento,
+          descricao_item: novaParcela.descricao_item,
+          idioma_registro: novaParcela.idioma_registro,
+          forma_pagamento: novaParcela.forma_pagamento
+        }
+      );
+
+      if (parcelaCriada) {
+        toast({
+          title: "Sucesso",
+          description: "Parcela criada com sucesso!",
         });
-
-      if (error) throw error;
-
-      toast({
-        title: "Sucesso",
-        description: "Parcela criada com sucesso!"
-      });
-
-      setIsCreateModalOpen(false);
-      setNovaParcela(null);
-      carregarDados();
+        setNovaParcela(null);
+        setIsCreateModalOpen(false);
+        await carregarDados();
+      } else {
+        throw new Error('Erro ao criar parcela');
+      }
     } catch (error) {
       console.error('Erro ao criar parcela:', error);
       toast({
@@ -794,7 +888,7 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
         variant: "destructive"
       });
     }
-  }, [novaParcela, toast, carregarDados]);
+  };
 
   // Função para salvar edição de parcela
   const salvarEdicaoParcela = useCallback(async () => {
@@ -992,7 +1086,6 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
                       </div>
                       <span>Agrupamento Financeiro de Alunos</span>
                     </CardTitle>
-                    {/* Removed description and statistics */}
                   </div>
                 </div>
                 <motion.button
@@ -1092,12 +1185,50 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
         </Card>
       </motion.div>
 
+      {/* Record Type Toggle - Centralizado onde estava o botão de criar plano */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+        className="flex justify-center mb-6"
+      >
+        <div className="bg-gray-100 p-1 rounded-lg flex shadow-sm">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setTipoRegistro('ativos')}
+            className={`px-4 py-2 rounded-md font-medium transition-all duration-200 flex items-center space-x-2 ${
+              tipoRegistro === 'ativos'
+                ? 'bg-white text-red-600 shadow-md'
+                : 'text-gray-600 hover:text-gray-800'
+            }`}
+          >
+            <CheckCircle className="h-4 w-4" />
+            <span>Registros Ativos</span>
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setTipoRegistro('migrados')}
+            className={`px-4 py-2 rounded-md font-medium transition-all duration-200 flex items-center space-x-2 ${
+              tipoRegistro === 'migrados'
+                ? 'bg-white text-orange-600 shadow-md'
+                : 'text-gray-600 hover:text-gray-800'
+            }`}
+          >
+            <Archive className="h-4 w-4" />
+            <span>Registros Migrados</span>
+          </motion.button>
+        </div>
+      </motion.div>
+
       {/* Enhanced Filters Section */}
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5, delay: 0.2 }}
       >
+
         <Card className="shadow-lg border-0 bg-gradient-to-r from-red-50 to-gray-100">
           <CardHeader 
             className="pb-4 cursor-pointer"
@@ -1108,12 +1239,31 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
                 <Filter className="h-6 w-6" />
                 Filtros Avançados
               </div>
-              <motion.div
-                animate={{ rotate: isFiltersExpanded ? 180 : 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <ChevronDown className="h-5 w-5" />
-              </motion.div>
+              <div className="flex items-center gap-4">
+                {/* Botão Criar Plano - Movido para o canto */}
+                {tipoRegistro === 'ativos' && (
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <Button
+                      onClick={handleCreatePlan}
+                      size="sm"
+                      className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 text-white border-0 shadow-md transition-all duration-300"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      <Users className="h-4 w-4 mr-1" />
+                      Criar Plano
+                    </Button>
+                  </motion.div>
+                )}
+                <motion.div
+                  animate={{ rotate: isFiltersExpanded ? 180 : 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <ChevronDown className="h-5 w-5" />
+                </motion.div>
+              </div>
             </CardTitle>
           </CardHeader>
           <AnimatePresence>
@@ -1126,104 +1276,59 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
                 style={{ overflow: "hidden" }}
               >
                 <CardContent>
-                  {/* Record Type Toggle */}
-                  <div className="flex items-center justify-center mb-6">
-                    <div className="bg-gray-100 p-1 rounded-lg flex">
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => setTipoRegistro('ativos')}
-                        className={`px-6 py-2 rounded-md font-medium transition-all duration-200 flex items-center space-x-2 ${
-                          tipoRegistro === 'ativos'
-                            ? 'bg-white text-red-600 shadow-md'
-                            : 'text-gray-600 hover:text-gray-800'
-                        }`}
-                      >
-                        <CheckCircle className="h-4 w-4" />
-                        <span>Registros Ativos</span>
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => setTipoRegistro('migrados')}
-                        className={`px-6 py-2 rounded-md font-medium transition-all duration-200 flex items-center space-x-2 ${
-                          tipoRegistro === 'migrados'
-                            ? 'bg-white text-blue-600 shadow-md'
-                            : 'text-gray-600 hover:text-gray-800'
-                        }`}
-                      >
-                        <Archive className="h-4 w-4" />
-                        <span>Registros Migrados</span>
-                      </motion.button>
+                  {/* Search Filter */}
+                  <div className="mb-6">
+                    <Label htmlFor="search" className="text-sm font-medium text-gray-700 mb-2 block">
+                      Buscar por nome do aluno
+                    </Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input
+                        id="search"
+                        type="text"
+                        placeholder="Digite o nome do aluno..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 border-gray-300 focus:border-red-500 focus:ring-red-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Status Filters */}
+                  <div className="mb-6">
+                    <Label className="text-sm font-medium text-gray-700 mb-3 block">
+                      Status das Parcelas
+                    </Label>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { key: 'pago', label: 'Pagas', color: 'green', icon: CheckCircle },
+                        { key: 'pendente', label: 'Pendentes', color: 'yellow', icon: Clock },
+                        { key: 'vencido', label: 'Vencidas', color: 'red', icon: AlertTriangle },
+                        { key: 'cancelado', label: 'Canceladas', color: 'gray', icon: XCircle }
+                      ].map(({ key, label, color, icon: Icon }) => {
+                        const isActive = statusFilters.includes(key);
+                        return (
+                          <motion.button
+                            key={key}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => handleStatusFilterChange(key, !isActive)}
+                            className={`px-4 py-2 rounded-lg border-2 transition-all duration-200 flex items-center space-x-2 ${
+                              isActive
+                                ? `bg-${color}-100 border-${color}-300 text-${color}-800`
+                                : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                            }`}
+                          >
+                            <Icon className="h-4 w-4" />
+                            <span className="font-medium">{label}</span>
+                          </motion.button>
+                        );
+                      })}
                     </div>
                   </div>
 
                   {/* Advanced Filters Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-                    {/* Search */}
-                    <div className="lg:col-span-2">
-                      <Label htmlFor="search" className="text-sm font-medium text-gray-700">Buscar Aluno</Label>
-                      <div className="relative mt-1">
-                        <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input
-                          id="search"
-                          placeholder="Nome do aluno..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="pl-10 border-gray-300 focus:border-red-500 focus:ring-red-500"
-                        />
-                      </div>
-                    </div>
-                    
-                    {/* Status Filter */}
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700 mb-2 block">Status das Parcelas</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className="w-full justify-between border-gray-300 focus:border-red-500 focus:ring-red-500"
-                          >
-                            <span className="text-sm">
-                              {statusFilters.length === 4 
-                                ? 'Todos os status' 
-                                : statusFilters.length === 0 
-                                ? 'Selecione status...' 
-                                : `${statusFilters.length} status`
-                              }
-                            </span>
-                            <ChevronDown className="h-4 w-4 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <div className="p-2 space-y-1">
-                            {[
-                              { value: 'pago', label: 'Pagas', icon: CheckCircle },
-                              { value: 'pendente', label: 'Pendentes', icon: Clock },
-                              { value: 'vencido', label: 'Vencidas', icon: AlertTriangle },
-                              { value: 'cancelado', label: 'Canceladas', icon: XCircle }
-                            ].map((status) => {
-                              const isChecked = statusFilters.includes(status.value);
-                              const IconComponent = status.icon;
-                              return (
-                                <div 
-                                  key={status.value}
-                                  className="flex items-center space-x-2 p-2 rounded hover:bg-gray-50 cursor-pointer"
-                                >
-                                  <Checkbox
-                                    checked={isChecked}
-                                    onCheckedChange={(checked) => handleStatusFilterChange(status.value, checked as boolean)}
-                                  />
-                                  <IconComponent className="h-4 w-4 text-gray-600" />
-                                  <span className="text-sm">{status.label}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                    
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                     {/* Type Filter */}
                     <div>
                       <Label className="text-sm font-medium text-gray-700 mb-2 block">Tipo de Item</Label>
@@ -1273,7 +1378,6 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
                         </PopoverContent>
                       </Popover>
                     </div>
-                    
                     {/* Language Filter */}
                     <div>
                       <Label className="text-sm font-medium text-gray-700">Idioma</Label>
@@ -1393,29 +1497,7 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
         </Card>
       </motion.div>
 
-      {/* Create Plan Button - Moved outside filters */}
-      {tipoRegistro === 'ativos' && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-          className="flex justify-center"
-        >
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <Button
-              onClick={handleCreatePlan}
-              className="bg-gradient-to-r from-red-600 via-gray-700 to-black hover:from-red-700 hover:via-gray-800 hover:to-gray-900 text-white border-0 px-8 py-3 shadow-lg transition-all duration-300 text-lg"
-            >
-              <Plus className="h-5 w-5 mr-2" />
-              <Users className="h-5 w-5 mr-2" />
-              Criar Plano de Pagamento
-            </Button>
-          </motion.div>
-        </motion.div>
-      )}
+
 
       {/* Modal de criar parcela */}
       <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
@@ -1531,9 +1613,8 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
                 <Button 
                   variant="outline" 
                   onClick={() => {
-                    saveScrollPosition();
                     setIsCreateModalOpen(false);
-                    restoreScrollPosition();
+                    setNovaParcela(null);
                   }}
                 >
                   Cancelar
@@ -1827,14 +1908,22 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
                               <div className="bg-gradient-to-r from-red-600 to-gray-800 rounded-full p-2">
                                 <Users className="h-4 w-4 text-white" />
                               </div>
-                              <span>{aluno.nome}</span>
+                              <div className="flex items-center space-x-2">
+                                <span>{aluno.nome}</span>
+                                {isRegistroArquivado(aluno) && (
+                                  <div className="flex items-center space-x-1 bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs">
+                                    <Archive className="h-3 w-3" />
+                                    <span>Arquivado</span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell className="text-base py-4">
                       <span className="font-semibold text-gray-800">
                         {tipoRegistro === 'migrados' 
                           ? formatCurrency(calcularTotalPago(aluno))
-                          : formatCurrency(aluno.valor_total)
+                          : formatCurrency((aluno.valor_plano || 0) + (aluno.valor_material || 0) + (aluno.valor_matricula || 0) - (aluno.desconto_total || 0))
                         }
                       </span>
                     </TableCell>
@@ -1992,15 +2081,36 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
                                       ) : null}
                                       
                                       {/* Botão Nova Parcela - agora disponível para todos os tipos de registro */}
-                                      <motion.button
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
-                                        onClick={(e) => handleButtonClick(() => abrirModalCriarParcela(aluno.id, aluno.nome, aluno.registro_financeiro_id), e)}
-                                        className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 shadow-lg"
-                                      >
-                                        <Plus className="h-4 w-4" />
-                                        <span>Nova Parcela</span>
-                                      </motion.button>
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <motion.button
+                                            whileHover={{ scale: 1.05 }}
+                                            whileTap={{ scale: 0.95 }}
+                                            className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 shadow-lg"
+                                          >
+                                            <Plus className="h-4 w-4" />
+                                            <span>Nova Parcela</span>
+                                            <ChevronDown className="h-4 w-4" />
+                                          </motion.button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent>
+                                          <DropdownMenuItem onClick={(e) => handleButtonClick(() => abrirModalCriarParcela(aluno.id, aluno.nome, aluno.registro_financeiro_id, 'plano'), e)}>
+                                            Plano
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={(e) => handleButtonClick(() => abrirModalCriarParcela(aluno.id, aluno.nome, aluno.registro_financeiro_id, 'material'), e)}>
+                                            Material
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={(e) => handleButtonClick(() => abrirModalCriarParcela(aluno.id, aluno.nome, aluno.registro_financeiro_id, 'matrícula'), e)}>
+                                            Matrícula
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={(e) => handleButtonClick(() => abrirModalCriarParcela(aluno.id, aluno.nome, aluno.registro_financeiro_id, 'cancelamento'), e)}>
+                                            Cancelamento
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={(e) => handleButtonClick(() => abrirModalCriarParcela(aluno.id, aluno.nome, aluno.registro_financeiro_id, 'outros'), e)}>
+                                            Outros
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
                                       
 
                                   
@@ -2032,57 +2142,80 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
                                     </div>
                                   </div>
                                   
-                                  <div className="rounded-xl border border-red-200 overflow-hidden shadow-lg bg-white">
-                                    <Table>
-                                      <TableHeader>
-                                        <TableRow className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900">
-                                          <TableHead className="font-semibold text-white">
-                                            <div className="flex items-center space-x-2">
-                                              <CreditCard className="h-4 w-4" />
-                                              <span>Tipo Item</span>
-                                            </div>
-                                          </TableHead>
-                                          <TableHead className="font-semibold text-white">Parcela</TableHead>
-                                          <TableHead className="font-semibold text-white">
-                                            <div className="flex items-center space-x-2">
-                                              <DollarSign className="h-4 w-4" />
-                                              <span>Valor</span>
-                                            </div>
-                                          </TableHead>
-                                          <TableHead className="font-semibold text-white">Forma Pagamento</TableHead>
-                                          <TableHead className="font-semibold text-white">
-                                            <div className="flex items-center space-x-2">
-                                              <FileText className="h-4 w-4" />
-                                              <span>Descrição do Item</span>
-                                            </div>
-                                          </TableHead>
-                                          <TableHead className="font-semibold text-white">
-                                            <div className="flex items-center space-x-2">
-                                              <Calendar className="h-4 w-4" />
-                                              <span>Vencimento</span>
-                                            </div>
-                                          </TableHead>
-                                          <TableHead className="font-semibold text-white">
-                                            <div className="flex items-center space-x-2">
-                                              <Calendar className="h-4 w-4" />
-                                              <span>Pagamento</span>
-                                            </div>
-                                          </TableHead>
-                                          <TableHead className="font-semibold text-white">Status</TableHead>
-                                          <TableHead className="font-semibold text-white">
-                                            <div className="flex items-center space-x-2">
-                                              <FileText className="h-4 w-4" />
-                                              <span>Observações</span>
-                                            </div>
-                                          </TableHead>
-                                          <TableHead className="font-semibold text-white text-center">Ações</TableHead>
-                                        </TableRow>
-                                      </TableHeader>
-                                      <TableBody>
-                                        {aluno.parcelas.length > 0 ? (
-                                          aluno.parcelas
-                                            .sort((a, b) => new Date(a.data_vencimento).getTime() - new Date(b.data_vencimento).getTime())
-                                            .map((parcela, parcelaIndex) => {
+                                  {/* Renderização condicional baseada no status arquivado */}
+                                  {isRegistroArquivado(aluno) ? (
+                                    <div className="rounded-xl border border-gray-200 overflow-hidden shadow-lg bg-gray-50 p-8">
+                                      <div className="text-center">
+                                        <div className="flex justify-center mb-4">
+                                          <Archive className="h-16 w-16 text-gray-400" />
+                                        </div>
+                                        <h3 className="text-lg font-semibold text-gray-600 mb-2">
+                                          Nenhum Registro Financeiro Ativo
+                                        </h3>
+                                        <p className="text-gray-500 mb-6">
+                                          Este aluno não possui registros financeiros ativos no momento.
+                                        </p>
+                                        <motion.button
+                                          whileHover={{ scale: 1.05 }}
+                                          whileTap={{ scale: 0.95 }}
+                                          onClick={() => handleCreatePlanForStudent(aluno)}
+                                          className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 text-white px-6 py-3 rounded-lg transition-all duration-200 flex items-center space-x-2 shadow-lg mx-auto"
+                                        >
+                                          <Plus className="h-5 w-5" />
+                                          <span>Criar Plano de Pagamento</span>
+                                        </motion.button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="rounded-xl border border-red-200 overflow-hidden shadow-lg bg-white">
+                                      <Table>
+                                        <TableHeader>
+                                          <TableRow className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900">
+                                            <TableHead className="font-semibold text-white">
+                                              <div className="flex items-center space-x-2">
+                                                <CreditCard className="h-4 w-4" />
+                                                <span>Tipo Item</span>
+                                              </div>
+                                            </TableHead>
+                                            <TableHead className="font-semibold text-white">Parcela</TableHead>
+                                            <TableHead className="font-semibold text-white">
+                                              <div className="flex items-center space-x-2">
+                                                <DollarSign className="h-4 w-4" />
+                                                <span>Valor</span>
+                                              </div>
+                                            </TableHead>
+                                            <TableHead className="font-semibold text-white">Forma Pagamento</TableHead>
+                                            <TableHead className="font-semibold text-white">
+                                              <div className="flex items-center space-x-2">
+                                                <FileText className="h-4 w-4" />
+                                                <span>Descrição do Item</span>
+                                              </div>
+                                            </TableHead>
+                                            <TableHead className="font-semibold text-white">
+                                              <div className="flex items-center space-x-2">
+                                                <Calendar className="h-4 w-4" />
+                                                <span>Vencimento</span>
+                                              </div>
+                                            </TableHead>
+                                            <TableHead className="font-semibold text-white">
+                                              <div className="flex items-center space-x-2">
+                                                <Calendar className="h-4 w-4" />
+                                                <span>Pagamento</span>
+                                              </div>
+                                            </TableHead>
+                                            <TableHead className="font-semibold text-white">Status</TableHead>
+                                            <TableHead className="font-semibold text-white">
+                                              <div className="flex items-center space-x-2">
+                                                <FileText className="h-4 w-4" />
+                                                <span>Observações</span>
+                                              </div>
+                                            </TableHead>
+                                            <TableHead className="font-semibold text-white text-center">Ações</TableHead>
+                                          </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                          {aluno.parcelas.length > 0 ? (
+                                          aluno.parcelas.map((parcela, parcelaIndex) => {
                                               const formaPagamento = getFormaPagamentoParcela(parcela, aluno);
                                               const isLastParcela = parcelaIndex === aluno.parcelas.length - 1;
                                               
@@ -2508,9 +2641,10 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
                                             </TableCell>
                                           </TableRow>
                                         )}
-                                      </TableBody>
-                                    </Table>
-                                  </div>
+                                        </TableBody>
+                                      </Table>
+                                    </div>
+                                  )}
                                   
                                   {aluno.parcelas.length > 0 && (
                                     <motion.div 
@@ -2658,120 +2792,7 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
         </Card>
       </motion.div>
 
-      {/* Contador de Parcelas */}
-      {filteredAlunos.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-          className="flex justify-center"
-        >
-          <div className="bg-gradient-to-r from-red-600 to-gray-800 rounded-full px-6 py-3 shadow-lg">
-            <span className="text-white font-medium text-sm flex items-center space-x-2">
-              <CreditCard className="h-4 w-4" />
-              <span>{totalParcelasCarregadas} parcelas carregadas</span>
-            </span>
-          </div>
-        </motion.div>
-      )}
 
-      {/* Paginação */}
-      {filteredAlunos.length > STUDENTS_PER_PAGE && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-        >
-          <Card className="shadow-md border-0 bg-gradient-to-r from-gray-50 to-white">
-            <CardContent className="p-6">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                {/* Informações de exibição */}
-                <div className="flex items-center space-x-4 text-gray-600">
-                  <span className="text-sm">
-                    Mostrando {startItem} a {endItem} de {filteredAlunos.length} alunos
-                  </span>
-                </div>
-
-                {/* Controles de paginação */}
-                <div className="flex items-center space-x-2">
-                  {/* Botão Anterior */}
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                    className={`p-2 rounded-lg transition-all duration-200 flex items-center space-x-1 ${
-                      currentPage === 1
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        : 'bg-white text-gray-700 hover:bg-red-50 hover:text-red-600 border border-gray-200 shadow-sm'
-                    }`}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    <span className="text-sm font-medium">Anterior</span>
-                  </motion.button>
-
-                  {/* Números das páginas */}
-                  <div className="flex items-center space-x-1">
-                    {visiblePages.map(page => (
-                      <motion.button
-                        key={page}
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => setCurrentPage(page)}
-                        className={`w-10 h-10 rounded-lg font-medium text-sm transition-all duration-200 ${
-                          currentPage === page
-                            ? 'bg-gradient-to-r from-red-600 to-gray-800 text-white shadow-lg'
-                            : 'bg-white text-gray-700 hover:bg-red-50 hover:text-red-600 border border-gray-200'
-                        }`}
-                      >
-                        {page}
-                      </motion.button>
-                    ))}
-                  </div>
-
-                  {/* Botão Próximo */}
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
-                    className={`p-2 rounded-lg transition-all duration-200 flex items-center space-x-1 ${
-                      currentPage === totalPages
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        : 'bg-white text-gray-700 hover:bg-red-50 hover:text-red-600 border border-gray-200 shadow-sm'
-                    }`}
-                  >
-                    <span className="text-sm font-medium">Próximo</span>
-                    <ChevronRight className="h-4 w-4" />
-                  </motion.button>
-                </div>
-
-                {/* Seletor de itens por página */}
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-600">Itens por página:</span>
-                  <Select
-                    value={STUDENTS_PER_PAGE.toString()}
-                    onValueChange={(value) => {
-                      // Para implementação futura se necessário
-                      console.log('Itens por página:', value);
-                    }}
-                  >
-                    <SelectTrigger className="w-20 h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="5">5</SelectItem>
-                      <SelectItem value="10">10</SelectItem>
-                      <SelectItem value="20">20</SelectItem>
-                      <SelectItem value="50">50</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
 
       {/* Modal Ver Histórico */}
       <HistoricoParcelasModal

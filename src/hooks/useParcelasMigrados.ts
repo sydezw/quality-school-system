@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { calcularProximaDataVencimento, encontrarPrimeiraParcela } from '@/utils/dateCalculators';
+import { getProximoNumeroParcela } from '@/utils/parcelaNumbering';
 
 // Modificar a interface para incluir qual parcela foi marcada
 interface ParcelaPreview {
@@ -42,12 +43,13 @@ export const useParcelasMigrados = () => {
       const parcelaParaMarcar = parcelas?.find(p => p.id === parcelaId);
       if (!parcelaParaMarcar) throw new Error('Parcela não encontrada');
 
-      // Encontrar a última parcela (maior número de parcela)
-      const ultimaParcela = parcelas?.reduce((ultima, atual) => 
+      // Encontrar a última parcela do mesmo tipo (maior número de parcela do mesmo tipo_item)
+      const parcelasMesmoTipo = parcelas?.filter(p => p.tipo_item === parcelaParaMarcar.tipo_item);
+      const ultimaParcelaMesmoTipo = parcelasMesmoTipo?.reduce((ultima, atual) => 
         atual.numero_parcela > ultima.numero_parcela ? atual : ultima
       );
 
-      const isUltimaParcela = ultimaParcela?.id === parcelaId;
+      const isUltimaParcelaMesmoTipo = ultimaParcelaMesmoTipo?.id === parcelaId;
 
       // 3. Marcar a parcela como paga
       const { error: updateError } = await supabase
@@ -61,35 +63,29 @@ export const useParcelasMigrados = () => {
 
       if (updateError) throw updateError;
 
-      // 4. Só criar preview se for a última parcela
-      if (isUltimaParcela) {
-        // 2. Buscar todas as parcelas do registro para criar a prévia
-        const { data: parcelas, error: parcelasError } = await supabase
-          .from('parcelas_alunos')
-          .select('*')
-          .eq('registro_financeiro_id', registroFinanceiroId)
-          .order('numero_parcela', { ascending: true });
-
-        if (parcelasError) throw parcelasError;
-
-        // 3. Buscar a parcela que foi marcada como paga para usar como base
+      // 4. Só criar preview se for a última parcela do mesmo tipo
+      if (isUltimaParcelaMesmoTipo) {
+        // Buscar a parcela que foi marcada como paga para usar como base
         const parcelaPaga = parcelas?.find(p => p.id === parcelaId);
         if (!parcelaPaga) throw new Error('Parcela não encontrada');
 
-        // 4. Encontrar a primeira parcela para calcular a data
-        const primeiraParcela = encontrarPrimeiraParcela(parcelas || []);
-        if (!primeiraParcela) throw new Error('Primeira parcela não encontrada');
+        // Encontrar a primeira parcela do mesmo tipo para calcular a data
+        const primeiraParcelaMesmoTipo = parcelasMesmoTipo?.reduce((primeira, atual) => 
+          atual.numero_parcela < primeira.numero_parcela ? atual : primeira
+        );
+        
+        if (!primeiraParcelaMesmoTipo) throw new Error('Primeira parcela do tipo não encontrada');
 
-        // 5. Calcular próximo número de parcela
-        const proximoNumero = Math.max(...(parcelas?.map(p => p.numero_parcela) || [0])) + 1;
+        // Calcular próximo número de parcela para este tipo específico
+        const proximoNumero = await getProximoNumeroParcela(registroFinanceiroId, parcelaPaga.tipo_item);
 
-        // 6. Calcular próxima data de vencimento
+        // Calcular próxima data de vencimento - Fix: Convert string to Date
         const proximaDataVencimento = calcularProximaDataVencimento(
-          primeiraParcela,
+          new Date(primeiraParcelaMesmoTipo.data_vencimento),
           new Date(parcelaPaga.data_vencimento)
         );
 
-        // 7. Criar prévia da próxima parcela
+        // Criar prévia da próxima parcela
         const preview: ParcelaPreview = {
           numero_parcela: proximoNumero,
           valor: parcelaPaga.valor,
@@ -106,11 +102,16 @@ export const useParcelasMigrados = () => {
 
         toast({
           title: 'Parcela marcada como paga!',
-          description: isUltimaParcela ? 'Deseja criar a próxima parcela?' : 'Parcela atualizada com sucesso!'
+          description: isUltimaParcelaMesmoTipo ? 'Deseja criar a próxima parcela?' : 'Parcela atualizada com sucesso!'
         });
-
-        onSuccess?.();
+      } else {
+        toast({
+          title: 'Parcela marcada como paga!',
+          description: 'Parcela atualizada com sucesso!'
+        });
       }
+
+      onSuccess?.();
     } catch (error) {
       console.error('Erro ao marcar como pago:', error);
       toast({
