@@ -1,6 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
+import { Database } from '@/integrations/supabase/types';
 
-export type TipoItem = 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'outros';
+// Usar o tipo correto do Supabase
+export type TipoItem = Database['public']['Enums']['tipo_item'];
 
 export interface ParcelaData {
   registro_financeiro_id: string;
@@ -25,6 +27,8 @@ export const getProximoNumeroParcela = async (
   tipoItem: TipoItem
 ): Promise<number> => {
   try {
+    console.log('Buscando próximo número para:', { registroFinanceiroId, tipoItem });
+    
     const { data: parcelas, error } = await supabase
       .from('parcelas_alunos')
       .select('numero_parcela')
@@ -33,15 +37,23 @@ export const getProximoNumeroParcela = async (
       .order('numero_parcela', { ascending: false })
       .limit(1);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Erro na query getProximoNumeroParcela:', error);
+      throw error;
+    }
+
+    console.log('Resultado da query:', parcelas);
 
     // Se não há parcelas deste tipo, começa do 1
     if (!parcelas || parcelas.length === 0) {
+      console.log('Nenhuma parcela encontrada, retornando 1');
       return 1;
     }
 
     // Retorna o próximo número
-    return parcelas[0].numero_parcela + 1;
+    const proximoNumero = parcelas[0].numero_parcela + 1;
+    console.log('Próximo número calculado:', proximoNumero);
+    return proximoNumero;
   } catch (error) {
     console.error('Erro ao buscar próximo número de parcela:', error);
     return 1; // Fallback para 1 em caso de erro

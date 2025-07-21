@@ -84,6 +84,7 @@ import { ExcluirRegistroModal } from './modals/ExcluirRegistroModal';
 import FinancialPlanDialog from './FinancialPlanDialog';
 import { PreviewProximaParcela } from './PreviewProximaParcela';
 import { ordenarParcelasPorTipoENumero, criarNovaParcela, getProximoNumeroParcela } from '@/utils/parcelaNumbering';
+import { MultipleParcelasModal } from './MultipleParcelasModal';
 
 interface AlunoFinanceiro {
   id: string;
@@ -182,6 +183,8 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
   const [selectedRegistroId, setSelectedRegistroId] = useState<string | null>(null);
   const [isTornarAtivoModalOpen, setIsTornarAtivoModalOpen] = useState(false);
   const [alunoParaTornarAtivo, setAlunoParaTornarAtivo] = useState<AlunoFinanceiro | null>(null);
+  const [isMultipleParcelasModalOpen, setIsMultipleParcelasModalOpen] = useState(false);
+  const [selectedAlunoForMultipleParcelas, setSelectedAlunoForMultipleParcelas] = useState<AlunoFinanceiro | null>(null);
   
   // Estados para confirmação de exclusão
   const [parcelaParaExcluir, setParcelaParaExcluir] = useState<{id: number, numero: number, valor: number} | null>(null);
@@ -613,6 +616,12 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
     setIsTornarAtivoModalOpen(true);
   }, []);
 
+  // Função para abrir modal de múltiplas parcelas
+  const abrirModalMultiplasParcelas = useCallback((aluno: AlunoFinanceiro) => {
+    setSelectedAlunoForMultipleParcelas(aluno);
+    setIsMultipleParcelasModalOpen(true);
+  }, []);
+
   // Função para abrir confirmação de exclusão
   const abrirConfirmacaoExclusao = useCallback((parcela: ParcelaAluno) => {
     setParcelaParaExcluir({
@@ -779,6 +788,7 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
           ),
           parcelas_alunos (
             id,
+            registro_financeiro_id,
             numero_parcela,
             valor,
             data_vencimento,
@@ -2109,8 +2119,14 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
                                           <DropdownMenuItem onClick={(e) => handleButtonClick(() => abrirModalCriarParcela(aluno.id, aluno.nome, aluno.registro_financeiro_id, 'outros'), e)}>
                                             Outros
                                           </DropdownMenuItem>
+                                          {aluno.migrado === 'sim' && (
+                                            <DropdownMenuItem onClick={(e) => handleButtonClick(() => abrirModalMultiplasParcelas(aluno), e)}>
+                                              Múltiplas Parcelas
+                                            </DropdownMenuItem>
+                                          )}
                                         </DropdownMenuContent>
                                       </DropdownMenu>
+
                                       
 
                                   
@@ -3252,6 +3268,28 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
           )}
         </DialogContent>
       </Dialog>
+
+
+
+      {/* Modal Múltiplas Parcelas */}
+      <MultipleParcelasModal
+        isOpen={isMultipleParcelasModalOpen}
+        onClose={() => {
+          setIsMultipleParcelasModalOpen(false);
+          setSelectedAlunoForMultipleParcelas(null);
+        }}
+        registroFinanceiroId={selectedAlunoForMultipleParcelas?.registro_financeiro_id || ''}
+        idiomaRegistro={selectedAlunoForMultipleParcelas?.parcelas[0]?.idioma_registro || 'Inglês'}
+        onSuccess={() => {
+          setIsMultipleParcelasModalOpen(false);
+          setSelectedAlunoForMultipleParcelas(null);
+          if (onRefresh) {
+            onRefresh();
+          } else {
+            carregarDados();
+          }
+        }}
+      />
 
       {/* Modal Criar Plano de Pagamento */}
       <FinancialPlanDialog
