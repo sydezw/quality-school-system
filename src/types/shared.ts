@@ -8,9 +8,12 @@ export type ParcelaAluno = Tables<'parcelas_alunos'>;
 
 // Interfaces específicas para componentes
 export interface StudentWithRelations extends Student {
+  // Todos os campos já estão incluídos via Student (Tables<'alunos'>)
+  // Adicionando apenas as relações
   turmas?: {
     nome: string;
     idioma: string;
+    nivel?: string; // Incluindo nivel da turma caso seja necessário
   };
   responsaveis?: {
     nome: string;

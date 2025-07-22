@@ -1,8 +1,9 @@
 
 import { FormField, FormMessage } from "@/components/ui/form";
 import StudentSelectField from "./StudentSelectField";
-import { Control } from "react-hook-form";
+import { Control, useWatch } from "react-hook-form";
 import { StudentFormValues } from "@/lib/validators/student";
+import { useEffect } from "react";
 
 interface Class {
   id: string;
@@ -15,12 +16,19 @@ interface AcademicFieldsProps {
   control: Control<StudentFormValues>;
   classes: Class[];
   selectedIdioma: string;
+  setValue?: (name: keyof StudentFormValues, value: any) => void; // Adicionando setValue como prop opcional
 }
 
-const AcademicFields = ({ control, classes, selectedIdioma }: AcademicFieldsProps) => {
+const AcademicFields = ({ control, classes, selectedIdioma, setValue }: AcademicFieldsProps) => {
   console.log('AcademicFields - classes recebidas:', classes);
   console.log('AcademicFields - selectedIdioma:', selectedIdioma);
   
+  // Observar mudanças no campo turma_id para sincronizar o nível
+  const turmaId = useWatch({
+    control,
+    name: "turma_id"
+  });
+
   // Função para normalizar strings removendo acentos e convertendo para minúsculas
   const normalizeString = (str: string) => {
     return str
@@ -44,6 +52,20 @@ const AcademicFields = ({ control, classes, selectedIdioma }: AcademicFieldsProp
 
   // Campo turma sempre habilitado, mas filtrado por idioma quando selecionado
   const turmaDisabled = false;
+
+  // Efeito para sincronizar o nível quando a turma muda
+  useEffect(() => {
+    if (turmaId && turmaId !== 'none' && setValue) {
+      const turmaSelecionada = classes.find(cls => cls.id === turmaId);
+      if (turmaSelecionada && turmaSelecionada.nivel) {
+        console.log('Sincronizando nível da turma:', turmaSelecionada.nivel);
+        setValue('nivel', turmaSelecionada.nivel);
+      }
+    } else if ((!turmaId || turmaId === 'none') && setValue) {
+      // Se não há turma selecionada, limpar o nível (opcional)
+      // setValue('nivel', '');
+    }
+  }, [turmaId, classes, setValue]);
 
   return (
     <>
@@ -99,6 +121,50 @@ const AcademicFields = ({ control, classes, selectedIdioma }: AcademicFieldsProp
             )}
           </div>
         )}
+      />
+      <FormField
+        control={control}
+        name="nivel"
+        render={({ field }) => {
+          const turmaSelecionada = turmaId && turmaId !== 'none' 
+            ? classes.find(cls => cls.id === turmaId) 
+            : null;
+          
+          return (
+            <div>
+              <StudentSelectField
+                value={field.value || 'none'}
+                label="Nível"
+                placeholder={turmaSelecionada ? `Nível da turma: ${turmaSelecionada.nivel}` : "Selecione o nível"}
+                options={[
+                  { value: "none", label: "Sem nível definido" },
+                  { value: "Book 1", label: "Book 1" },
+                  { value: "Book 2", label: "Book 2" },
+                  { value: "Book 3", label: "Book 3" },
+                  { value: "Book 4", label: "Book 4" },
+                  { value: "Book 5", label: "Book 5" },
+                  { value: "Book 6", label: "Book 6" },
+                  { value: "Book 7", label: "Book 7" },
+                  { value: "Book 8", label: "Book 8" },
+                  { value: "Book 9", label: "Book 9" },
+                  { value: "Book 10", label: "Book 10" }
+                ]}
+                onChange={field.onChange}
+                formMessage={<FormMessage />}
+              />
+              {turmaSelecionada && (
+                <div className="text-xs text-blue-600 mt-1">
+                  💡 Nível sincronizado automaticamente com a turma "{turmaSelecionada.nome}". Você pode alterar manualmente se necessário.
+                </div>
+              )}
+              {!turmaSelecionada && (
+                <div className="text-xs text-gray-500 mt-1">
+                  Selecione uma turma para sincronizar o nível automaticamente ou defina manualmente.
+                </div>
+              )}
+            </div>
+          );
+        }}
       />
       <FormField
         control={control}

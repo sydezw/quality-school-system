@@ -89,7 +89,7 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
       estado: '',
       cep: '',
       idioma: '',
-      nivel: '',
+      nivel: 'none',
       turma_id: '',
       responsavel_id: '',
       status: 'Ativo',
@@ -128,7 +128,7 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
         estado: editingStudent.estado || '',
         cep: editingStudent.cep || '',
         idioma: editingStudent.idioma || '',
-        nivel: editingStudent.nivel || '',
+        nivel: editingStudent.nivel || 'none',
         turma_id: editingStudent.turma_id || '',
         responsavel_id: editingStudent.responsavel_id || '',
         status: (editingStudent.status as "Ativo" | "Inativo" | "Suspenso") || 'Ativo',
@@ -152,8 +152,9 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
       setValue('telefone', editingStudent.telefone || '');
       setValue('email', editingStudent.email || '');
       setValue('endereco', editingStudent.endereco || '');
-      setValue('numero', editingStudent.numero_endereco || editingStudent.numero || ''); // Mapear numero_endereco para numero
+      setValue('numero_endereco', editingStudent.numero || ''); // Mapear numero para numero_endereco
       setValue('idioma', editingStudent.idioma || '');
+      setValue('nivel', editingStudent.nivel || 'none'); // Adicionando campo nivel
       setValue('turma_id', editingStudent.turma_id || '');
       setValue('responsavel_id', editingStudent.responsavel_id || '');
       setValue('status', (editingStudent.status as "Ativo" | "Inativo" | "Suspenso" | "Trancado") || 'Ativo');
@@ -170,7 +171,7 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
       const formattedData = {
         ...data,
         cpf: data.cpf ? formatCPF(data.cpf) : '',
-        cep: (data as any).cep ? formatCEP((data as any).cep) : '',
+        cep: data.cep ? formatCEP(data.cep) : '',
         numero_endereco: data.numero_endereco || '' // Ensure the address number is sent
       };
       
@@ -228,6 +229,7 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
           control={form.control}
           classes={classes}
           selectedIdioma={selectedIdioma}
+          setValue={form.setValue}
         />
       )
     },

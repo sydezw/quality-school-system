@@ -18,6 +18,7 @@ interface Class {
   id: string;
   nome: string;
   idioma: string;
+  nivel: string;
   dias_da_semana: string;
   horario: string;
   professor_id: string | null;
@@ -53,6 +54,7 @@ const Classes = () => {
     defaultValues: {
       nome: '',
       idioma: '',
+      nivel: '',
       dias_da_semana: '',
       horario: '',
       professor_id: 'none'
@@ -124,7 +126,7 @@ const Classes = () => {
   const onSubmit = async (data: any) => {
     try {
       // Validar campos obrigatórios
-      if (!data.nome || !data.idioma || !data.dias_da_semana || !data.horario) {
+      if (!data.nome || !data.idioma || !data.nivel || !data.dias_da_semana || !data.horario) {
         toast({
           title: "Erro",
           description: "Por favor, preencha todos os campos obrigatórios.",
@@ -137,6 +139,7 @@ const Classes = () => {
       const submitData = {
         nome: data.nome,
         idioma: data.idioma,
+        nivel: data.nivel,
         dias_da_semana: data.dias_da_semana,
         horario: data.horario,
         professor_id: data.professor_id === 'none' ? null : data.professor_id,
@@ -160,11 +163,11 @@ const Classes = () => {
           .insert({
             nome: submitData.nome,
             idioma: submitData.idioma,
+            nivel: submitData.nivel,
             dias_da_semana: submitData.dias_da_semana,
             horario: submitData.horario,
             professor_id: submitData.professor_id,
-            materiais_ids: submitData.materiais_ids,
-            nivel: 'Book 1' // Adding required nivel field with default value
+            materiais_ids: submitData.materiais_ids
           });
 
         if (error) throw error;
@@ -293,6 +296,7 @@ const Classes = () => {
     reset({
       nome: classItem.nome,
       idioma: classItem.idioma,
+      nivel: classItem.nivel || '',
       dias_da_semana: classItem.dias_da_semana,
       horario: classItem.horario,
       professor_id: classItem.professor_id || 'none'
@@ -308,6 +312,7 @@ const Classes = () => {
     reset({
       nome: '',
       idioma: '',
+      nivel: '',
       dias_da_semana: '',
       horario: '',
       professor_id: 'none'
@@ -420,6 +425,38 @@ const Classes = () => {
                     <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
                       <span className="text-red-500">⚠</span>
                       {errors.idioma.message}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="nivel" className="text-sm font-medium text-gray-700">
+                    Nível *
+                  </Label>
+                  <Select 
+                    onValueChange={(value) => setValue('nivel', value)} 
+                    value={watch('nivel')}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Selecione o nível" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Book 1">📚 Book 1</SelectItem>
+                      <SelectItem value="Book 2">📚 Book 2</SelectItem>
+                      <SelectItem value="Book 3">📚 Book 3</SelectItem>
+                      <SelectItem value="Book 4">📚 Book 4</SelectItem>
+                      <SelectItem value="Book 5">📚 Book 5</SelectItem>
+                      <SelectItem value="Book 6">📚 Book 6</SelectItem>
+                      <SelectItem value="Book 7">📚 Book 7</SelectItem>
+                      <SelectItem value="Book 8">📚 Book 8</SelectItem>
+                      <SelectItem value="Book 9">📚 Book 9</SelectItem>
+                      <SelectItem value="Book 10">📚 Book 10</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.nivel && (
+                    <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
+                      <span className="text-red-500">⚠</span>
+                      {errors.nivel.message}
                     </p>
                   )}
                 </div>
@@ -740,6 +777,7 @@ const Classes = () => {
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>Idioma</TableHead>
+                <TableHead>Nível</TableHead>
                 <TableHead>Materiais</TableHead>
                 <TableHead>Horário</TableHead>
                 <TableHead>Professor</TableHead>
@@ -753,6 +791,11 @@ const Classes = () => {
                   <TableCell>
                     <Badge className={`text-sm ${getIdiomaColor(classItem.idioma)}`}>
                       {classItem.idioma}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="text-sm">
+                      {classItem.nivel || 'Não definido'}
                     </Badge>
                   </TableCell>
                   <TableCell>

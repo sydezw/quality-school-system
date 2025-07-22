@@ -9,7 +9,7 @@ interface Class {
   id: string;
   nome: string;
   idioma: string;
-  nivel: string;
+  nivel?: string; // Opcional, pois não estamos buscando esse campo atualmente
 }
 
 export const useStudents = () => {
@@ -34,6 +34,7 @@ export const useStudents = () => {
           telefone,
           email,
           idioma,
+          nivel,
           status,
           turma_id,
           responsavel_id,
@@ -42,6 +43,10 @@ export const useStudents = () => {
           data_nascimento,
           endereco,
           numero_endereco,
+          bairro,
+          cep,
+          cidade,
+          estado,
           data_cancelamento,
           data_conclusao,
           data_exclusao,
@@ -66,6 +71,7 @@ export const useStudents = () => {
         telefone: item.telefone,
         email: item.email,
         idioma: item.idioma,
+        nivel: item.nivel || 'none', // Campo nivel do aluno, usando 'none' como padrão
         status: item.status,
         turma_id: item.turma_id,
         responsavel_id: item.responsavel_id,
@@ -74,6 +80,10 @@ export const useStudents = () => {
         data_nascimento: item.data_nascimento,
         endereco: item.endereco,
         numero_endereco: item.numero_endereco,
+        bairro: item.bairro, // Campos que estavam faltando
+        cep: item.cep,
+        cidade: item.cidade,
+        estado: item.estado,
         data_cancelamento: item.data_cancelamento,
         data_conclusao: item.data_conclusao,
         data_exclusao: item.data_exclusao,
@@ -129,7 +139,12 @@ export const useStudents = () => {
         telefone: data.telefone || null,
         email: data.email || null,
         endereco: data.endereco || null,
-        numero_endereco: data.numero || null, // Mapear 'numero' para 'numero_endereco'
+        numero_endereco: data.numero_endereco || null,
+        bairro: data.bairro || null,
+        cep: data.cep || null,
+        cidade: data.cidade || null,
+        estado: data.estado || null,
+        nivel: data.nivel && data.nivel !== 'none' ? data.nivel : null,
         status: data.status || 'Ativo'
       };
   
