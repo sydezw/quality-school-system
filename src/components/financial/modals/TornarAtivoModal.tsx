@@ -295,7 +295,7 @@ export const TornarAtivoModal: React.FC<TornarAtivoModalProps> = ({
       const valorMatricula = parseFloat(formData.valor_matricula) || 0;
       const valorMaterial = parseFloat(formData.valor_material) || 0;
 
-      // 4. Atualizar o registro financeiro com os novos dados
+      // 4. Atualizar registro financeiro
       const { error: updateError } = await supabase
         .from('financeiro_alunos')
         .update({
@@ -307,11 +307,11 @@ export const TornarAtivoModal: React.FC<TornarAtivoModalProps> = ({
           desconto_total: descontoCalculado,
           status_geral: 'Pendente',
           data_primeiro_vencimento: dataVencimentoPrimeira?.toISOString().split('T')[0],
-          forma_pagamento_plano: formData.forma_pagamento_plano,
+          forma_pagamento_plano: formData.forma_pagamento_plano || 'boleto',
           numero_parcelas_plano: parseInt(formData.numero_parcelas_plano) || 1,
-          forma_pagamento_material: formData.forma_pagamento_material,
+          forma_pagamento_material: formData.forma_pagamento_material || 'boleto',
           numero_parcelas_material: parseInt(formData.numero_parcelas_material) || 1,
-          forma_pagamento_matricula: formData.forma_pagamento_matricula,
+          forma_pagamento_matricula: formData.forma_pagamento_matricula || 'boleto',
           numero_parcelas_matricula: parseInt(formData.numero_parcelas_matricula) || 1
         })
         .eq('id', registroAtual.id);

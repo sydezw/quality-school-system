@@ -109,6 +109,7 @@ const AcademicFields = ({ control, classes, selectedIdioma }: AcademicFieldsProp
             label="Status"
             options={[
               { value: "Ativo", label: "Ativo" },
+              { value: "Inativo", label: "Inativo" },
               { value: "Trancado", label: "Trancado" },
               { value: "Cancelado", label: "Cancelado" }
             ]}

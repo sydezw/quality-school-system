@@ -44,7 +44,7 @@ export const useDashboardData = () => {
         supabase.from('alunos').select('idioma, status').eq('status', 'Ativo'),
         supabase.from('turmas').select('id'),
         supabase.from('professores').select('id'),
-        supabase.from('contratos').select('id').eq('status', 'Ativo'),
+        supabase.from('contratos').select('id').eq('status_contrato', 'Ativo'),
         supabase.from('financeiro_alunos').select('status_geral, data_primeiro_vencimento, valor_total, created_at'),
         supabase.from('despesas').select('valor, data').gte('data', new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0])
       ]);

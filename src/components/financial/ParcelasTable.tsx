@@ -192,6 +192,29 @@ const ParcelasTable: React.FC = () => {
     setSelectedStudentForPlan(null);
   };
 
+  // Função para calcular o número da parcela por tipo de item
+  const calcularNumeroPorTipo = (parcelaAtual: any, todasParcelas: any[]) => {
+    // Filtrar parcelas do mesmo tipo de item e mesmo registro financeiro
+    const parcelasMesmoTipo = todasParcelas.filter(p => 
+      p.tipo_item === parcelaAtual.tipo_item && 
+      p.registro_financeiro_id === parcelaAtual.registro_financeiro_id
+    );
+    
+    // Ordenar por data de vencimento e depois por ID
+    const parcelasOrdenadas = parcelasMesmoTipo.sort((a, b) => {
+      const dataA = new Date(a.data_vencimento);
+      const dataB = new Date(b.data_vencimento);
+      if (dataA.getTime() !== dataB.getTime()) {
+        return dataA.getTime() - dataB.getTime();
+      }
+      return a.id - b.id;
+    });
+    
+    // Encontrar a posição da parcela atual na lista ordenada
+    const posicao = parcelasOrdenadas.findIndex(p => p.id === parcelaAtual.id);
+    return posicao + 1; // +1 porque queremos começar de 1, não de 0
+  };
+
   // Filtragem local atualizada para múltipla seleção + filtro de data automático
   const parcelasFiltradas = useMemo(() => {
     const hoje = new Date();
@@ -861,7 +884,7 @@ const ParcelasTable: React.FC = () => {
                                 </span>
                               </TableCell>
                               <TableCell className="font-medium text-base">
-                                {parcela.numero_parcela}ª
+                                {calcularNumeroPorTipo(parcela, todasParcelas)}ª
                               </TableCell>
                               <TableCell className="font-bold text-base text-green-700">
                                 R$ {parcela.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}

@@ -73,7 +73,7 @@ const PlanStudentsModal = ({ planId, planName, isOpen, onClose }: PlanStudentsMo
           )
         `)
         .eq('plano_id', planId)
-        .eq('status', 'Ativo');
+        .eq('status_contrato', 'Ativo');
 
       if (error) {
         throw error;

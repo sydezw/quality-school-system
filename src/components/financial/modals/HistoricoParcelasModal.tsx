@@ -100,6 +100,20 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
     }
   }, []);
 
+  // Função para calcular o número da parcela por tipo de item
+  const calcularNumeroPorTipo = useCallback((parcelas: ParcelaHistorico[], parcelaAtual: ParcelaHistorico) => {
+    // Filtrar parcelas do mesmo tipo e ordenar por numero_parcela
+    const parcelasMesmoTipo = parcelas
+      .filter(p => p.tipo_item === parcelaAtual.tipo_item)
+      .sort((a, b) => a.numero_parcela - b.numero_parcela);
+    
+    // Encontrar a posição da parcela atual na lista ordenada
+    const indice = parcelasMesmoTipo.findIndex(p => p.id === parcelaAtual.id);
+    
+    // Retornar a posição + 1 (numeração começa em 1)
+    return indice + 1;
+  }, []);
+
   // Carregar histórico de parcelas
   const carregarHistoricoParcelas = useCallback(async (alunoId: string) => {
     try {
@@ -414,7 +428,7 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                                         <span className="capitalize font-medium text-base">{parcela.tipo_item}</span>
                                       </div>
                                     </TableCell>
-                                    <TableCell className="py-4 text-base font-semibold">{parcela.numero_parcela}</TableCell>
+                                    <TableCell className="py-4 text-base font-semibold">{calcularNumeroPorTipo(parcelasHistorico, parcela)}</TableCell>
                                     <TableCell className="font-bold py-4 text-base text-green-700">
                                       {formatCurrency(parcela.valor)}
                                     </TableCell>

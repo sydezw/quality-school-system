@@ -123,6 +123,29 @@ const FinancialReportsTable = () => {
   const [variacaoSaldo, setVariacaoSaldo] = useState<VariacaoSaldo[]>([]);
   const [receitaPorIdioma, setReceitaPorIdioma] = useState<ReceitaPorIdioma[]>([]);
 
+  // Função para calcular o número da parcela por tipo de item
+  const calcularNumeroPorTipo = (parcelaAtual: ParcelaDetalhada, todasParcelas: ParcelaDetalhada[]) => {
+    // Filtrar parcelas do mesmo tipo de item e mesmo registro financeiro
+    const parcelasMesmoTipo = todasParcelas.filter(p => 
+      p.tipo_item === parcelaAtual.tipo_item && 
+      p.registro_financeiro_id === parcelaAtual.registro_financeiro_id
+    );
+    
+    // Ordenar por data de vencimento e depois por ID
+    const parcelasOrdenadas = parcelasMesmoTipo.sort((a, b) => {
+      const dataA = new Date(a.data_vencimento);
+      const dataB = new Date(b.data_vencimento);
+      if (dataA.getTime() !== dataB.getTime()) {
+        return dataA.getTime() - dataB.getTime();
+      }
+      return a.id - b.id;
+    });
+    
+    // Encontrar a posição da parcela atual na lista ordenada
+    const posicao = parcelasOrdenadas.findIndex(p => p.id === parcelaAtual.id);
+    return posicao + 1; // +1 porque queremos começar de 1, não de 0
+  };
+
   // Função para buscar dados das parcelas
   const buscarDadosRegistros = async () => {
     try {
@@ -1262,7 +1285,7 @@ const FinancialReportsTable = () => {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">
-                          {parcela.numero_parcela}
+                          {calcularNumeroPorTipo(parcela, parcelas)}
                         </Badge>
                       </TableCell>
                       <TableCell className="font-bold">

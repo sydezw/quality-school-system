@@ -1024,7 +1024,19 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
     }
   }, [toast, carregarDados, onRefresh]);
 
-
+  // Função para calcular o número da parcela por tipo de item
+  const calcularNumeroPorTipo = useCallback((parcelas: any[], parcelaAtual: any) => {
+    // Filtrar parcelas do mesmo tipo e ordenar por numero_parcela
+    const parcelasMesmoTipo = parcelas
+      .filter(p => p.tipo_item === parcelaAtual.tipo_item)
+      .sort((a, b) => a.numero_parcela - b.numero_parcela);
+    
+    // Encontrar a posição da parcela atual na lista ordenada
+    const indice = parcelasMesmoTipo.findIndex(p => p.id === parcelaAtual.id);
+    
+    // Retornar a posição + 1 (numeração começa em 1)
+    return indice + 1;
+  }, []);
 
   // Carregar dados ao montar o componente
   useEffect(() => {
@@ -1920,113 +1932,117 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
                               </div>
                               <div className="flex items-center space-x-2">
                                 <span>{aluno.nome}</span>
-                                {isRegistroArquivado(aluno) && (
-                                  <div className="flex items-center space-x-1 bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs">
-                                    <Archive className="h-3 w-3" />
-                                    <span>Arquivado</span>
-                                  </div>
-                                )}
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell className="text-base py-4">
-                      <span className="font-semibold text-gray-800">
-                        {tipoRegistro === 'migrados' 
-                          ? formatCurrency(calcularTotalPago(aluno))
-                          : formatCurrency((aluno.valor_plano || 0) + (aluno.valor_material || 0) + (aluno.valor_matricula || 0) - (aluno.desconto_total || 0))
-                        }
-                      </span>
-                    </TableCell>
-                          <TableCell className="py-4">
-                            <div className="flex gap-1 flex-wrap">
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <motion.div whileHover={{ scale: 1.05 }}>
-                                    <Badge className="bg-green-100 text-green-800 text-xs border border-green-200 flex items-center gap-1 px-1 py-0.5 min-w-[30px] justify-center cursor-help">
-                                      <span className="font-semibold">{aluno.parcelas.filter(p => p.status_pagamento === 'pago').length}</span>
-                                      <CheckCircle className="h-5 w-5" />
-                                    </Badge>
-                                  </motion.div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Parcelas Pagas</p>
-                                </TooltipContent>
-                              </Tooltip>
-                              
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <motion.div whileHover={{ scale: 1.05 }}>
-                                    <Badge className="bg-red-100 text-red-800 text-xs border border-red-200 flex items-center gap-1 px-1 py-0.5 min-w-[30px] justify-center cursor-help">
-                                      <span className="font-semibold">{aluno.parcelas.filter(p => p.status_pagamento === 'vencido').length}</span>
-                                      <AlertTriangle className="h-5 w-5" />
-                                    </Badge>
-                                  </motion.div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Parcelas Vencidas</p>
-                                </TooltipContent>
-                              </Tooltip>
-                              
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <motion.div whileHover={{ scale: 1.05 }}>
-                                    <Badge className="bg-yellow-100 text-yellow-800 text-xs border border-yellow-200 flex items-center gap-1 px-1 py-0.5 min-w-[30px] justify-center cursor-help">
-                                      <span className="font-semibold">{aluno.parcelas.filter(p => p.status_pagamento === 'pendente').length}</span>
-                                      <Clock className="h-5 w-5" />
-                                    </Badge>
-                                  </motion.div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Parcelas Pendentes</p>
-                                </TooltipContent>
-                              </Tooltip>
-                              
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <motion.div whileHover={{ scale: 1.05 }}>
-                                    <Badge className="bg-gray-100 text-gray-800 text-xs border border-gray-200 flex items-center gap-1 px-1 py-0.5 min-w-[30px] justify-center cursor-help">
-                                      <span className="font-semibold">{aluno.parcelas.filter(p => p.status_pagamento === 'cancelado').length}</span>
-                                      <XCircle className="h-5 w-5" />
-                                    </Badge>
-                                  </motion.div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Parcelas Canceladas</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-base py-4">
-                            <span className="font-semibold text-gray-600">{formatDate(aluno.data_primeiro_vencimento)}</span>
-                          </TableCell>
-                          {/* Remover barra de progresso apenas para migrados */}
-                    {tipoRegistro === 'ativos' && (
-                      <TableCell className="text-base py-4">
-                        <div className="flex flex-col gap-2 min-w-[120px]">
-                          {(() => {
-                            const progresso = calcularProgressoTotal(aluno);
-                            return (
-                              <>
-                                <div className="flex items-center justify-between text-sm">
-                                  <span className="font-semibold text-gray-700">
-                                    {progresso.pagas}/{progresso.total}
-                                  </span>
-                                  <span className="text-xs text-gray-500">
-                                    {progresso.percentual}%
-                                  </span>
+                          {isRegistroArquivado(aluno) ? (
+                            <TableCell colSpan={tipoRegistro === 'ativos' ? 4 : 3} className="py-4">
+                              <div className="flex items-center justify-center bg-gray-100 text-gray-600 px-6 py-6 rounded-lg">
+                                <Archive className="h-6 w-6 mr-2" />
+                                <span className="text-lg font-semibold">Arquivado</span>
+                              </div>
+                            </TableCell>
+                          ) : (
+                            <>
+                              <TableCell className="text-base py-4">
+                                <span className="font-semibold text-gray-800">
+                                  {tipoRegistro === 'migrados' 
+                                    ? formatCurrency(calcularTotalPago(aluno))
+                                    : formatCurrency((aluno.valor_plano || 0) + (aluno.valor_material || 0) + (aluno.valor_matricula || 0) - (aluno.desconto_total || 0))
+                                  }
+                                </span>
+                              </TableCell>
+                              <TableCell className="py-4">
+                                <div className="flex gap-1 flex-wrap">
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <motion.div whileHover={{ scale: 1.05 }}>
+                                        <Badge className="bg-green-100 text-green-800 text-xs border border-green-200 flex items-center gap-1 px-1 py-0.5 min-w-[30px] justify-center cursor-help">
+                                          <span className="font-semibold">{aluno.parcelas.filter(p => p.status_pagamento === 'pago').length}</span>
+                                          <CheckCircle className="h-5 w-5" />
+                                        </Badge>
+                                      </motion.div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Parcelas Pagas</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                  
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <motion.div whileHover={{ scale: 1.05 }}>
+                                        <Badge className="bg-red-100 text-red-800 text-xs border border-red-200 flex items-center gap-1 px-1 py-0.5 min-w-[30px] justify-center cursor-help">
+                                          <span className="font-semibold">{aluno.parcelas.filter(p => p.status_pagamento === 'vencido').length}</span>
+                                          <AlertTriangle className="h-5 w-5" />
+                                        </Badge>
+                                      </motion.div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Parcelas Vencidas</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                  
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <motion.div whileHover={{ scale: 1.05 }}>
+                                        <Badge className="bg-yellow-100 text-yellow-800 text-xs border border-yellow-200 flex items-center gap-1 px-1 py-0.5 min-w-[30px] justify-center cursor-help">
+                                          <span className="font-semibold">{aluno.parcelas.filter(p => p.status_pagamento === 'pendente').length}</span>
+                                          <Clock className="h-5 w-5" />
+                                        </Badge>
+                                      </motion.div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Parcelas Pendentes</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                  
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <motion.div whileHover={{ scale: 1.05 }}>
+                                        <Badge className="bg-gray-100 text-gray-800 text-xs border border-gray-200 flex items-center gap-1 px-1 py-0.5 min-w-[30px] justify-center cursor-help">
+                                          <span className="font-semibold">{aluno.parcelas.filter(p => p.status_pagamento === 'cancelado').length}</span>
+                                          <XCircle className="h-5 w-5" />
+                                        </Badge>
+                                      </motion.div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Parcelas Canceladas</p>
+                                    </TooltipContent>
+                                  </Tooltip>
                                 </div>
-                                <div className="w-full bg-gray-200 rounded-full h-5">
-                                  <div 
-                                    className="h-5 rounded-full transition-all duration-300 bg-gradient-to-r from-red-600 to-gray-800"
-                                    style={{ width: `${progresso.percentual}%` }}
-                                  ></div>
-                                </div>
-                              </>
-                            );
-                          })()}
-                        </div>
-                      </TableCell>
-                    )}
+                              </TableCell>
+                              <TableCell className="text-base py-4">
+                                <span className="font-semibold text-gray-600">{formatDate(aluno.data_primeiro_vencimento)}</span>
+                              </TableCell>
+                              {tipoRegistro === 'ativos' && (
+                                <TableCell className="text-base py-4">
+                                  <div className="flex flex-col gap-2 min-w-[120px]">
+                                    {(() => {
+                                      const progresso = calcularProgressoTotal(aluno);
+                                      return (
+                                        <>
+                                          <div className="flex items-center justify-between text-sm">
+                                            <span className="font-semibold text-gray-700">
+                                              {progresso.pagas}/{progresso.total}
+                                            </span>
+                                            <span className="text-xs text-gray-500">
+                                              {progresso.percentual}%
+                                            </span>
+                                          </div>
+                                          <div className="w-full bg-gray-200 rounded-full h-5">
+                                            <div 
+                                              className="h-5 rounded-full transition-all duration-300 bg-gradient-to-r from-red-600 to-gray-800"
+                                              style={{ width: `${progresso.percentual}%` }}
+                                            ></div>
+                                          </div>
+                                        </>
+                                      );
+                                    })()}
+                                  </div>
+                                </TableCell>
+                              )}
+                            </>
+                          )}
                         </motion.tr>
                         
                         {/* Linha expandida com animação */}
@@ -2257,7 +2273,7 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ alunosFinance
                                                         <span className="capitalize font-medium text-base">{parcela.tipo_item}</span>
                                                       </div>
                                                     </TableCell>
-                                                    <TableCell className="py-4 text-base font-semibold">{parcela.numero_parcela}</TableCell>
+                                                    <TableCell className="py-4 text-base font-semibold">{calcularNumeroPorTipo(aluno.parcelas, parcela)}</TableCell>
                                                     <TableCell className="font-bold py-4 text-base text-green-700">{formatCurrency(parcela.valor)}</TableCell>
                                                     <TableCell className="py-4 text-base capitalize">
                                                       {formaPagamento}

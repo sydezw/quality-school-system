@@ -19,11 +19,13 @@ interface Plan {
   valor_total: number | null;
   valor_por_aula: number | null;
   horario_por_aula: number | null;
-  permite_cancelamento: boolean;
-  permite_parcelamento: boolean;
+  permite_cancelamento: boolean | null;
+  permite_parcelamento: boolean | null;
   observacoes: string | null;
-  ativo: boolean;
-  idioma: 'Inglês' | 'Japonês';
+  ativo: boolean | null;
+  idioma: 'Inglês' | 'Japonês' | 'Inglês/Japonês';
+  created_at: string;
+  updated_at: string;
 }
 
 interface PlanFormProps {
@@ -39,7 +41,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
     descricao: '',
     numero_aulas: '',
     frequencia_aulas: 'semanal',
-    idioma: 'Inglês' as 'Inglês' | 'Japonês',
+    idioma: 'Inglês' as 'Inglês' | 'Japonês' | 'Inglês/Japonês',
     carga_horaria_total: '',
     valor_total: '',
     valor_por_aula: '',
@@ -73,6 +75,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
   useEffect(() => {
     if (plan) {
       const { horas, minutos } = convertFromDecimal(plan.horario_por_aula || 0);
+      
       setFormData({
         nome: plan.nome,
         descricao: plan.descricao,
@@ -86,10 +89,10 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
         horas_por_aula: horas,
         minutos_por_aula: minutos,
         horario_por_aula: plan.horario_por_aula?.toString() || '',
-        permite_cancelamento: plan.permite_cancelamento,
-        permite_parcelamento: plan.permite_parcelamento,
+        permite_cancelamento: plan.permite_cancelamento ?? false,
+        permite_parcelamento: plan.permite_parcelamento ?? false,
         observacoes: plan.observacoes || '',
-        ativo: plan.ativo
+        ativo: plan.ativo ?? true
       });
     }
   }, [plan]);
@@ -113,20 +116,44 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
 
   useEffect(() => {
     const valorTotal = parseFloat(formData.valor_total) || 0;
-    const numeroAulas = parseInt(formData.numero_aulas) || 0;
-    const horarioPorAula = parseFloat(formData.horario_por_aula) || 0;
+    const numeroAulas = parseInt(formData.numero_aulas.toString()) || 0;
+    const horarioPorAula = convertToDecimal(formData.horas_por_aula, formData.minutos_por_aula);
 
     if (valorTotal > 0 && numeroAulas > 0) {
-      const valorPorAula = (valorTotal / numeroAulas).toFixed(2);
-      if (formData.valor_por_aula !== valorPorAula) {
-        setFormData(prev => ({ ...prev, valor_por_aula: valorPorAula }));
-      }
-    }
+      const valorPorAula = valorTotal / numeroAulas;
+      const cargaHorariaTotal = numeroAulas * horarioPorAula;
 
-    if (numeroAulas > 0 && horarioPorAula > 0) {
-      const cargaHorariaTotal = (numeroAulas * horarioPorAula).toFixed(1);
-      if (formData.carga_horaria_total !== cargaHorariaTotal) {
-        setFormData(prev => ({ ...prev, carga_horaria_total: cargaHorariaTotal }));
+      const planData = {
+        nome: formData.nome,
+        descricao: formData.descricao,
+        numero_aulas: numeroAulas,
+        frequencia_aulas: formData.frequencia_aulas,
+        idioma: formData.idioma,
+        carga_horaria_total: parseFloat(cargaHorariaTotal.toFixed(2)),
+        valor_total: parseFloat(valorTotal.toFixed(2)),
+        valor_por_aula: parseFloat(valorPorAula.toFixed(2)),
+        horario_por_aula: parseFloat(horarioPorAula.toFixed(2)),
+        permite_cancelamento: formData.permite_cancelamento,
+        permite_parcelamento: formData.permite_parcelamento,
+        observacoes: formData.observacoes || null,
+        ativo: formData.ativo
+      };
+
+      // DEBUG: Vamos ver exatamente o que está sendo enviado
+      console.log('=== DADOS SENDO ENVIADOS ===');
+      console.log('planData:', planData);
+      console.log('Tipos dos campos:');
+      Object.keys(planData).forEach(key => {
+        console.log(`${key}: ${typeof planData[key]} = ${planData[key]}`);
+      });
+      console.log('=============================');
+
+      if (formData.valor_por_aula !== valorPorAula.toFixed(2)) {
+        setFormData(prev => ({ ...prev, valor_por_aula: valorPorAula.toFixed(2) }));
+      }
+
+      if (formData.carga_horaria_total !== cargaHorariaTotal.toFixed(2)) {
+        setFormData(prev => ({ ...prev, carga_horaria_total: cargaHorariaTotal.toFixed(2) }));
       }
     }
   }, [formData.valor_total, formData.numero_aulas, formData.horario_por_aula]);
@@ -136,24 +163,55 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
     setLoading(true);
 
     try {
-      const valorTotal = parseFloat(formData.valor_total) || 0;
-      const numeroAulas = parseInt(formData.numero_aulas.toString()) || 0;
-      const horarioPorAula = convertToDecimal(formData.horas_por_aula, formData.minutos_por_aula);
-
-      if (valorTotal <= 0) {
+      // Validações específicas para cada campo obrigatório
+      if (!formData.nome.trim()) {
         toast({
-          title: "Erro de Validação",
-          description: "Valor Total deve ser maior que zero.",
+          title: "Campo Obrigatório",
+          description: "O campo 'Nome do Plano' é obrigatório.",
           variant: "destructive",
         });
         setLoading(false);
         return;
       }
 
-      if (numeroAulas <= 0) {
+      if (!formData.descricao.trim()) {
         toast({
-          title: "Erro de Validação",
-          description: "Número de Aulas deve ser maior que zero.",
+          title: "Campo Obrigatório",
+          description: "O campo 'Descrição' é obrigatório.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      if (!formData.idioma) {
+        toast({
+          title: "Campo Obrigatório",
+          description: "O campo 'Idioma' é obrigatório.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      if (!formData.frequencia_aulas) {
+        toast({
+          title: "Campo Obrigatório",
+          description: "O campo 'Frequência das Aulas' é obrigatório.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      const valorTotal = parseFloat(formData.valor_total) || 0;
+      const numeroAulas = parseInt(formData.numero_aulas.toString()) || 0;
+      const horarioPorAula = convertToDecimal(formData.horas_por_aula, formData.minutos_por_aula);
+
+      if (!formData.numero_aulas || numeroAulas <= 0) {
+        toast({
+          title: "Campo Obrigatório",
+          description: "O campo 'Número de Aulas' é obrigatório e deve ser maior que zero.",
           variant: "destructive",
         });
         setLoading(false);
@@ -162,8 +220,18 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
 
       if (horarioPorAula <= 0) {
         toast({
-          title: "Erro de Validação",
-          description: "Duração da aula deve ser maior que zero.",
+          title: "Campo Obrigatório",
+          description: "O campo 'Duração da Aula' é obrigatório e deve ser maior que zero.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      if (!formData.valor_total || valorTotal <= 0) {
+        toast({
+          title: "Campo Obrigatório",
+          description: "O campo 'Valor Total' é obrigatório e deve ser maior que zero.",
           variant: "destructive",
         });
         setLoading(false);
@@ -177,9 +245,9 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
         nome: formData.nome,
         descricao: formData.descricao,
         numero_aulas: numeroAulas,
-        frequencia_aulas: JSON.stringify(formData.frequencia_aulas),
+        frequencia_aulas: formData.frequencia_aulas,
         idioma: formData.idioma,
-        carga_horaria_total: cargaHorariaTotal,
+        carga_horaria_total: Math.round(cargaHorariaTotal),
         valor_total: valorTotal,
         valor_por_aula: valorPorAula,
         horario_por_aula: horarioPorAula,
@@ -188,7 +256,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
         observacoes: formData.observacoes || null,
         ativo: formData.ativo
       };
-  
+
       let error;
       if (plan) {
         const { error: updateError } = await supabase
@@ -202,16 +270,16 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
           .insert([planData]);
         error = insertError;
       }
-  
+
       if (error) {
         throw error;
       }
-  
+
       toast({
         title: "Sucesso!",
         description: plan ? "Plano atualizado com sucesso." : "Plano criado com sucesso.",
       });
-  
+
       onSuccess();
     } catch (error) {
       console.error('Erro ao salvar plano:', error);
@@ -233,7 +301,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="nome">Nome do Plano</Label>
+          <Label htmlFor="nome">Nome do Plano *</Label>
           <Input
             id="nome"
             type="text"
@@ -244,14 +312,15 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
         </div>
 
         <div>
-          <Label htmlFor="idioma">Idioma</Label>
-          <Select value={formData.idioma} onValueChange={(value) => handleInputChange('idioma', value)}>
+          <Label htmlFor="idioma">Idioma *</Label>
+          <Select value={formData.idioma} onValueChange={(value) => handleInputChange('idioma', value)} required>
             <SelectTrigger>
               <SelectValue placeholder="Selecione o idioma" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="Inglês">Inglês</SelectItem>
               <SelectItem value="Japonês">Japonês</SelectItem>
+              <SelectItem value="Inglês/Japonês">Inglês/Japonês</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -259,7 +328,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="numero_aulas">Número de Aulas</Label>
+          <Label htmlFor="numero_aulas">Número de Aulas *</Label>
           <Input
             id="numero_aulas"
             type="number"
@@ -272,7 +341,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
         </div>
 
         <div>
-          <Label>Duração da Aula</Label>
+          <Label>Duração da Aula *</Label>
           
           <div className="flex gap-2 mt-1 mb-2">
             <label className={`flex items-center space-x-1 text-xs px-2 py-1 rounded cursor-pointer transition-colors ${
@@ -382,20 +451,21 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
       </div>
 
       <div>
-        <Label htmlFor="descricao">Descrição</Label>
+        <Label htmlFor="descricao">Descrição *</Label>
         <Textarea
           id="descricao"
           value={formData.descricao}
           onChange={(e) => handleInputChange('descricao', e.target.value)}
           rows={3}
           placeholder="Descreva o plano de pagamento..."
+          required
         />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="frequencia_aulas">Frequência das Aulas</Label>
-          <Select value={formData.frequencia_aulas} onValueChange={(value) => handleInputChange('frequencia_aulas', value)}>
+          <Label htmlFor="frequencia_aulas">Frequência das Aulas *</Label>
+          <Select value={formData.frequencia_aulas} onValueChange={(value) => handleInputChange('frequencia_aulas', value)} required>
             <SelectTrigger>
               <SelectValue placeholder="Selecione a frequência" />
             </SelectTrigger>
@@ -403,6 +473,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
               <SelectItem value="semanal">Semanal</SelectItem>
               <SelectItem value="quinzenal">Quinzenal</SelectItem>
               <SelectItem value="mensal">Mensal</SelectItem>
+              <SelectItem value="intensivo">Intensivo</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -424,7 +495,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="valor_total">Valor Total (R$)</Label>
+          <Label htmlFor="valor_total">Valor Total (R$) *</Label>
           <Input
             id="valor_total"
             type="number"
@@ -433,6 +504,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
             value={formData.valor_total || ''}
             onChange={(e) => handleInputChange('valor_total', parseFloat(e.target.value) || null)}
             placeholder="0,00"
+            required
           />
         </div>
 

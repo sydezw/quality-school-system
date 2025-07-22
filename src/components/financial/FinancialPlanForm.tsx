@@ -15,6 +15,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { cn } from '@/lib/utils';
 import DatePicker from '@/components/shared/DatePicker';
 import { format } from 'date-fns';
+import { criarParcelasComNumeracaoCorreta } from '@/utils/parcelaNumbering';
 
 // HELPER FUNCTION: Formatação de valores decimais para padrão brasileiro
 const formatarDecimalBR = (valor: number): string => {
@@ -347,12 +348,90 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
         throw financeiroError;
       }
       
-      console.log('Plano criado com sucesso!');
+      console.log('Plano criado com sucesso! Criando parcelas...');
       
-      toast({
-        title: "Plano Criado",
-        description: "Plano financeiro criado com sucesso!",
-      });
+      // Criar parcelas automaticamente usando a mesma lógica do TornarAtivoModal
+      if (financeiroData?.id) {
+        const dataBase = new Date(data.data_vencimento_primeira);
+        
+        // Preparar dados das parcelas seguindo a mesma estrutura do TornarAtivoModal
+        const parcelasData: any = {};
+        
+        // Adicionar parcelas do plano se houver valor
+        if (valorAPagar > 0) {
+          parcelasData.plano = {
+            valor: valorAPagar,
+            numParcelas: parseInt(data.numero_parcelas_plano) || 1,
+            dataBase,
+            formaPagamento: data.forma_pagamento_plano,
+            descricao: 'Plano de aulas'
+          };
+        }
+        
+        // Adicionar parcelas de matrícula se houver valor
+        if (valorMatricula > 0) {
+          parcelasData.matricula = {
+            valor: valorMatricula,
+            numParcelas: parseInt(data.numero_parcelas_matricula) || 1,
+            dataBase,
+            formaPagamento: data.forma_pagamento_matricula,
+            descricao: 'Taxa de matrícula'
+          };
+        }
+        
+        // Adicionar parcelas de material se houver valor
+        if (valorMaterial > 0) {
+          parcelasData.material = {
+            valor: valorMaterial,
+            numParcelas: parseInt(data.numero_parcelas_material) || 1,
+            dataBase,
+            formaPagamento: data.forma_pagamento_material,
+            descricao: 'Material didático'
+          };
+        }
+        
+        // Criar as parcelas com numeração correta
+        const parcelas = await criarParcelasComNumeracaoCorreta(
+          financeiroData.id,
+          parcelasData,
+          'Inglês' // Idioma padrão, pode ser ajustado conforme necessário
+        );
+        
+        console.log('Parcelas criadas:', parcelas);
+        
+        // Inserir as parcelas no banco
+        if (parcelas.length > 0) {
+          const { error: parcelasError } = await supabase
+            .from('parcelas_alunos')
+            .insert(parcelas);
+          
+          if (parcelasError) {
+            console.error('Erro ao inserir parcelas:', parcelasError);
+            // Não falhar completamente, apenas avisar
+            toast({
+              title: "Plano Criado com Aviso",
+              description: "Plano financeiro criado, mas houve erro ao criar as parcelas. Você pode criá-las manualmente.",
+              variant: "destructive",
+            });
+          } else {
+            console.log('Parcelas inseridas com sucesso!');
+            toast({
+              title: "Plano Criado",
+              description: "Plano financeiro e parcelas criados com sucesso!",
+            });
+          }
+        } else {
+          toast({
+            title: "Plano Criado",
+            description: "Plano financeiro criado com sucesso!",
+          });
+        }
+      } else {
+        toast({
+          title: "Plano Criado",
+          description: "Plano financeiro criado com sucesso!",
+        });
+      }
       
       reset();
       onSuccess();

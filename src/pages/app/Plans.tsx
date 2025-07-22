@@ -23,11 +23,11 @@ interface Plan {
   carga_horaria_total: number | null;
   valor_total: number | null;
   valor_por_aula: number | null;
-  permite_cancelamento: boolean;
-  permite_parcelamento: boolean;
+  permite_cancelamento: boolean | null;
+  permite_parcelamento: boolean | null;
   observacoes: string | null;
-  ativo: boolean;
-  idioma: 'Inglês' | 'Japonês'; // Mudança aqui também
+  ativo: boolean | null;
+  idioma: 'Inglês' | 'Japonês' | 'Inglês/Japonês';
   created_at: string;
   updated_at: string;
 }
@@ -104,7 +104,18 @@ const Plans = () => {
         console.log('First plan frequencia_aulas:', plansData[0].frequencia_aulas, typeof plansData[0].frequencia_aulas);
       }
       
-      setPlans(plansData);
+      // Converter e normalizar dados para garantir compatibilidade de tipos
+      const typedPlansData: Plan[] = plansData.map(plan => ({
+        ...plan,
+        frequencia_aulas: String(plan.frequencia_aulas || ''),
+        numero_aulas: Number(plan.numero_aulas) || 0,
+        permite_cancelamento: plan.permite_cancelamento ?? true,
+        permite_parcelamento: plan.permite_parcelamento ?? true,
+        ativo: plan.ativo ?? true,
+        idioma: plan.idioma as 'Inglês' | 'Japonês' | 'Inglês/Japonês'
+      }));
+      
+      setPlans(typedPlansData);
       
       // Buscar contagem de alunos para cada plano
       if (plansData.length > 0) {
@@ -166,6 +177,35 @@ const Plans = () => {
     if (!deletingPlan) return;
 
     try {
+      // Verificar se há registros financeiros vinculados ao plano
+      const { data: financialRecords, error: financialError } = await supabase
+        .from('financeiro_alunos')
+        .select('id')
+        .eq('plano_id', deletingPlan.id)
+        .limit(1);
+
+      if (financialError) {
+        console.error('Erro ao verificar registros financeiros:', financialError);
+        toast({
+          title: 'Erro',
+          description: 'Erro ao verificar vinculações do plano.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Se há registros financeiros, impedir a exclusão
+      if (financialRecords && financialRecords.length > 0) {
+        toast({
+          title: 'Exclusão não permitida',
+          description: `Não é possível excluir o plano "${deletingPlan.nome}" pois há alunos vinculados a ele. Para excluir este plano, primeiro remova todos os alunos associados.`,
+          variant: 'destructive',
+        });
+        setDeletingPlan(null);
+        return;
+      }
+
+      // Se não há registros financeiros, prosseguir com a exclusão
       const { error } = await supabase
         .from('planos')
         .delete()
@@ -247,6 +287,7 @@ const Plans = () => {
             <SelectItem value="todos">Todos os idiomas</SelectItem>
             <SelectItem value="Inglês">Inglês</SelectItem>
             <SelectItem value="Japonês">Japonês</SelectItem>
+            <SelectItem value="Inglês/Japonês">Inglês/Japonês</SelectItem>
           </SelectContent>
         </Select>
       </div>
