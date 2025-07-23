@@ -113,7 +113,7 @@ export const ExcluirRegistroModal: React.FC<ExcluirRegistroModalProps> = ({
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-3 text-2xl">
-            <div className="bg-gradient-to-r from-red-600 to-gray-800 rounded-full p-2">
+            <div className="rounded-full p-2" style={{background: 'linear-gradient(to right, #D90429, #1F2937)'}}>
               <Trash2 className="h-6 w-6 text-white" />
             </div>
             <span>Excluir Registro Financeiro - {aluno.nome}</span>
@@ -129,7 +129,7 @@ export const ExcluirRegistroModal: React.FC<ExcluirRegistroModalProps> = ({
           {/* Aviso Principal */}
           <motion.div
             whileHover={{ scale: 1.02 }}
-            className="bg-gradient-to-r from-red-600 to-gray-800 p-6 rounded-xl border border-red-200 shadow-lg text-white"
+            className="p-6 rounded-xl border border-red-200 shadow-lg text-white" style={{background: 'linear-gradient(to right, #D90429, #1F2937)'}}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-start space-x-3">
@@ -162,7 +162,7 @@ export const ExcluirRegistroModal: React.FC<ExcluirRegistroModalProps> = ({
               transition={{ delay: 0.1 }}
               className="bg-white rounded-xl border border-green-200 shadow-lg overflow-hidden"
             >
-              <div className="bg-gradient-to-r from-green-600 to-green-800 p-4">
+              <div className="bg-green-600 p-4">
                 <div className="flex items-center space-x-2 text-white">
                   <Archive className="h-5 w-5" />
                   <h3 className="font-bold text-lg">Mover para Histórico</h3>
@@ -200,7 +200,7 @@ export const ExcluirRegistroModal: React.FC<ExcluirRegistroModalProps> = ({
               transition={{ delay: 0.2 }}
               className="bg-white rounded-xl border border-red-200 shadow-lg overflow-hidden"
             >
-              <div className="bg-gradient-to-r from-red-600 to-red-800 p-4">
+              <div className="p-4" style={{background: 'linear-gradient(to right, #D90429, #B91C1C)'}}>
                 <div className="flex items-center space-x-2 text-white">
                   <Trash2 className="h-5 w-5" />
                   <h3 className="font-bold text-lg">Excluir Permanentemente</h3>
@@ -214,7 +214,7 @@ export const ExcluirRegistroModal: React.FC<ExcluirRegistroModalProps> = ({
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Aluno nunca mais será usado</span>
-                    <span className="text-red-600">⚠</span>
+                    <span style={{color: '#D90429'}}>⚠</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Limpeza definitiva</span>
@@ -238,7 +238,7 @@ export const ExcluirRegistroModal: React.FC<ExcluirRegistroModalProps> = ({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="bg-gradient-to-r from-red-50 to-gray-100 p-6 rounded-xl border border-red-200 shadow-lg space-y-4"
+            className="p-6 rounded-xl border border-red-200 shadow-lg space-y-4" style={{background: 'linear-gradient(to right, #FEF2F2, #F3F4F6)'}}
           >
             <div>
               <Label className="text-base font-medium text-red-700">
@@ -260,7 +260,7 @@ export const ExcluirRegistroModal: React.FC<ExcluirRegistroModalProps> = ({
                 onCheckedChange={(checked) => setEntendeuConsequencias(!!checked)}
                 disabled={loading}
               />
-              <Label htmlFor="entendeu" className="text-sm text-gray-700">
+              <Label htmlFor="entendeu" className="text-sm" style={{color: '#6B7280'}}>
                 Entendo que esta ação é <strong>irreversível</strong> e que os dados serão 
                 <strong>perdidos permanentemente</strong>. Confirmo que não há parcelas pagas 
                 e que o aluno nunca mais será utilizado no sistema.
@@ -275,7 +275,7 @@ export const ExcluirRegistroModal: React.FC<ExcluirRegistroModalProps> = ({
             <Button 
               onClick={handleExcluir}
               disabled={confirmText !== 'excluir' || !entendeuConsequencias || loading}
-              className="bg-red-600 hover:bg-red-700"
+              className="" style={{backgroundColor: '#D90429'}} onMouseEnter={(e) => e.target.style.backgroundColor = '#B91C1C'} onMouseLeave={(e) => e.target.style.backgroundColor = '#D90429'}
             >
               {loading ? (
                 'Excluindo...'

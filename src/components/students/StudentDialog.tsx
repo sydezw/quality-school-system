@@ -80,7 +80,7 @@ const StudentDialog = ({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       {!hideButton && (
         <DialogTrigger asChild>
-          <Button onClick={onOpenCreate} className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 text-white shadow-lg hover:shadow-xl transition-all duration-300 font-medium">
+          <Button onClick={onOpenCreate} className="bg-[#D90429] hover:bg-[#1F2937] text-white shadow-lg hover:shadow-xl transition-all duration-300 font-medium">
             <Plus />
             Novo Aluno
           </Button>

@@ -704,7 +704,7 @@ const FinancialReportsTable = () => {
       case 'pago':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'cancelado':
-        return <XCircle className="h-4 w-4 text-red-600" />;
+        return <XCircle className="h-4 w-4" style={{color: '#D90429'}} />;
       default:
         return <Clock className="h-4 w-4 text-yellow-600" />;
     }
@@ -940,13 +940,13 @@ const FinancialReportsTable = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{borderBottomColor: '#D90429'}}></div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 p-6 bg-gradient-to-br from-gray-50 to-white min-h-screen">
+    <div className="space-y-6 p-6 bg-[#F9FAFB] min-h-screen">
       {/* Cabeçalho */}
       <motion.div 
         className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
@@ -973,7 +973,7 @@ const FinancialReportsTable = () => {
             <Button 
               onClick={exportarDados}
               disabled={exportandoPDF}
-              className={`flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-300 ${exportandoPDF ? "animate-pulse" : ""}`}
+              className={`flex items-center gap-2 text-white shadow-lg hover:shadow-xl transition-all duration-300 bg-[#D90429] hover:bg-[#1F2937] ${exportandoPDF ? "animate-pulse" : ""}`}
             >
               {exportandoPDF ? (
                 <RefreshCw className="h-4 w-4 animate-spin" />
@@ -1009,14 +1009,14 @@ const FinancialReportsTable = () => {
                 {despesas.map((despesa) => (
                   <motion.div 
                     key={despesa.id} 
-                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200"
+                    className="flex items-center justify-between p-4 rounded-lg transition-colors duration-200" style={{backgroundColor: '#F9FAFB'}} onMouseEnter={(e) => e.target.style.backgroundColor = '#F3F4F6'} onMouseLeave={(e) => e.target.style.backgroundColor = '#F9FAFB'}
                     whileHover={{ scale: 1.02 }}
                     transition={{ type: "spring", stiffness: 300 }}
                   >
                     <div className="flex items-center gap-3">
                       <div className="flex-1">
                         <p className="font-medium">{despesa.descricao}</p>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm" style={{color: '#6B7280'}}>
                           {despesa.categoria} • {new Date(despesa.data).toLocaleDateString('pt-BR')}
                         </p>
                       </div>
@@ -1061,7 +1061,7 @@ const FinancialReportsTable = () => {
                 {proximosVencimentosRegistros.map((vencimento) => (
                   <motion.div 
                     key={vencimento.id} 
-                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200"
+                    className="flex items-center justify-between p-4 rounded-lg transition-colors duration-200" style={{backgroundColor: '#F9FAFB'}} onMouseEnter={(e) => e.target.style.backgroundColor = '#F3F4F6'} onMouseLeave={(e) => e.target.style.backgroundColor = '#F9FAFB'}
                     whileHover={{ scale: 1.02 }}
                     transition={{ type: "spring", stiffness: 300 }}
                   >
@@ -1069,7 +1069,7 @@ const FinancialReportsTable = () => {
                       {getStatusIcon(vencimento.status)}
                       <div className="flex-1">
                         <p className="font-medium">{vencimento.alunoNome}</p>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm" style={{color: '#6B7280'}}>
                           {vencimento.planoNome} - Parcela {vencimento.numeroParcela}
                         </p>
                       </div>
@@ -1100,27 +1100,27 @@ const FinancialReportsTable = () => {
       >
         {/* Título da Seção de Gráficos */}
         <div className="flex items-center gap-3 mb-6">
-          <div className="h-8 w-1 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full"></div>
-          <h2 className="text-2xl font-bold text-gray-800">Análise Financeira</h2>
+          <div className="h-8 w-1 rounded-full bg-[#D90429]"></div>
+          <h2 className="text-2xl font-bold" style={{color: '#1F2937'}}>Análise Financeira</h2>
         </div>
 
         {/* Grid de Gráficos */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Gráfico de Crescimento de Receita */}
-          <Card className="lg:col-span-2 border-0 shadow-xl bg-gradient-to-br from-white to-gray-50">
+          <Card className="lg:col-span-2 border-0 shadow-xl bg-[#F9FAFB]">
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-3 text-lg">
                 <div className="p-2 bg-green-100 rounded-lg">
                   <TrendingUp className="h-5 w-5 text-green-600" />
                 </div>
                 <div>
-                  <span className="text-gray-800">Crescimento de Receita</span>
+                  <span style={{color: '#1F2937'}}>Crescimento de Receita</span>
                   <p className="text-sm text-gray-500 font-normal mt-1">Evolução mensal das receitas</p>
                 </div>
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="h-80 p-4 bg-white rounded-lg border border-gray-100">
+              <div className="h-80 p-4 bg-white rounded-lg border" style={{borderColor: '#F3F4F6'}}>
                 <Chart
                   options={areaChartOptions}
                   series={[{
@@ -1135,20 +1135,20 @@ const FinancialReportsTable = () => {
           </Card>
 
           {/* Gráfico de Receita por Idioma */}
-          <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-blue-50">
+          <Card className="border-0 shadow-xl bg-[#F9FAFB]">
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-3 text-lg">
                 <div className="p-2 bg-blue-100 rounded-lg">
                   <BarChart3 className="h-5 w-5 text-blue-600" />
                 </div>
                    <div>
-                  <span className="text-gray-800">Distribuição por curso</span>
+                  <span style={{color: '#1F2937'}}>Distribuição por curso</span>
                   <p className="text-sm text-gray-500 font-normal mt-1">Receita por idioma/curso</p>
                 </div>
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0 px-2">
-              <div className="h-80 p-2 bg-white rounded-lg border border-gray-100">
+              <div className="h-80 p-2 bg-white rounded-lg border" style={{borderColor: '#F3F4F6'}}>
                 <Chart
                   options={barChartOptions}
                   series={[{
@@ -1164,20 +1164,20 @@ const FinancialReportsTable = () => {
         </div>
 
         {/* Gráfico de Variação de Saldo - Largura Total */}
-        <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-purple-50">
+        <Card className="border-0 shadow-xl bg-[#F9FAFB]">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-3 text-lg">
               <div className="p-2 bg-purple-100 rounded-lg">
                 <BarChart3 className="h-5 w-5 text-purple-600" />
               </div>
               <div>
-                <span className="text-gray-800">Variação de Saldo</span>
+                <span style={{color: '#1F2937'}}>Variação de Saldo</span>
                 <p className="text-sm text-gray-500 font-normal mt-1">Entradas e saídas por categoria</p>
               </div>
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0 px-6">
-            <div className="h-80 p-6 bg-white rounded-lg border border-gray-100">
+            <div className="h-80 p-6 bg-white rounded-lg border" style={{borderColor: '#F3F4F6'}}>
               <Chart
                 options={columnChartOptions}
                 series={[{
@@ -1369,7 +1369,7 @@ const FinancialReportsTable = () => {
                 transition={{ duration: 0.5, delay: 0.3 }}
                 className="flex justify-center mt-4"
               >
-                <div className="bg-gradient-to-r from-red-600 to-gray-800 rounded-full px-6 py-3 shadow-lg">
+                <div className="rounded-full px-6 py-3 shadow-lg bg-[#D90429]">
                   <span className="text-white font-medium text-sm flex items-center space-x-2">
                     <CreditCard className="h-4 w-4" />
                     <span>{parcelasFiltradas.length} registros encontrados</span>
@@ -1386,7 +1386,7 @@ const FinancialReportsTable = () => {
                 transition={{ duration: 0.5, delay: 0.4 }}
                 className="mt-4"
               >
-                <Card className="shadow-md border-0 bg-gradient-to-r from-gray-50 to-white">
+                <Card className="shadow-md border-0 bg-[#F9FAFB]">
                   <CardContent className="p-6">
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                       {/* Informações de exibição */}
@@ -1410,8 +1410,8 @@ const FinancialReportsTable = () => {
                             disabled={currentPageRegistros === 1}
                             className={`p-2 rounded-lg transition-all duration-200 flex items-center space-x-1 ${
                               currentPageRegistros === 1
-                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                : 'bg-white text-gray-700 hover:bg-red-50 hover:text-red-600 border border-gray-200 shadow-sm'
+                                ? 'cursor-not-allowed' + ' ' + 'bg-gray-100 text-gray-400'
+        : 'bg-white border shadow-sm' + ' ' + 'text-gray-700 hover:text-red-600 border-gray-200'
                             }`}
                           >
                             <ChevronLeft className="h-4 w-4" />
@@ -1431,8 +1431,8 @@ const FinancialReportsTable = () => {
                                   onClick={() => setCurrentPageRegistros(page as number)}
                                   className={`w-10 h-10 rounded-lg font-medium text-sm transition-all duration-200 ${
                                     currentPageRegistros === page
-                                      ? 'bg-gradient-to-r from-red-600 to-gray-800 text-white shadow-lg'
-                                      : 'bg-white text-gray-700 hover:bg-red-50 hover:text-red-600 border border-gray-200'
+                                      ? 'text-white shadow-lg bg-[#D90429]'
+        : 'bg-white border border-gray-200' + ' ' + 'text-gray-700 hover:bg-[#F9FAFB] hover:text-[#D90429]'
                                   }`}
                                 >
                                   {page}
@@ -1449,8 +1449,8 @@ const FinancialReportsTable = () => {
                             disabled={currentPageRegistros === totalPagesRegistros}
                             className={`p-2 rounded-lg transition-all duration-200 flex items-center space-x-1 ${
                               currentPageRegistros === totalPagesRegistros
-                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                : 'bg-white text-gray-700 hover:bg-red-50 hover:text-red-600 border border-gray-200 shadow-sm'
+                                ? 'cursor-not-allowed' + ' ' + 'bg-gray-100 text-gray-400'
+        : 'bg-white border shadow-sm' + ' ' + 'text-gray-700 hover:text-red-600 border-gray-200'
                             }`}
                           >
                             <span className="text-sm font-medium">Próximo</span>

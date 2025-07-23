@@ -51,7 +51,7 @@ export const MoverParaHistoricoModal: React.FC<MoverParaHistoricoModalProps> = (
       case 'arquivado':
         return <Archive className="h-4 w-4 text-gray-600" />;
       case 'vencido':
-        return <AlertTriangle className="h-4 w-4 text-red-600" />;
+        return <AlertTriangle className="h-4 w-4" style={{color: '#D90429'}} />;
       default:
         return <Clock className="h-4 w-4 text-gray-600" />;
     }
@@ -66,7 +66,7 @@ export const MoverParaHistoricoModal: React.FC<MoverParaHistoricoModalProps> = (
       case 'parcialmente pago':
         return 'bg-blue-100 text-blue-800';
       case 'arquivado':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100' + ' ' + 'text-gray-800';
       case 'vencido':
         return 'bg-red-100 text-red-800';
       default:
@@ -84,7 +84,7 @@ export const MoverParaHistoricoModal: React.FC<MoverParaHistoricoModalProps> = (
       case 'matrícula':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'cancelamento':
-        return <XCircle className="h-4 w-4 text-red-600" />;
+        return <XCircle className="h-4 w-4" style={{color: '#D90429'}} />;
       case 'outros':
         return <FileText className="h-4 w-4 text-orange-600" />;
       default:
@@ -294,34 +294,34 @@ export const MoverParaHistoricoModal: React.FC<MoverParaHistoricoModalProps> = (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div className="text-center p-4 bg-blue-50 rounded-lg">
                   <p className="text-2xl font-bold text-blue-600">{estatisticas.total}</p>
-                  <p className="text-sm text-gray-600">Total de Parcelas</p>
+                  <p className="text-sm" style={{color: '#6B7280'}}>Total de Parcelas</p>
                 </div>
                 <div className="text-center p-4 bg-green-50 rounded-lg">
                   <p className="text-2xl font-bold text-green-600">{estatisticas.pagas}</p>
-                  <p className="text-sm text-gray-600">Pagas</p>
+                  <p className="text-sm" style={{color: '#6B7280'}}>Pagas</p>
                 </div>
                 <div className="text-center p-4 bg-yellow-50 rounded-lg">
                   <p className="text-2xl font-bold text-yellow-600">{estatisticas.pendentes}</p>
-                  <p className="text-sm text-gray-600">Pendentes</p>
+                  <p className="text-sm" style={{color: '#6B7280'}}>Pendentes</p>
                 </div>
-                <div className="text-center p-4 bg-red-50 rounded-lg">
-                  <p className="text-2xl font-bold text-red-600">{estatisticas.vencidas}</p>
-                  <p className="text-sm text-gray-600">Vencidas</p>
+                <div className="text-center p-4 rounded-lg" style={{backgroundColor: '#FEF2F2'}}>
+                  <p className="text-2xl font-bold" style={{color: '#D90429'}}>{estatisticas.vencidas}</p>
+                  <p className="text-sm" style={{color: '#6B7280'}}>Vencidas</p>
                 </div>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="text-center p-4 bg-gray-50 rounded-lg">
-                  <p className="text-xl font-bold text-gray-700">{formatCurrency(estatisticas.valorTotal)}</p>
-                  <p className="text-sm text-gray-600">Valor Total</p>
+                  <p className="text-xl font-bold" style={{color: '#6B7280'}}>{formatCurrency(estatisticas.valorTotal)}</p>
+                  <p className="text-sm" style={{color: '#6B7280'}}>Valor Total</p>
                 </div>
                 <div className="text-center p-4 bg-green-50 rounded-lg">
                   <p className="text-xl font-bold text-green-600">{formatCurrency(estatisticas.valorPago)}</p>
-                  <p className="text-sm text-gray-600">Valor Pago</p>
+                  <p className="text-sm" style={{color: '#6B7280'}}>Valor Pago</p>
                 </div>
                 <div className="text-center p-4 bg-orange-50 rounded-lg">
                   <p className="text-xl font-bold text-orange-600">{formatCurrency(estatisticas.valorPendente)}</p>
-                  <p className="text-sm text-gray-600">Valor Pendente</p>
+                  <p className="text-sm" style={{color: '#6B7280'}}>Valor Pendente</p>
                 </div>
               </div>
             </CardContent>
@@ -387,7 +387,7 @@ export const MoverParaHistoricoModal: React.FC<MoverParaHistoricoModalProps> = (
           </Card>
           
           {/* Avisos Importantes */}
-          <Card className="border-red-200 bg-red-50">
+          <Card className="border-red-200" style={{backgroundColor: '#FEF2F2'}}>
             <CardContent className="p-4">
               <h4 className="font-semibold text-red-800 mb-3 flex items-center space-x-2">
                 <AlertTriangle className="h-5 w-5" />
@@ -395,19 +395,19 @@ export const MoverParaHistoricoModal: React.FC<MoverParaHistoricoModalProps> = (
               </h4>
               <ul className="space-y-2 text-sm text-red-700">
                 <li className="flex items-start space-x-2">
-                  <span className="text-red-600 mt-1">•</span>
+                  <span className="mt-1" style={{color: '#D90429'}}>•</span>
                   <span>O registro financeiro do aluno será zerado após o arquivamento</span>
                 </li>
                 <li className="flex items-start space-x-2">
-                  <span className="text-red-600 mt-1">•</span>
+                  <span className="mt-1" style={{color: '#D90429'}}>•</span>
                   <span>Esta operação não pode ser revertida automaticamente</span>
                 </li>
                 <li className="flex items-start space-x-2">
-                  <span className="text-red-600 mt-1">•</span>
+                  <span className="mt-1" style={{color: '#D90429'}}>•</span>
                   <span>O status do aluno será alterado para "Inativo"</span>
                 </li>
                 <li className="flex items-start space-x-2">
-                  <span className="text-red-600 mt-1">•</span>
+                  <span className="mt-1" style={{color: '#D90429'}}>•</span>
                   <span>Recomendamos mover apenas parcelas pagas para evitar problemas futuros</span>
                 </li>
               </ul>
@@ -422,7 +422,7 @@ export const MoverParaHistoricoModal: React.FC<MoverParaHistoricoModalProps> = (
           <Button 
             onClick={handleMoverParaHistorico} 
             disabled={loading}
-            className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900"
+            className="" style={{background: 'linear-gradient(to right, #D90429, #1F2937)'}} onMouseEnter={(e) => e.target.style.background = 'linear-gradient(to right, #B91C1C, #111827)'} onMouseLeave={(e) => e.target.style.background = 'linear-gradient(to right, #D90429, #1F2937)'}
           >
             {loading ? 'Processando...' : 'Mover para Histórico'}
           </Button>

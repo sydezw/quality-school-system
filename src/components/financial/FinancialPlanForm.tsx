@@ -598,19 +598,19 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
           return (
             <div className="mb-6">
               {/* Header com fundo harmônico */}
-              <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-lg p-4 shadow-sm">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4 text-center">
+              <div className="border rounded-lg p-4 shadow-sm" style={{background: 'linear-gradient(to right, #F9FAFB, #F3F4F6)', borderColor: '#E5E7EB'}}>
+                <h3 className="text-lg font-semibold mb-4 text-center" style={{color: '#1F2937'}}>
                   Detalhes do Plano Selecionado
                 </h3>
                 
                 {/* Grid de Cards de Estatísticas */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {/* Card Valor Total */}
-                  <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
+                  <div className="bg-white rounded-lg p-3 shadow-sm border" style={{borderColor: '#F3F4F6'}}>
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-xs text-gray-500 font-medium">Valor Total</p>
-                        <p className="text-sm font-bold text-gray-800">
+                        <p className="text-sm font-bold" style={{color: '#1F2937'}}>
                           R$ {(planoSelecionado.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </p>
                       </div>
@@ -624,8 +624,8 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
                   <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-xs text-gray-500 font-medium">Nº de Aulas</p>
-                        <p className="text-sm font-bold text-gray-800">
+                        <p className="text-xs font-medium" style={{color: '#6B7280'}}>Nº de Aulas</p>
+                        <p className="text-sm font-bold" style={{color: '#1F2937'}}>
                           {planoSelecionado.numero_aulas || 0}
                         </p>
                       </div>
@@ -639,8 +639,8 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
                   <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-xs text-gray-500 font-medium">Valor/Aula</p>
-                        <p className="text-sm font-bold text-gray-800">
+                        <p className="text-xs font-medium" style={{color: '#6B7280'}}>Valor/Aula</p>
+                        <p className="text-sm font-bold" style={{color: '#1F2937'}}>
                           R$ {valorPorAula.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </p>
                       </div>
@@ -654,8 +654,8 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
                   <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-xs text-gray-500 font-medium">Frequência</p>
-                        <p className="text-sm font-bold text-gray-800">
+                        <p className="text-xs font-medium" style={{color: '#6B7280'}}>Frequência</p>
+                        <p className="text-sm font-bold" style={{color: '#1F2937'}}>
                           {planoSelecionado.frequencia_aulas || 'N/A'}
                         </p>
                       </div>
@@ -672,8 +672,8 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
                   <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-xs text-gray-500 font-medium">Idioma</p>
-                        <p className="text-sm font-bold text-gray-800">
+                        <p className="text-xs font-medium" style={{color: '#6B7280'}}>Idioma</p>
+                        <p className="text-sm font-bold" style={{color: '#1F2937'}}>
                           {planoSelecionado.idioma || 'N/A'}
                         </p>
                       </div>
@@ -686,8 +686,8 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
                   {/* Card Descrição */}
                   <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
                     <div>
-                      <p className="text-xs text-gray-500 font-medium mb-1">Descrição</p>
-                      <p className="text-xs text-gray-700 leading-relaxed">
+                      <p className="text-xs font-medium mb-1" style={{color: '#6B7280'}}>Descrição</p>
+                      <p className="text-xs leading-relaxed" style={{color: '#6B7280'}}>
                         {planoSelecionado.descricao || 'Sem descrição disponível'}
                       </p>
                     </div>
@@ -696,8 +696,8 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
                   {/* Card Observação */}
                   <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
                     <div>
-                      <p className="text-xs text-gray-500 font-medium mb-1">Observação</p>
-                      <p className="text-xs text-gray-700 leading-relaxed">
+                      <p className="text-xs font-medium mb-1" style={{color: '#6B7280'}}>Observação</p>
+                      <p className="text-xs leading-relaxed" style={{color: '#374151'}}>
                         {planoSelecionado.observacao || 'Nenhuma observação'}
                       </p>
                     </div>
@@ -782,7 +782,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
           )}
           
           {!watchedValues.plano_id && (
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs mt-1" style={{color: '#9CA3AF'}}>
               Selecione um plano para ver os cálculos
             </p>
           )}
@@ -1047,7 +1047,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
         {calculatedValues.valorAPagar > 0 && (
           <div className="bg-green-50 p-4 rounded">
             <h4 className="font-semibold mb-2">Valor Total do Contrato</h4>
-            <div className="text-sm text-gray-700">
+            <div className="text-sm" style={{color: '#6B7280'}}>
               {(() => {
                 const planoSelecionado = planosGenericos.find(p => p.id === watchedValues.plano_id);
                 const valorMatricula = parseFloat(watchedValues.valor_matricula) || 0;
@@ -1095,7 +1095,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
           </Button>
           <Button 
             type="submit" 
-            className="w-32 bg-red-600 hover:bg-red-700"
+            className="w-32" style={{backgroundColor: '#D90429'}} onMouseEnter={(e) => e.target.style.backgroundColor = '#B91C1C'} onMouseLeave={(e) => e.target.style.backgroundColor = '#D90429'}
             disabled={loading}
           >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

@@ -172,7 +172,7 @@ const Financial = () => {
           >
             <TabsTrigger 
               value="registros" 
-              className="flex-1 data-[state=active]:bg-gradient-to-r data-[state=active]:from-red-600 data-[state=active]:to-black data-[state=active]:text-white data-[state=active]:shadow-lg text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-all duration-300 font-medium rounded-md"
+              className="flex-1 data-[state=active]:bg-[#D90429] data-[state=active]:text-white data-[state=active]:shadow-lg text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-all duration-300 font-medium rounded-md"
             >
               <motion.span
                 whileHover={{ scale: 1.05 }}
@@ -184,7 +184,7 @@ const Financial = () => {
             </TabsTrigger>
             <TabsTrigger 
               value="agrupamento" 
-              className="flex-1 data-[state=active]:bg-gradient-to-r data-[state=active]:from-red-600 data-[state=active]:to-gray-800 data-[state=active]:text-white data-[state=active]:shadow-lg text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-all duration-300 font-medium rounded-md"
+              className="flex-1 data-[state=active]:bg-[#D90429] data-[state=active]:text-white data-[state=active]:shadow-lg text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-all duration-300 font-medium rounded-md"
             >
               <motion.span
                 whileHover={{ scale: 1.05 }}
@@ -196,7 +196,7 @@ const Financial = () => {
             </TabsTrigger>
             <TabsTrigger 
               value="operacional" 
-              className="flex-1 data-[state=active]:bg-gradient-to-r data-[state=active]:from-red-600 data-[state=active]:to-gray-800 data-[state=active]:text-white data-[state=active]:shadow-lg text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-all duration-300 font-medium rounded-md"
+              className="flex-1 data-[state=active]:bg-[#D90429] data-[state=active]:text-white data-[state=active]:shadow-lg text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-all duration-300 font-medium rounded-md"
             >
               <motion.span
                 whileHover={{ scale: 1.05 }}
@@ -209,7 +209,7 @@ const Financial = () => {
             {/* Aba de renovações removida */}
             <TabsTrigger 
               value="relatorios" 
-              className="flex-1 data-[state=active]:bg-gradient-to-r data-[state=active]:from-red-600 data-[state=active]:to-gray-800 data-[state=active]:text-white data-[state=active]:shadow-lg text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-all duration-300 font-medium rounded-md"
+              className="flex-1 data-[state=active]:bg-[#D90429] data-[state=active]:text-white data-[state=active]:shadow-lg text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-all duration-300 font-medium rounded-md"
             >
               <motion.span
                 whileHover={{ scale: 1.05 }}

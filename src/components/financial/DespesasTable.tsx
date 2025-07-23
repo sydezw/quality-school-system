@@ -282,7 +282,7 @@ const DespesasTable = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
         >
-          <Card className="shadow-lg border-0 bg-gradient-to-r from-red-50 to-gray-100 hover:shadow-xl transition-all duration-300">
+          <Card className="shadow-lg border-0 bg-[#F9FAFB] hover:shadow-xl transition-all duration-300">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-red-700 flex items-center gap-3">
@@ -298,7 +298,7 @@ const DespesasTable = () => {
                       resetarFormulario();
                       setModalDespesaAberto(true);
                     }}
-                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+                    className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
                   >
                     <Plus className="h-4 w-4" />
                     Nova Despesa
@@ -584,7 +584,7 @@ const DespesasTable = () => {
                 >
                   <Button
                     onClick={adicionarDespesa}
-                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 transition-all duration-200"
+                    className="w-full bg-[#2563EB] hover:bg-[#1D4ED8] transition-all duration-200"
                     disabled={salvandoDespesa}
                   >
                     {salvandoDespesa ? (

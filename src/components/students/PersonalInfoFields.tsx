@@ -25,7 +25,7 @@ const PersonalInfoFields = ({ control }: PersonalInfoFieldsProps) => {
       </div>
 
       {/* Nome - Destaque especial */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-100">
+      <div className="bg-[#F9FAFB] p-6 rounded-2xl border border-[#6B7280]">
         <FormField
           control={control}
           name="nome"
@@ -60,7 +60,7 @@ const PersonalInfoFields = ({ control }: PersonalInfoFieldsProps) => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-sm font-bold text-gray-700 flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg">
+                  <div className="p-2 bg-[#2563EB] rounded-lg">
                     <Calendar className="h-4 w-4 text-white" />
                   </div>
                   Data de Nascimento
@@ -92,7 +92,7 @@ const PersonalInfoFields = ({ control }: PersonalInfoFieldsProps) => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-sm font-bold text-gray-700 flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg">
+                  <div className="p-2 bg-[#2563EB] rounded-lg">
                     <CreditCard className="h-4 w-4 text-white" />
                   </div>
                   CPF
@@ -121,7 +121,7 @@ const PersonalInfoFields = ({ control }: PersonalInfoFieldsProps) => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-sm font-bold text-gray-700 flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg">
+                  <div className="p-2 bg-[#2563EB] rounded-lg">
                     <Phone className="h-4 w-4 text-white" />
                   </div>
                   Telefone
@@ -150,7 +150,7 @@ const PersonalInfoFields = ({ control }: PersonalInfoFieldsProps) => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-sm font-bold text-gray-700 flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg">
+                  <div className="p-2 bg-[#2563EB] rounded-lg">
                     <Mail className="h-4 w-4 text-white" />
                   </div>
                   Email

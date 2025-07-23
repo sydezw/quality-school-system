@@ -152,7 +152,7 @@ const AddressFields = ({ control, setValue }: AddressFieldsProps) => {
       </div>
 
       {/* CEP com busca automática - Destaque especial */}
-      <div className="bg-gradient-to-r from-emerald-50 to-green-50 p-6 rounded-2xl border border-emerald-100">
+      <div className="bg-[#F9FAFB] p-6 rounded-2xl border border-[#6B7280]">
         <FormField
           control={control}
           name="cep"
@@ -217,7 +217,7 @@ const AddressFields = ({ control, setValue }: AddressFieldsProps) => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-sm font-bold text-gray-700 flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg">
+                  <div className="p-2 bg-emerald-600 rounded-lg">
                     <Home className="h-4 w-4 text-white" />
                   </div>
                   Endereço *
@@ -244,7 +244,7 @@ const AddressFields = ({ control, setValue }: AddressFieldsProps) => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-sm font-bold text-gray-700 flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg">
+                  <div className="p-2 bg-emerald-600 rounded-lg">
                     <Hash className="h-4 w-4 text-white" />
                   </div>
                   Número *
@@ -271,7 +271,7 @@ const AddressFields = ({ control, setValue }: AddressFieldsProps) => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-sm font-bold text-gray-700 flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg">
+                  <div className="p-2 bg-emerald-600 rounded-lg">
                     <MapIcon className="h-4 w-4 text-white" />
                   </div>
                   Bairro *
@@ -298,7 +298,7 @@ const AddressFields = ({ control, setValue }: AddressFieldsProps) => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-sm font-bold text-gray-700 flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg">
+                  <div className="p-2 bg-emerald-600 rounded-lg">
                     <Building2 className="h-4 w-4 text-white" />
                   </div>
                   Cidade *
@@ -325,7 +325,7 @@ const AddressFields = ({ control, setValue }: AddressFieldsProps) => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-sm font-bold text-gray-700 flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg">
+                  <div className="p-2 bg-emerald-600 rounded-lg">
                     <MapPin className="h-4 w-4 text-white" />
                   </div>
                   Estado *

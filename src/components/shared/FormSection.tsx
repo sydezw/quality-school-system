@@ -15,7 +15,7 @@ const FormSection = ({
   icon, 
   children, 
   delay = 0, 
-  gradient = "bg-gradient-to-r from-gray-500 to-gray-600",
+  gradient = "bg-[#6B7280]",
   className = ""
 }: FormSectionProps) => {
   const sectionVariants: Variants = {

@@ -220,7 +220,7 @@ export const MultipleParcelasModal: React.FC<MultipleParcelasModalProps> = ({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
-            <Plus className="h-5 w-5 text-red-600" />
+            <Plus className="h-5 w-5" style={{color: '#D90429'}} />
             <span>Criar Parcelas</span>
           </DialogTitle>
         </DialogHeader>
@@ -334,7 +334,7 @@ export const MultipleParcelasModal: React.FC<MultipleParcelasModalProps> = ({
                 <Button 
                   onClick={criarParcelaUnica}
                   disabled={loading}
-                  className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 transition-all duration-200"
+                  className="transition-all duration-200" style={{background: 'linear-gradient(to right, #D90429, #1F2937)'}} onMouseEnter={(e) => e.target.style.background = 'linear-gradient(to right, #B91C1C, #111827)'} onMouseLeave={(e) => e.target.style.background = 'linear-gradient(to right, #D90429, #1F2937)'}
                 >
                   {loading ? 'Criando...' : 'Criar Parcela'}
                 </Button>
@@ -487,7 +487,7 @@ export const MultipleParcelasModal: React.FC<MultipleParcelasModalProps> = ({
                 <Button 
                   onClick={criarMultiplasParcelas}
                   disabled={loading}
-                  className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 transition-all duration-200"
+                  className="transition-all duration-200" style={{background: 'linear-gradient(to right, #D90429, #1F2937)'}} onMouseEnter={(e) => e.target.style.background = 'linear-gradient(to right, #B91C1C, #111827)'} onMouseLeave={(e) => e.target.style.background = 'linear-gradient(to right, #D90429, #1F2937)'}
                 >
                   {loading ? 'Criando...' : `Criar ${multipleParcelas.quantidade} Parcelas`}
                 </Button>

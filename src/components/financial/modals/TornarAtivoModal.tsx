@@ -470,7 +470,7 @@ export const TornarAtivoModal: React.FC<TornarAtivoModalProps> = ({
                   <div>
                     <Label htmlFor="aluno_id">Aluno *</Label>
                     <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                      <p className="font-medium text-gray-800">{aluno.nome}</p>
+                      <p className="font-medium" style={{color: '#1F2937'}}>{aluno.nome}</p>
                     </div>
                   </div>
                   
@@ -517,19 +517,19 @@ export const TornarAtivoModal: React.FC<TornarAtivoModalProps> = ({
                   return (
                     <div className="mb-6">
                       {/* Header com fundo harmônico */}
-                      <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-lg p-4 shadow-sm">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-4 text-center">
+                      <div className="border rounded-lg p-4 shadow-sm" style={{background: 'linear-gradient(to right, #F9FAFB, #F3F4F6)', borderColor: '#E5E7EB'}}>
+                        <h3 className="text-lg font-semibold mb-4 text-center" style={{color: '#1F2937'}}>
                           Detalhes do Plano Selecionado
                         </h3>
                         
                         {/* Grid de Cards de Estatísticas */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                           {/* Card Valor Total */}
-                          <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
+                          <div className="bg-white rounded-lg p-3 shadow-sm border" style={{borderColor: '#F3F4F6'}}>
                             <div className="flex items-center justify-between">
                               <div>
                                 <p className="text-xs text-gray-500 font-medium">Valor Total</p>
-                                <p className="text-sm font-bold text-gray-800">
+                                <p className="text-sm font-bold" style={{color: '#1F2937'}}>
                                   R$ {(planoSelecionado.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                 </p>
                               </div>
@@ -606,7 +606,7 @@ export const TornarAtivoModal: React.FC<TornarAtivoModalProps> = ({
                           <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
                             <div>
                               <p className="text-xs text-gray-500 font-medium">Descrição</p>
-                              <p className="text-xs text-gray-700 leading-relaxed">
+                              <p className="text-xs leading-relaxed" style={{color: '#6B7280'}}>
                                 {planoSelecionado.descricao || 'Sem descrição disponível'}
                               </p>
                             </div>
@@ -964,7 +964,7 @@ export const TornarAtivoModal: React.FC<TornarAtivoModalProps> = ({
                 {calculatedValues.valorAPagar > 0 && (
                   <div className="bg-green-50 p-4 rounded">
                     <h4 className="font-semibold mb-2">Valor Total do Contrato</h4>
-                    <div className="text-sm text-gray-700">
+                    <div className="text-sm" style={{color: '#6B7280'}}>
                       {(() => {
                         const planoSelecionado = planosGenericos.find(p => p.id === watchedValues.plano_id);
                         const valorMatricula = parseFloat(watchedValues.valor_matricula) || 0;

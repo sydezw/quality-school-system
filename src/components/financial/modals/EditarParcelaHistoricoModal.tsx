@@ -81,7 +81,7 @@ export const EditarParcelaHistoricoModal: React.FC<EditarParcelaHistoricoModalPr
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
-            <Edit className="h-5 w-5 text-blue-600" />
+            <Edit className="h-5 w-5" style={{color: '#2563EB'}} />
             <span>Editar Parcela do Histórico</span>
           </DialogTitle>
         </DialogHeader>
@@ -89,7 +89,7 @@ export const EditarParcelaHistoricoModal: React.FC<EditarParcelaHistoricoModalPr
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="edit-hist-tipo">Tipo de Item</Label>
+              <Label htmlFor="edit-hist-tipo" className="text-sm font-medium" style={{color: '#6B7280'}}>Tipo de Item</Label>
               <Select 
                 value={editandoParcela.tipo_item} 
                 onValueChange={(value: 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'outros') => 
@@ -110,7 +110,7 @@ export const EditarParcelaHistoricoModal: React.FC<EditarParcelaHistoricoModalPr
             </div>
             
             <div>
-              <Label htmlFor="edit-hist-numero">Número da Parcela</Label>
+              <Label htmlFor="edit-hist-numero" className="text-sm font-medium" style={{color: '#6B7280'}}>Número da Parcela</Label>
               <Input
                 id="edit-hist-numero"
                 type="number"
@@ -124,7 +124,7 @@ export const EditarParcelaHistoricoModal: React.FC<EditarParcelaHistoricoModalPr
           
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="edit-hist-valor">Valor</Label>
+              <Label htmlFor="edit-hist-valor" className="text-sm font-medium" style={{color: '#6B7280'}}>Valor</Label>
               <Input
                 id="edit-hist-valor"
                 type="number"
@@ -137,7 +137,7 @@ export const EditarParcelaHistoricoModal: React.FC<EditarParcelaHistoricoModalPr
             </div>
             
             <div>
-              <Label htmlFor="edit-hist-vencimento">Data de Vencimento</Label>
+              <Label htmlFor="edit-hist-vencimento" className="text-sm font-medium" style={{color: '#6B7280'}}>Data de Vencimento</Label>
               <Input
                 id="edit-hist-vencimento"
                 type="date"
@@ -150,7 +150,7 @@ export const EditarParcelaHistoricoModal: React.FC<EditarParcelaHistoricoModalPr
           </div>
           
           <div>
-            <Label htmlFor="edit-hist-descricao">Descrição do Item</Label>
+            <Label htmlFor="edit-hist-descricao" className="text-sm font-medium" style={{color: '#6B7280'}}>Descrição do Item</Label>
             <Input
               id="edit-hist-descricao"
               value={editandoParcela.descricao_item || ''}
@@ -162,7 +162,7 @@ export const EditarParcelaHistoricoModal: React.FC<EditarParcelaHistoricoModalPr
           </div>
           
           <div>
-            <Label htmlFor="edit-hist-status">Status</Label>
+            <Label htmlFor="edit-hist-status" className="text-sm font-medium" style={{color: '#6B7280'}}>Status</Label>
             <Select 
               value={editandoParcela.status_pagamento || ''} 
               onValueChange={(value: 'pago' | 'pendente' | 'vencido' | 'cancelado') => 
@@ -182,7 +182,7 @@ export const EditarParcelaHistoricoModal: React.FC<EditarParcelaHistoricoModalPr
           </div>
           
           <div>
-            <Label htmlFor="edit-hist-obs">Observações</Label>
+            <Label htmlFor="edit-hist-obs" className="text-sm font-medium" style={{color: '#6B7280'}}>Observações</Label>
             <Input
               id="edit-hist-obs"
               value={editandoParcela.observacoes || ''}
@@ -198,7 +198,7 @@ export const EditarParcelaHistoricoModal: React.FC<EditarParcelaHistoricoModalPr
           <Button variant="outline" onClick={onClose} disabled={loading}>
             Cancelar
           </Button>
-          <Button onClick={salvarEdicao} disabled={loading}>
+          <Button onClick={salvarEdicao} disabled={loading} className="" style={{background: 'linear-gradient(to right, #D90429, #1F2937)'}} onMouseEnter={(e) => e.target.style.background = 'linear-gradient(to right, #B91C1C, #111827)'} onMouseLeave={(e) => e.target.style.background = 'linear-gradient(to right, #D90429, #1F2937)'}>
             {loading ? 'Salvando...' : 'Salvar Alterações'}
           </Button>
         </div>

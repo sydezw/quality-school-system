@@ -62,7 +62,7 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
       case 'matrícula':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'cancelamento':
-        return <XCircle className="h-4 w-4 text-red-600" />;
+        return <XCircle className="h-4 w-4" style={{color: '#D90429'}} />;
       case 'outros':
         return <FileText className="h-4 w-4 text-orange-600" />;
       default:
@@ -76,7 +76,7 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
       case 'pago':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'vencido':
-        return <AlertTriangle className="h-4 w-4 text-red-600" />;
+        return <AlertTriangle className="h-4 w-4" style={{color: '#D90429'}} />;
       case 'cancelado':
         return <XCircle className="h-4 w-4 text-gray-600" />;
       default:
@@ -94,7 +94,7 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
       case 'vencido':
         return 'bg-red-100 text-red-800 border-red-200';
       case 'cancelado':
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-gray-100 border-gray-200' + ' ' + 'text-gray-800';
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200';
     }
@@ -209,17 +209,17 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-hidden flex flex-col">
-          <DialogHeader className="bg-gradient-to-r from-red-50 to-gray-100 -m-6 mb-0 p-6 border-b">
+          <DialogHeader className="-m-6 mb-0 p-6 border-b" style={{background: 'linear-gradient(to right, #FEF2F2, #F3F4F6)'}}>
             <DialogTitle className="flex items-center space-x-3">
               <motion.div 
-                className="bg-gradient-to-r from-red-600 to-gray-800 rounded-full p-2"
+                className="rounded-full p-2" style={{background: 'linear-gradient(to right, #D90429, #1F2937)'}}
                 whileHover={{ scale: 1.05 }}
                 transition={{ duration: 0.2 }}
               >
                 <History className="h-5 w-5 text-white" />
               </motion.div>
               <div>
-                <span className="text-xl font-semibold text-gray-800">Histórico de Parcelas</span>
+                <span className="text-xl font-semibold" style={{color: '#1F2937'}}>Histórico de Parcelas</span>
                 <p className="text-sm text-gray-600 font-normal mt-1">{aluno.nome}</p>
               </div>
             </DialogTitle>
@@ -235,18 +235,18 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                 className="flex-shrink-0"
               >
                 <Card className="shadow-lg border-0 overflow-hidden">
-                  <CardHeader className="bg-gradient-to-r from-red-50 to-gray-50 border-b">
+                  <CardHeader className="border-b" style={{background: 'linear-gradient(to right, #FEF2F2, #F9FAFB)'}}>
                     <div className="flex items-center space-x-3">
                       <div className="bg-red-100 rounded-full p-2">
-                        <Filter className="h-4 w-4 text-red-600" />
+                        <Filter className="h-4 w-4" style={{color: '#D90429'}} />
                       </div>
-                      <CardTitle className="text-lg text-gray-800">Filtros de Pesquisa</CardTitle>
+                      <CardTitle className="text-lg" style={{color: '#1F2937'}}>Filtros de Pesquisa</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent className="p-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="tipo-arquivamento" className="text-sm font-medium text-gray-700">
+                        <Label htmlFor="tipo-arquivamento" className="text-sm font-medium" style={{color: '#6B7280'}}>
                           Tipo de Arquivamento
                         </Label>
                         <Select value={filtros.tipo_arquivamento} onValueChange={(value) => setFiltros(prev => ({ ...prev, tipo_arquivamento: value }))}>
@@ -262,7 +262,7 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="data-inicio" className="text-sm font-medium text-gray-700">
+                        <Label htmlFor="data-inicio" className="text-sm font-medium" style={{color: '#6B7280'}}>
                           Data Início
                         </Label>
                         <Input
@@ -275,7 +275,7 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="data-fim" className="text-sm font-medium text-gray-700">
+                        <Label htmlFor="data-fim" className="text-sm font-medium" style={{color: '#6B7280'}}>
                           Data Fim
                         </Label>
                         <Input
@@ -288,7 +288,7 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="status-original" className="text-sm font-medium text-gray-700">
+                        <Label htmlFor="status-original" className="text-sm font-medium" style={{color: '#6B7280'}}>
                           Status Original
                         </Label>
                         <Select value={filtros.status_original} onValueChange={(value) => setFiltros(prev => ({ ...prev, status_original: value }))}>
@@ -306,7 +306,7 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="tipo-item" className="text-sm font-medium text-gray-700">
+                        <Label htmlFor="tipo-item" className="text-sm font-medium" style={{color: '#6B7280'}}>
                           Tipo de Item
                         </Label>
                         <Select value={filtros.tipo_item} onValueChange={(value) => setFiltros(prev => ({ ...prev, tipo_item: value }))}>
@@ -329,7 +329,7 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                       <Button 
                         variant="outline" 
                         onClick={limparFiltros}
-                        className="hover:bg-red-50 hover:border-red-200 transition-all duration-200"
+                        className="transition-all duration-200" onMouseEnter={(e) => {e.target.style.backgroundColor = '#FEF2F2'; e.target.style.borderColor = '#FECACA'}} onMouseLeave={(e) => {e.target.style.backgroundColor = ''; e.target.style.borderColor = ''}}
                       >
                         <Filter className="h-4 w-4 mr-2" />
                         Limpar Filtros
@@ -347,13 +347,13 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                 className="flex-1 min-h-0"
               >
                 <Card className="shadow-lg border-0 overflow-hidden h-full flex flex-col">
-                  <CardHeader className="bg-gradient-to-r from-red-50 to-gray-50 border-b flex-shrink-0">
+                  <CardHeader className="border-b flex-shrink-0" style={{background: 'linear-gradient(to right, #FEF2F2, #F9FAFB)'}}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
                         <div className="bg-red-100 rounded-full p-2">
-                          <Archive className="h-4 w-4 text-red-600" />
+                          <Archive className="h-4 w-4" style={{color: '#D90429'}} />
                         </div>
-                        <CardTitle className="text-lg text-gray-800">Parcelas Arquivadas</CardTitle>
+                        <CardTitle className="text-lg" style={{color: '#1F2937'}}>Parcelas Arquivadas</CardTitle>
                       </div>
                       <Badge variant="secondary" className="bg-red-100 text-red-700">
                         {parcelasFiltradas.length} parcela{parcelasFiltradas.length !== 1 ? 's' : ''}
@@ -368,7 +368,7 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                             animate={{ rotate: 360 }}
                             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                           >
-                            <Loader2 className="h-8 w-8 text-red-600" />
+                            <Loader2 className="h-8 w-8" style={{color: '#D90429'}} />
                           </motion.div>
                           <p className="text-gray-600">Carregando histórico...</p>
                         </div>
@@ -378,17 +378,17 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                         <Table>
                           <TableHeader className="sticky top-0 bg-white z-10">
                             <TableRow className="border-b-2 border-gray-200">
-                              <TableHead className="font-semibold text-gray-700 py-4 text-base">Tipo</TableHead>
-                              <TableHead className="font-semibold text-gray-700 py-4 text-base">Parcela</TableHead>
-                              <TableHead className="font-semibold text-gray-700 py-4 text-base">Valor</TableHead>
-                              <TableHead className="font-semibold text-gray-700 py-4 text-base">Vencimento</TableHead>
-                              <TableHead className="font-semibold text-gray-700 py-4 text-base">Pagamento</TableHead>
-                              <TableHead className="font-semibold text-gray-700 py-4 text-base">Status</TableHead>
-                              <TableHead className="font-semibold text-gray-700 py-4 text-base">Descrição</TableHead>
-                              <TableHead className="font-semibold text-gray-700 py-4 text-base">Arquivamento</TableHead>
-                              <TableHead className="font-semibold text-gray-700 py-4 text-base">Data Arquivo</TableHead>
-                              <TableHead className="font-semibold text-gray-700 py-4 text-base">Observações</TableHead>
-                              <TableHead className="font-semibold text-gray-700 py-4 text-base text-center">Ações</TableHead>
+                              <TableHead className="font-semibold py-4 text-base" style={{color: '#6B7280'}}>Tipo</TableHead>
+                <TableHead className="font-semibold py-4 text-base" style={{color: '#6B7280'}}>Parcela</TableHead>
+                <TableHead className="font-semibold py-4 text-base" style={{color: '#6B7280'}}>Valor</TableHead>
+                <TableHead className="font-semibold py-4 text-base" style={{color: '#6B7280'}}>Vencimento</TableHead>
+                <TableHead className="font-semibold py-4 text-base" style={{color: '#6B7280'}}>Pagamento</TableHead>
+                <TableHead className="font-semibold py-4 text-base" style={{color: '#6B7280'}}>Status</TableHead>
+                <TableHead className="font-semibold py-4 text-base" style={{color: '#6B7280'}}>Descrição</TableHead>
+                <TableHead className="font-semibold py-4 text-base" style={{color: '#6B7280'}}>Arquivamento</TableHead>
+                <TableHead className="font-semibold py-4 text-base" style={{color: '#6B7280'}}>Data Arquivo</TableHead>
+                <TableHead className="font-semibold py-4 text-base" style={{color: '#6B7280'}}>Observações</TableHead>
+                <TableHead className="font-semibold py-4 text-base text-center" style={{color: '#6B7280'}}>Ações</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -420,7 +420,7 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                                     initial={{ opacity: 0, x: -20 }}
                                     animate={{ opacity: 1, x: 0 }}
                                     transition={{ duration: 0.3, delay: index * 0.05 }}
-                                    className="hover:bg-red-50 transition-colors duration-200 border-b border-gray-100"
+                                    className="transition-colors duration-200 border-b" style={{borderBottomColor: '#F3F4F6'}} onMouseEnter={(e) => e.target.style.backgroundColor = '#FEF2F2'} onMouseLeave={(e) => e.target.style.backgroundColor = ''}
                                   >
                                     <TableCell className="font-medium py-4 text-base">
                                       <div className="flex items-center gap-2">
@@ -429,7 +429,7 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                                       </div>
                                     </TableCell>
                                     <TableCell className="py-4 text-base font-semibold">{calcularNumeroPorTipo(parcelasHistorico, parcela)}</TableCell>
-                                    <TableCell className="font-bold py-4 text-base text-green-700">
+                                    <TableCell className="font-bold py-4 text-base" style={{color: '#15803D'}}>
                                       {formatCurrency(parcela.valor)}
                                     </TableCell>
                                     <TableCell className="py-4 text-base">{formatDate(parcela.data_vencimento)}</TableCell>
@@ -445,13 +445,13 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                                       </motion.div>
                                     </TableCell>
                                     <TableCell className="py-4 max-w-xs">
-                                      <div className="text-sm text-gray-600">
+                                      <div className="text-sm" style={{color: '#6B7280'}}>
                                         {parcela.descricao_item ? (
                                           <div className="truncate" title={parcela.descricao_item}>
                                             {parcela.descricao_item}
                                           </div>
                                         ) : (
-                                          <span className="text-gray-400 italic">-</span>
+                                          <span className="italic" style={{color: '#9CA3AF'}}>-</span>
                                         )}
                                       </div>
                                     </TableCell>
@@ -464,13 +464,13 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                                       {parcela.criado_em ? formatDate(parcela.criado_em) : '-'}
                                     </TableCell>
                                     <TableCell className="py-4 max-w-xs">
-                                      <div className="text-sm text-gray-600">
+                                      <div className="text-sm" style={{color: '#6B7280'}}>
                                         {parcela.observacoes ? (
                                           <div className="truncate" title={parcela.observacoes}>
                                             {parcela.observacoes}
                                           </div>
                                         ) : (
-                                          <span className="text-gray-400 italic">Sem observações</span>
+                                          <span className="italic" style={{color: '#9CA3AF'}}>Sem observações</span>
                                         )}
                                       </div>
                                     </TableCell>
@@ -485,7 +485,7 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                                               <Button
                                                 size="sm"
                                                 onClick={() => abrirModalEdicao(parcela)}
-                                                className="bg-gradient-to-r from-red-600 to-gray-800 hover:from-red-700 hover:to-gray-900 text-white h-8 w-8 p-0"
+                                                className="text-white h-8 w-8 p-0" style={{background: 'linear-gradient(to right, #D90429, #1F2937)'}} onMouseEnter={(e) => e.target.style.background = 'linear-gradient(to right, #B91C1C, #111827)'} onMouseLeave={(e) => e.target.style.background = 'linear-gradient(to right, #D90429, #1F2937)'}
                                               >
                                                 <Edit className="h-4 w-4" />
                                               </Button>
@@ -518,62 +518,62 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                   className="flex-shrink-0"
                 >
                   <Card className="shadow-md border-0 overflow-hidden">
-                    <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b py-3">
+                    <CardHeader className="border-b py-3" style={{background: 'linear-gradient(to right, #F9FAFB, #FFFFFF)'}}>
                       <div className="flex items-center space-x-2">
-                        <div className="bg-red-100 rounded-full p-1.5">
-                          <TrendingUp className="h-3 w-3 text-red-600" />
+                        <div className="rounded-full p-1.5" style={{backgroundColor: '#FEE2E2'}}>
+                          <TrendingUp className="h-3 w-3" style={{color: '#D90429'}} />
                         </div>
-                        <CardTitle className="text-sm text-gray-800">Estatísticas do Histórico</CardTitle>
+                        <CardTitle className="text-sm" style={{color: '#1F2937'}}>Estatísticas do Histórico</CardTitle>
                       </div>
                     </CardHeader>
                     <CardContent className="p-4">
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         <motion.div 
-                          className="text-center p-3 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg"
+                          className="text-center p-3 bg-[#F9FAFB] rounded-lg"
                           whileHover={{ scale: 1.02 }}
                           transition={{ duration: 0.2 }}
                         >
                           <div className="flex items-center justify-center mb-1">
                             <Archive className="h-4 w-4 text-blue-600" />
                           </div>
-                          <p className="text-xs text-gray-600 font-medium">Total de Parcelas</p>
+                          <p className="text-xs font-medium" style={{color: '#6B7280'}}>Total de Parcelas</p>
                           <p className="text-lg font-bold text-blue-600">{parcelasFiltradas.length}</p>
                         </motion.div>
                         <motion.div 
-                          className="text-center p-3 bg-gradient-to-r from-green-50 to-green-100 rounded-lg"
+                          className="text-center p-3 bg-[#F9FAFB] rounded-lg"
                           whileHover={{ scale: 1.02 }}
                           transition={{ duration: 0.2 }}
                         >
                           <div className="flex items-center justify-center mb-1">
                             <DollarSign className="h-4 w-4 text-green-600" />
                           </div>
-                          <p className="text-xs text-gray-600 font-medium">Valor Total</p>
+                          <p className="text-xs font-medium" style={{color: '#6B7280'}}>Valor Total</p>
                           <p className="text-lg font-bold text-green-600">
                             {formatCurrency(parcelasFiltradas.reduce((acc, p) => acc + p.valor, 0))}
                           </p>
                         </motion.div>
                         <motion.div 
-                          className="text-center p-3 bg-gradient-to-r from-emerald-50 to-emerald-100 rounded-lg"
+                          className="text-center p-3 bg-[#F9FAFB] rounded-lg"
                           whileHover={{ scale: 1.02 }}
                           transition={{ duration: 0.2 }}
                         >
                           <div className="flex items-center justify-center mb-1">
                             <CheckCircle className="h-4 w-4 text-emerald-600" />
                           </div>
-                          <p className="text-xs text-gray-600 font-medium">Parcelas Pagas</p>
+                          <p className="text-xs font-medium" style={{color: '#6B7280'}}>Parcelas Pagas</p>
                           <p className="text-lg font-bold text-emerald-600">
                             {parcelasFiltradas.filter(p => p.status_pagamento === 'pago').length}
                           </p>
                         </motion.div>
                         <motion.div 
-                          className="text-center p-3 bg-gradient-to-r from-teal-50 to-teal-100 rounded-lg"
+                          className="text-center p-3 bg-[#F9FAFB] rounded-lg"
                           whileHover={{ scale: 1.02 }}
                           transition={{ duration: 0.2 }}
                         >
                           <div className="flex items-center justify-center mb-1">
                             <DollarSign className="h-4 w-4 text-teal-600" />
                           </div>
-                          <p className="text-xs text-gray-600 font-medium">Valor Pago</p>
+                          <p className="text-xs font-medium" style={{color: '#6B7280'}}>Valor Pago</p>
                           <p className="text-lg font-bold text-teal-600">
                             {formatCurrency(parcelasFiltradas
                               .filter(p => p.status_pagamento === 'pago')
@@ -588,12 +588,12 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
             </div>
           </div>
           
-          <div className="flex justify-end space-x-2 pt-4 border-t bg-gradient-to-r from-gray-50 to-white -m-6 mt-0 p-6">
+          <div className="flex justify-end space-x-2 pt-4 border-t -m-6 mt-0 p-6" style={{background: 'linear-gradient(to right, #F9FAFB, #FFFFFF)'}}>
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
               <Button 
                 variant="outline" 
                 onClick={onClose}
-                className="hover:bg-red-50 hover:border-red-200 transition-all duration-200"
+                className="transition-all duration-200" onMouseEnter={(e) => {e.target.style.backgroundColor = '#FEF2F2'; e.target.style.borderColor = '#FECACA'}} onMouseLeave={(e) => {e.target.style.backgroundColor = ''; e.target.style.borderColor = ''}}
               >
                 Fechar
               </Button>

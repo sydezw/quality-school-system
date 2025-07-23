@@ -50,7 +50,7 @@ export const PreviewProximaParcela: React.FC<PreviewProximaParcelaProps> = ({
       case 'plano': return 'text-blue-600 bg-blue-50 border-blue-200';
       case 'material': return 'text-green-600 bg-green-50 border-green-200';
       case 'matrícula': return 'text-purple-600 bg-purple-50 border-purple-200';
-      case 'cancelamento': return 'text-red-600 bg-red-50 border-red-200';
+      case 'cancelamento': return 'bg-red-50 border-red-200' + ' ' + 'text-red-600';
       default: return 'text-gray-600 bg-gray-50 border-gray-200';
     }
   };
@@ -60,7 +60,7 @@ export const PreviewProximaParcela: React.FC<PreviewProximaParcelaProps> = ({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-dashed border-blue-200 rounded-lg"
+      className="mt-4 p-4 bg-[#F9FAFB] border-2 border-dashed border-[#6B7280] rounded-lg"
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center space-x-2">
@@ -110,7 +110,7 @@ export const PreviewProximaParcela: React.FC<PreviewProximaParcelaProps> = ({
             {parcelaPreview.tipo_item.charAt(0).toUpperCase() + parcelaPreview.tipo_item.slice(1)}
           </span>
           <span className="text-sm text-gray-600">•</span>
-          <span className="text-sm font-medium text-gray-700">{parcelaPreview.idioma_registro}</span>
+          <span className="text-sm font-medium" style={{color: '#6B7280'}}>{parcelaPreview.idioma_registro}</span>
         </div>
       </div>
 

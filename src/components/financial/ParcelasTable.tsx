@@ -406,7 +406,7 @@ const ParcelasTable: React.FC = () => {
       case 'pago':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'vencido':
-        return <AlertTriangle className="h-4 w-4 text-red-600" />;
+        return <AlertTriangle className="h-4 w-4" style={{color: '#D90429'}} />;
       case 'cancelado':
         return <XCircle className="h-4 w-4 text-gray-600" />;
       default:
@@ -421,7 +421,7 @@ const ParcelasTable: React.FC = () => {
       case 'vencido':
         return 'bg-red-100 text-red-800 border-red-200 hover:bg-red-200 transition-colors';
       case 'cancelado':
-        return 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200 transition-colors';
+        return 'transition-colors' + ' ' + 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200';
       default:
         return 'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200 transition-colors';
     }
@@ -436,7 +436,7 @@ const ParcelasTable: React.FC = () => {
       case 'matrícula':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'cancelamento':
-        return <XCircle className="h-4 w-4 text-red-600" />;
+        return <XCircle className="h-4 w-4" style={{color: '#D90429'}} />;
       case 'outros':
         return <FileText className="h-4 w-4 text-orange-600" />;
       default:
@@ -454,7 +454,7 @@ const ParcelasTable: React.FC = () => {
           transition={{ duration: 0.5 }}
         >
           <motion.div 
-            className="h-12 w-12 animate-spin rounded-full border-4 border-red-600 border-t-transparent mx-auto"
+            className="h-12 w-12 animate-spin rounded-full border-4 border-t-transparent mx-auto" style={{borderColor: '#D90429', borderTopColor: 'transparent'}}
             animate={{ rotate: 360 }}
             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
           />
@@ -478,7 +478,7 @@ const ParcelasTable: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
         >
-          <Card className="shadow-lg border-0 bg-gradient-to-r from-red-50 to-gray-100">
+          <Card className="shadow-lg border-0 bg-[#F9FAFB]">
             <CardHeader className="pb-4">
               <CardTitle 
                 className="flex items-center justify-between text-red-700 cursor-pointer"
@@ -512,7 +512,7 @@ const ParcelasTable: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                   {/* Busca */}
                   <div className="lg:col-span-2">
-                    <Label htmlFor="search" className="text-sm font-medium text-gray-700">Buscar</Label>
+                    <Label htmlFor="search" className="text-sm font-medium" style={{color: '#6B7280'}}>Buscar</Label>
                     <div className="relative mt-1">
                       <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
@@ -520,19 +520,19 @@ const ParcelasTable: React.FC = () => {
                         placeholder="Nome do aluno..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 border-gray-300 focus:border-red-500 focus:ring-red-500"
+                        className="pl-10" style={{borderColor: '#D1D5DB'}} onFocus={(e) => {e.target.style.borderColor = '#D90429'; e.target.style.boxShadow = '0 0 0 1px #D90429'}} onBlur={(e) => {e.target.style.borderColor = '#D1D5DB'; e.target.style.boxShadow = 'none'}}
                       />
                     </div>
                   </div>
                   
                   {/* Filtros de Status com Multi-Select */}
                   <div>
-                    <Label className="text-sm font-medium text-gray-700 mb-2 block">Status</Label>
+                    <Label className="text-sm font-medium mb-2 block" style={{color: '#6B7280'}}>Status</Label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
-                          className="w-full justify-between border-gray-300 focus:border-red-500 focus:ring-red-500"
+                          className="w-full justify-between" style={{borderColor: '#D1D5DB'}} onFocus={(e) => {e.target.style.borderColor = '#D90429'; e.target.style.boxShadow = '0 0 0 1px #D90429'}} onBlur={(e) => {e.target.style.borderColor = '#D1D5DB'; e.target.style.boxShadow = 'none'}}
                         >
                           <span className="text-sm">
                             {statusFilters.length === 4 
@@ -578,12 +578,12 @@ const ParcelasTable: React.FC = () => {
                   
                   {/* Filtros de Tipo com Multi-Select */}
                   <div>
-                    <Label className="text-sm font-medium text-gray-700 mb-2 block">Tipo</Label>
+                    <Label className="text-sm font-medium mb-2 block" style={{color: '#6B7280'}}>Tipo</Label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
-                          className="w-full justify-between border-gray-300 focus:border-red-500 focus:ring-red-500"
+                          className="w-full justify-between" style={{borderColor: '#D1D5DB'}} onFocus={(e) => {e.target.style.borderColor = '#D90429'; e.target.style.boxShadow = '0 0 0 1px #D90429'}} onBlur={(e) => {e.target.style.borderColor = '#D1D5DB'; e.target.style.boxShadow = 'none'}}
                         >
                           <span className="text-sm">
                             {tipoFilters.length === 5 
@@ -628,9 +628,9 @@ const ParcelasTable: React.FC = () => {
                   
                   {/* Filtro de Idioma */}
                   <div>
-                    <Label className="text-sm font-medium text-gray-700">Idioma</Label>
+                    <Label className="text-sm font-medium" style={{color: '#6B7280'}}>Idioma</Label>
                     <Select value={idiomaFilter} onValueChange={handleIdiomaChange}>
-                      <SelectTrigger className="mt-1 border-gray-300 focus:border-red-500 focus:ring-red-500">
+                      <SelectTrigger className="mt-1" style={{borderColor: '#D1D5DB'}} onFocus={(e) => {e.target.style.borderColor = '#D90429'; e.target.style.boxShadow = '0 0 0 1px #D90429'}} onBlur={(e) => {e.target.style.borderColor = '#D1D5DB'; e.target.style.boxShadow = 'none'}}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -643,19 +643,19 @@ const ParcelasTable: React.FC = () => {
                   
                   {/* Filtro de Data Início */}
                   <div>
-                    <Label htmlFor="dataInicio" className="text-sm font-medium text-gray-700">Data Início</Label>
+                    <Label htmlFor="dataInicio" className="text-sm font-medium" style={{color: '#6B7280'}}>Data Início</Label>
                     <Input
                       id="dataInicio"
                       type="date"
                       value={dataInicio}
                       onChange={(e) => handleDataInicioChange(e.target.value)}
-                      className="mt-1 border-gray-300 focus:border-red-500 focus:ring-red-500"
+                      className="mt-1" style={{borderColor: '#D1D5DB'}} onFocus={(e) => {e.target.style.borderColor = '#D90429'; e.target.style.boxShadow = '0 0 0 1px #D90429'}} onBlur={(e) => {e.target.style.borderColor = '#D1D5DB'; e.target.style.boxShadow = 'none'}}
                     />
                   </div>
                   
                   {/* Filtro de Data Fim */}
                   <div>
-                    <Label htmlFor="dataFim" className="text-sm font-medium text-gray-700">Data Fim</Label>
+                    <Label htmlFor="dataFim" className="text-sm font-medium" style={{color: '#6B7280'}}>Data Fim</Label>
                     <Input
                       id="dataFim"
                       type="date"
@@ -707,7 +707,7 @@ const ParcelasTable: React.FC = () => {
                         variant="outline"
                         size="sm"
                         onClick={limparTodosFiltros}
-                        className="flex items-center gap-2 text-red-600 border-red-300 hover:bg-red-50"
+                        className="flex items-center gap-2 hover:bg-red-50" style={{color: '#D90429', borderColor: '#FECACA'}}
                       >
                         <RotateCcw className="h-4 w-4" />
                         Limpar Todos
@@ -727,7 +727,7 @@ const ParcelasTable: React.FC = () => {
           transition={{ duration: 0.5, delay: 0.2 }}
         >
           <Card className="shadow-xl border-0">
-            <CardHeader className="bg-gradient-to-r from-red-600 to-gray-800 text-white rounded-t-lg">
+            <CardHeader className="text-white rounded-t-lg bg-[#D90429]">
               <CardTitle className="flex items-center justify-between w-full">
                 <div className="flex items-center gap-3">
                   <CreditCard className="h-6 w-6" />
@@ -790,7 +790,7 @@ const ParcelasTable: React.FC = () => {
                   >
                     <Button
                       onClick={handleCreatePlan}
-                      className="w-full bg-gradient-to-r from-red-600 via-gray-700 to-black hover:from-red-700 hover:via-gray-800 hover:to-gray-900 text-white border-0 px-6 py-2 shadow-lg transition-all duration-300"
+                      className="w-full text-white border-0 px-6 py-2 shadow-lg transition-all duration-300 bg-[#D90429] hover:bg-[#1F2937]"
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       <Users className="h-4 w-4 mr-2" />
@@ -837,19 +837,19 @@ const ParcelasTable: React.FC = () => {
                   <Table className="w-full min-w-[1200px]">
                     <TableHeader>
                       <TableRow className="bg-gray-50 hover:bg-gray-50">
-                        <TableHead className="font-bold text-gray-700 w-20">ID</TableHead>
-                        <TableHead className="font-bold text-gray-700 min-w-[180px]">Aluno</TableHead>
-                        <TableHead className="font-bold text-gray-700 min-w-[150px]">Plano</TableHead>
-                        <TableHead className="font-bold text-gray-700 w-32">Tipo</TableHead>
-                        <TableHead className="font-bold text-gray-700 w-24">Idioma</TableHead>
-                        <TableHead className="font-bold text-gray-700 w-20">Parcela</TableHead>
-                        <TableHead className="font-bold text-gray-700 w-32">Valor</TableHead>
-                        <TableHead className="font-bold text-gray-700 w-32">Vencimento</TableHead>
-                        <TableHead className="font-bold text-gray-700 w-32">Forma Pagamento</TableHead>
-                        <TableHead className="font-bold text-gray-700 min-w-[150px]">Descrição do Item</TableHead>
-                        <TableHead className="font-bold text-gray-700 w-32">Status</TableHead>
-                        <TableHead className="font-bold text-gray-700 min-w-[200px]">Observações</TableHead>
-                        <TableHead className="font-bold text-gray-700 text-center w-32">Ações</TableHead>
+                        <TableHead className="font-bold w-20" style={{color: '#6B7280'}}>ID</TableHead>
+              <TableHead className="font-bold min-w-[180px]" style={{color: '#6B7280'}}>Aluno</TableHead>
+              <TableHead className="font-bold min-w-[150px]" style={{color: '#6B7280'}}>Plano</TableHead>
+              <TableHead className="font-bold w-32" style={{color: '#6B7280'}}>Tipo</TableHead>
+              <TableHead className="font-bold w-24" style={{color: '#6B7280'}}>Idioma</TableHead>
+              <TableHead className="font-bold w-20" style={{color: '#6B7280'}}>Parcela</TableHead>
+              <TableHead className="font-bold w-32" style={{color: '#6B7280'}}>Valor</TableHead>
+              <TableHead className="font-bold w-32" style={{color: '#6B7280'}}>Vencimento</TableHead>
+              <TableHead className="font-bold w-32" style={{color: '#6B7280'}}>Forma Pagamento</TableHead>
+              <TableHead className="font-bold min-w-[150px]" style={{color: '#6B7280'}}>Descrição do Item</TableHead>
+              <TableHead className="font-bold w-32" style={{color: '#6B7280'}}>Status</TableHead>
+              <TableHead className="font-bold min-w-[200px]" style={{color: '#6B7280'}}>Observações</TableHead>
+              <TableHead className="font-bold text-center w-32" style={{color: '#6B7280'}}>Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -869,7 +869,7 @@ const ParcelasTable: React.FC = () => {
                               <TableCell className="font-medium text-base text-gray-900">
                                 {parcela.aluno_nome || 'N/A'}
                               </TableCell>
-                              <TableCell className="text-base text-gray-700">
+                              <TableCell className="text-base" style={{color: '#6B7280'}}>
                                 {parcela.plano_nome || 'N/A'}
                               </TableCell>
                               <TableCell>
@@ -879,7 +879,7 @@ const ParcelasTable: React.FC = () => {
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <span className="inline-block px-3 py-1 rounded-md text-base font-medium bg-gray-100/80 text-gray-700 border border-gray-200/50">
+                                <span className="inline-block px-3 py-1 rounded-md text-base font-medium border" style={{backgroundColor: '#F3F4F6', color: '#6B7280', borderColor: '#E5E7EB'}}>
                                   {parcela.idioma_registro}
                                 </span>
                               </TableCell>
@@ -894,7 +894,7 @@ const ParcelasTable: React.FC = () => {
                                   {new Date(parcela.data_vencimento).toLocaleDateString('pt-BR')}
                                 </div>
                               </TableCell>
-                              <TableCell className="text-base text-gray-700">
+                              <TableCell className="text-base" style={{color: '#6B7280'}}>
                                 {formatarFormaPagamento(parcela.forma_pagamento) || '-'}
                               </TableCell>
                               <TableCell className="max-w-xs">
@@ -961,7 +961,7 @@ const ParcelasTable: React.FC = () => {
                                           excluirParcela(parcela.id);
                                         }
                                       }}
-                                      className="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
+                                      className="hover:bg-red-50" style={{borderColor: '#FECACA', color: '#D90429'}} onMouseEnter={(e) => e.target.style.borderColor = '#FCA5A5'} onMouseLeave={(e) => e.target.style.borderColor = '#FECACA'}
                                     >
                                       <Trash2 className="h-4 w-4" />
                                     </Button>
@@ -988,7 +988,7 @@ const ParcelasTable: React.FC = () => {
             transition={{ duration: 0.5, delay: 0.3 }}
             className="flex justify-center mt-4"
           >
-            <div className="bg-gradient-to-r from-red-600 to-gray-800 rounded-full px-6 py-3 shadow-lg">
+            <div className="rounded-full px-6 py-3 shadow-lg bg-[#D90429]">
               <span className="text-white font-medium text-sm flex items-center space-x-2">
                 <CreditCard className="h-4 w-4" />
                 <span>{parcelasFiltradas.length} registros encontrados</span>
@@ -1005,7 +1005,7 @@ const ParcelasTable: React.FC = () => {
             transition={{ duration: 0.5, delay: 0.4 }}
             className="mt-4"
           >
-            <Card className="shadow-md border-0 bg-gradient-to-r from-gray-50 to-white">
+            <Card className="shadow-md border-0 bg-[#F9FAFB]">
               <CardContent className="p-6">
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                   {/* Informações de exibição */}
@@ -1036,8 +1036,8 @@ const ParcelasTable: React.FC = () => {
                         disabled={currentPage === 1}
                         className={`p-2 rounded-lg transition-all duration-200 flex items-center space-x-1 ${
                           currentPage === 1
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                            : 'bg-white text-gray-700 hover:bg-red-50 hover:text-red-600 border border-gray-200 shadow-sm'
+                            ? 'cursor-not-allowed' + ' ' + 'bg-gray-100 text-gray-400'
+                : 'bg-white border shadow-sm' + ' ' + 'text-gray-700 hover:bg-red-50 hover:text-red-600 border-gray-200'
                         }`}
                       >
                         <ChevronLeft className="h-4 w-4" />
@@ -1057,8 +1057,8 @@ const ParcelasTable: React.FC = () => {
                               onClick={() => setCurrentPage(page as number)}
                               className={`w-10 h-10 rounded-lg font-medium text-sm transition-all duration-200 ${
                                 currentPage === page
-                                  ? 'bg-gradient-to-r from-red-600 to-gray-800 text-white shadow-lg'
-                                  : 'bg-white text-gray-700 hover:bg-red-50 hover:text-red-600 border border-gray-200'
+                                  ? 'text-white shadow-lg bg-[#D90429]'
+                : 'bg-white border border-gray-200' + ' ' + 'text-gray-700 hover:bg-red-50 hover:text-red-600'
                               }`}
                             >
                               {page}
@@ -1075,8 +1075,8 @@ const ParcelasTable: React.FC = () => {
                         disabled={currentPage === totalPages}
                         className={`p-2 rounded-lg transition-all duration-200 flex items-center space-x-1 ${
                           currentPage === totalPages
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                            : 'bg-white text-gray-700 hover:bg-red-50 hover:text-red-600 border border-gray-200 shadow-sm'
+                            ? 'cursor-not-allowed' + ' ' + 'bg-gray-100 text-gray-400'
+                : 'bg-white border shadow-sm' + ' ' + 'text-gray-700 hover:bg-red-50 hover:text-red-600 border-gray-200'
                         }`}
                       >
                         <span className="text-sm font-medium">Próximo</span>
@@ -1128,7 +1128,7 @@ const ParcelasTable: React.FC = () => {
               whileHover={{ scale: 1.01 }}
               transition={{ duration: 0.3 }}
             >
-              <Card className="shadow-sm border-0 bg-gradient-to-r from-red-600 to-gray-800 overflow-hidden">
+              <Card className="shadow-sm border-0 overflow-hidden bg-[#D90429]">
                 <CardContent className="p-2">
                   <div className="flex items-center gap-2">
                     <CreditCard className="h-3 w-3 text-white flex-shrink-0" />
@@ -1148,7 +1148,7 @@ const ParcelasTable: React.FC = () => {
               whileHover={{ scale: 1.01 }}
               transition={{ duration: 0.3 }}
             >
-              <Card className="shadow-sm border-0 bg-gradient-to-r from-red-600 to-gray-800 overflow-hidden">
+              <Card className="shadow-sm border-0 bg-[#D90429] overflow-hidden">
                 <CardContent className="p-2">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="h-3 w-3 text-white flex-shrink-0" />
