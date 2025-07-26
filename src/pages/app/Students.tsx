@@ -27,7 +27,7 @@ const Students = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [query, setQuery] = useState('');
-  const [filters, setFilters] = useState<StudentFilters>({});
+  const [filters, setFilters] = useState<StudentFilters>({ status: 'Ativo' }); // Filtro padrão para alunos ativos
   const [isFinancialDialogOpen, setIsFinancialDialogOpen] = useState(false);
   const [selectedStudentForPlan, setSelectedStudentForPlan] = useState<Student | null>(null);
   const [currentPage, setCurrentPage] = useState(1);

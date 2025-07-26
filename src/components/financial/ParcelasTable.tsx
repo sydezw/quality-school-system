@@ -73,8 +73,8 @@ const ParcelasTable: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilters, setStatusFilters] = useState<string[]>(['pendente', 'vencido']); // Filtro inicial: apenas pendentes e vencidas
   const [tipoFilters, setTipoFilters] = useState<string[]>(['plano', 'material', 'matrícula', 'cancelamento', 'outros']);
-  const [dataInicio, setDataInicio] = useState(new Date().toISOString().split('T')[0]); // Data atual como padrão
-  const [dataFim, setDataFim] = useState('');
+  const [dataInicio, setDataInicio] = useState(''); // Sem data início para mostrar desde o início
+  const [dataFim, setDataFim] = useState(new Date().toISOString().split('T')[0]); // Data atual como fim para mostrar até hoje
   const [idiomaFilter, setIdiomaFilter] = useState<'todos' | 'Inglês' | 'Japonês'>('todos');
   
   // Estados para paginação
@@ -95,7 +95,7 @@ const ParcelasTable: React.FC = () => {
     if (isInitialLoad) {
       toast({
         title: "🎯 Filtro automático aplicado",
-        description: "Mostrando apenas parcelas pendentes e vencidas a partir do ano atual.",
+        description: "Mostrando apenas parcelas pendentes e vencidas até hoje.",
         duration: 4000,
       });
       setIsInitialLoad(false);
@@ -242,14 +242,14 @@ const ParcelasTable: React.FC = () => {
       const filtroDataInicio = !dataInicio || dataVencimento >= new Date(dataInicio);
       const filtroDataFim = !dataFim || dataVencimento <= new Date(dataFim);
       
-      // Filtro automático: apenas parcelas a partir de hoje (quando filtro inicial está ativo)
-      const isFilteringCurrentDate = dataInicio === new Date().toISOString().split('T')[0] && 
-                                     !dataFim &&
+      // Filtro automático: apenas parcelas até hoje (quando filtro inicial está ativo)
+      const isFilteringCurrentDate = !dataInicio && 
+                                     dataFim === new Date().toISOString().split('T')[0] &&
                                      statusFilters.length === 2 && 
                                      statusFilters.includes('pendente') && 
                                      statusFilters.includes('vencido');
       
-      const filtroDataAutomatico = !isFilteringCurrentDate || dataVencimento >= hoje;
+      const filtroDataAutomatico = !isFilteringCurrentDate || dataVencimento <= hoje;
       
       return filtroNome && filtroStatus && filtroTipo && filtroIdioma && 
              filtroDataInicio && filtroDataFim && filtroDataAutomatico;
@@ -262,14 +262,14 @@ const ParcelasTable: React.FC = () => {
     setSearchTerm('');
     setStatusFilters(['pendente', 'vencido']);
     setTipoFilters(['plano', 'material', 'matrícula', 'cancelamento', 'outros']);
-    setDataInicio(new Date().toISOString().split('T')[0]);
-    setDataFim('');
+    setDataInicio(''); // Sem data início para mostrar desde o início
+    setDataFim(new Date().toISOString().split('T')[0]); // Data atual como fim
     setIdiomaFilter('todos');
     setCurrentPage(1);
     
     toast({
       title: "🔄 Filtros resetados",
-      description: "Filtros voltaram ao padrão inicial (pendentes/vencidas a partir de hoje).",
+      description: "Filtros voltaram ao padrão inicial (pendentes/vencidas até hoje).",
       duration: 3000,
     });
   };
@@ -296,8 +296,8 @@ const ParcelasTable: React.FC = () => {
     return statusFilters.length === 2 && 
            statusFilters.includes('pendente') && 
            statusFilters.includes('vencido') &&
-           dataInicio === new Date().toISOString().split('T')[0] &&
-           !dataFim &&
+           !dataInicio && // Sem data início
+           dataFim === new Date().toISOString().split('T')[0] && // Data fim é hoje
            idiomaFilter === 'todos' &&
            !searchTerm &&
            tipoFilters.length === 5;
@@ -961,7 +961,7 @@ const ParcelasTable: React.FC = () => {
                                           excluirParcela(parcela.id);
                                         }
                                       }}
-                                      className="hover:bg-red-50" style={{borderColor: '#FECACA', color: '#D90429'}} onMouseEnter={(e) => e.target.style.borderColor = '#FCA5A5'} onMouseLeave={(e) => e.target.style.borderColor = '#FECACA'}
+                                      className="hover:bg-red-50" style={{borderColor: '#FECACA', color: '#D90429'}} onMouseEnter={(e) => (e.target as HTMLElement).style.borderColor = '#FCA5A5'} onMouseLeave={(e) => (e.target as HTMLElement).style.borderColor = '#FECACA'}
                                     >
                                       <Trash2 className="h-4 w-4" />
                                     </Button>

@@ -58,10 +58,13 @@ export interface PlanoGenerico {
   nome: string;
   valor_total: number | null;
   valor_por_aula: number | null;
-  numero_aulas?: number; // Adicionar campos que estão sendo usados
+  numero_aulas: number; // Obrigatório para cálculos
   descricao?: string;
   carga_horaria_total?: number;
   frequencia_aulas?: string | number; // Aceitar Json do banco
+  tipo_valor?: string; // Adicionar tipo_valor para controle dos campos
+  idioma?: string; // Campo idioma usado nos formulários
+  observacao?: string; // Campo observacao usado nos formulários
 }
 
 export interface ContratoAluno {

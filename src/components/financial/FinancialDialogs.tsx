@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus } from 'lucide-react';
-import { Controller } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { DialogState, Student, Despesa, PlanoGenerico } from '@/types/financial';
 import { UseFormReturn } from 'react-hook-form';
 import DatePicker from '@/components/shared/DatePicker';
@@ -23,6 +23,17 @@ interface FinancialDialogsProps {
   openEditDespesaDialog: (despesa: Despesa) => void;
 }
 
+interface NovoPlanoFormData {
+  aluno_id: string;
+  plano_id: string;
+  aulas_pagas: string;
+  numero_parcelas: string;
+  data_primeiro_vencimento: string;
+  valor_matricula: string;
+  valor_material: string;
+  observacoes: string;
+}
+
 const FinancialDialogs: React.FC<FinancialDialogsProps> = ({
   dialogState,
   setDialogState,
@@ -34,7 +45,67 @@ const FinancialDialogs: React.FC<FinancialDialogsProps> = ({
   criarParcelaAvulsa,
   openEditDespesaDialog
 }) => {
-  // Forms removidos conforme solicitado
+  const { register, control, watch, reset, handleSubmit, setValue } = useForm<NovoPlanoFormData>({
+    defaultValues: {
+      aluno_id: '',
+      plano_id: '',
+      aulas_pagas: '',
+      numero_parcelas: '',
+      data_primeiro_vencimento: '',
+      valor_matricula: '0',
+      valor_material: '0',
+      observacoes: ''
+    }
+  });
+
+  const watchedValues = watch();
+  const planoSelecionado = planosGenericos.find(p => p.id === watchedValues.plano_id);
+
+  // Reset dos valores quando o plano é alterado
+  useEffect(() => {
+    if (watchedValues.plano_id && planoSelecionado) {
+      const tipoValor = planoSelecionado.tipo_valor;
+      
+      // Reset dos valores de matrícula e material baseado no tipo do plano
+      if (tipoValor === 'plano_matricula' || tipoValor === 'plano_completo') {
+        setValue('valor_matricula', '0');
+      }
+      
+      if (tipoValor === 'plano_material' || tipoValor === 'plano_completo') {
+        setValue('valor_material', '0');
+      }
+    }
+  }, [watchedValues.plano_id, planoSelecionado]);
+
+  // Função para determinar se o campo deve ser desabilitado e qual mensagem mostrar
+  const getFieldState = (field: 'matricula' | 'material') => {
+    if (!planoSelecionado?.tipo_valor) {
+      return { disabled: false, placeholder: '0,00' };
+    }
+
+    const tipoValor = planoSelecionado.tipo_valor;
+
+    if (field === 'matricula') {
+      if (tipoValor === 'plano_matricula' || tipoValor === 'plano_completo') {
+        return { disabled: true, placeholder: 'Matrícula já incluída no plano' };
+      }
+    }
+
+    if (field === 'material') {
+      if (tipoValor === 'plano_material' || tipoValor === 'plano_completo') {
+        return { disabled: true, placeholder: 'Material já incluído no plano' };
+      }
+    }
+
+    return { disabled: false, placeholder: '0,00' };
+  };
+
+  const matriculaState = getFieldState('matricula');
+  const materialState = getFieldState('material');
+
+  const onSubmitNovoPlano = (data: NovoPlanoFormData) => {
+    criarNovoPlano(data);
+  };
 
   return (
     <>
@@ -230,13 +301,13 @@ const FinancialDialogs: React.FC<FinancialDialogsProps> = ({
           <DialogHeader>
             <DialogTitle>Criar Novo Plano de Pagamento</DialogTitle>
           </DialogHeader>
-          <form onSubmit={(e) => { e.preventDefault(); criarNovoPlano({}); }} className="space-y-6">
+          <form onSubmit={handleSubmit(onSubmitNovoPlano)} className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="aluno_id">Aluno</Label>
                 <Controller
                   name="aluno_id"
-                  // control removido
+                  control={control}
                   rules={{ required: 'Selecione um aluno' }}
                   render={({ field }) => (
                     <Select onValueChange={field.onChange} value={field.value}>
@@ -259,7 +330,7 @@ const FinancialDialogs: React.FC<FinancialDialogsProps> = ({
                 <Label htmlFor="plano_id">Plano Base</Label>
                 <Controller
                   name="plano_id"
-                  // control removido
+                  control={control}
                   rules={{ required: 'Selecione um plano' }}
                   render={({ field }) => (
                     <Select onValueChange={field.onChange} value={field.value}>
@@ -285,7 +356,7 @@ const FinancialDialogs: React.FC<FinancialDialogsProps> = ({
                 <Input
                   id="aulas_pagas"
                   type="number"
-                  // register removido
+                  {...register('aulas_pagas')}
                   placeholder="Ex: 12"
                 />
               </div>
@@ -295,7 +366,7 @@ const FinancialDialogs: React.FC<FinancialDialogsProps> = ({
                 <Input
                   id="numero_parcelas"
                   type="number"
-                  // register removido
+                  {...register('numero_parcelas')}
                   placeholder="Ex: 12"
                 />
               </div>
@@ -305,7 +376,7 @@ const FinancialDialogs: React.FC<FinancialDialogsProps> = ({
                 <Input
                   id="data_primeiro_vencimento"
                   type="date"
-                  // register removido
+                  {...register('data_primeiro_vencimento')}
                 />
               </div>
             </div>
@@ -317,8 +388,10 @@ const FinancialDialogs: React.FC<FinancialDialogsProps> = ({
                   id="valor_matricula"
                   type="number"
                   step="0.01"
-                  // register removido
-                  placeholder="0,00"
+                  {...register('valor_matricula')}
+                  placeholder={matriculaState.placeholder}
+                  disabled={matriculaState.disabled}
+                  className={matriculaState.disabled ? 'bg-gray-100 text-gray-500' : ''}
                 />
               </div>
               
@@ -328,8 +401,10 @@ const FinancialDialogs: React.FC<FinancialDialogsProps> = ({
                   id="valor_material"
                   type="number"
                   step="0.01"
-                  // register removido
-                  placeholder="0,00"
+                  {...register('valor_material')}
+                  placeholder={materialState.placeholder}
+                  disabled={materialState.disabled}
+                  className={materialState.disabled ? 'bg-gray-100 text-gray-500' : ''}
                 />
               </div>
             </div>
@@ -338,7 +413,7 @@ const FinancialDialogs: React.FC<FinancialDialogsProps> = ({
               <Label htmlFor="observacoes">Observações</Label>
               <Textarea
                 id="observacoes"
-                // register removido
+                {...register('observacoes')}
                 placeholder="Observações adicionais sobre o plano..."
                 rows={3}
               />
@@ -353,7 +428,7 @@ const FinancialDialogs: React.FC<FinancialDialogsProps> = ({
                 variant="outline" 
                 onClick={() => {
                   setDialogState(prev => ({ ...prev, isNovoPlanoDialogOpen: false }));
-                  // reset removido
+                  reset();
                 }}
               >
                 Cancelar

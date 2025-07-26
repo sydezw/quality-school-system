@@ -63,14 +63,46 @@ export function useAuth() {
     setState(prev => ({ ...prev, loading: true, error: null }));
     
     try {
-      const { data: user, error } = await supabase
+      console.log('🔍 Tentando login com:', { email, password });
+      
+      // Primeiro, vamos verificar se o usuário existe
+      const { data: userCheck, error: checkError } = await supabase
         .from('usuarios')
-        .select('id, nome, email, cargo, created_at, updated_at')
-        .eq('email', email)
-        .eq('senha', password)
-        .single();
+        .select('id, nome, email, senha, cargo, created_at, updated_at')
+        .eq('email', email);
 
-      if (error || !user) {
+      console.log('👤 Usuários encontrados:', userCheck);
+      console.log('❌ Erro na busca:', checkError);
+
+      if (checkError) {
+        console.error('Erro ao buscar usuário:', checkError);
+        setState(prev => ({ ...prev, loading: false, error: 'Erro ao verificar usuário' }));
+        throw new Error('Erro ao verificar usuário');
+      }
+
+      if (!userCheck || userCheck.length === 0) {
+        console.log('❌ Nenhum usuário encontrado com este email');
+        setState(prev => ({ ...prev, loading: false, error: 'Email não encontrado' }));
+        throw new Error('Email não encontrado');
+      }
+
+      const user = userCheck[0];
+      console.log('🔐 Comparando senhas:', { 
+        senhaDigitada: password, 
+        senhaBanco: user.senha,
+        senhaLimpa: user.senha?.trim(),
+        saoIguais: password === user.senha?.trim()
+      });
+
+      if (user.senha?.trim() !== password.trim()) {
+        console.log('❌ Senha incorreta');
+        setState(prev => ({ ...prev, loading: false, error: 'Senha incorreta' }));
+        throw new Error('Senha incorreta');
+      }
+
+      console.log('✅ Login bem-sucedido!');
+
+      if (!user) {
         setState(prev => ({ ...prev, loading: false, error: 'Credenciais inválidas' }));
         throw new Error('Credenciais inválidas');
       }
@@ -111,7 +143,7 @@ export function useAuth() {
     try {
       const { error } = await supabase
         .from('usuarios_pendentes')
-        .insert([userData]);
+        .insert(userData);
 
       if (error) {
         if (error.code === '23505') {

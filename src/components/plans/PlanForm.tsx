@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
@@ -24,6 +25,7 @@ interface Plan {
   observacoes: string | null;
   ativo: boolean | null;
   idioma: 'Inglês' | 'Japonês' | 'Inglês/Japonês';
+  tipo_valor?: 'plano' | 'plano_material' | 'plano_matricula' | 'plano_completo';
   created_at: string;
   updated_at: string;
 }
@@ -52,7 +54,8 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
     permite_cancelamento: false,
     permite_parcelamento: false,
     observacoes: '',
-    ativo: true
+    ativo: true,
+    tipo_valor: 'plano' // novo campo
   });
 
   const { toast } = useToast();
@@ -92,7 +95,8 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
         permite_cancelamento: plan.permite_cancelamento ?? false,
         permite_parcelamento: plan.permite_parcelamento ?? false,
         observacoes: plan.observacoes || '',
-        ativo: plan.ativo ?? true
+        ativo: plan.ativo ?? true,
+        tipo_valor: plan.tipo_valor || 'plano'
       });
     }
   }, [plan]);
@@ -254,7 +258,8 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
         permite_cancelamento: formData.permite_cancelamento,
         permite_parcelamento: formData.permite_parcelamento,
         observacoes: formData.observacoes || null,
-        ativo: formData.ativo
+        ativo: formData.ativo,
+        tipo_valor: formData.tipo_valor
       };
 
       let error;
@@ -491,6 +496,30 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
             placeholder="Calculado automaticamente"
           />
         </div>
+      </div>
+
+      <div>
+        <Label>Tipo de Valor *</Label>
+        <Tabs value={formData.tipo_valor} onValueChange={(value) => handleInputChange('tipo_valor', value)} className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="plano">Plano Básico</TabsTrigger>
+            <TabsTrigger value="plano_material">Plano + Material</TabsTrigger>
+            <TabsTrigger value="plano_matricula">Plano + Matrícula</TabsTrigger>
+            <TabsTrigger value="plano_completo">Plano Completo</TabsTrigger>
+          </TabsList>
+          <TabsContent value="plano" className="mt-2">
+            <p className="text-sm text-gray-600">Valor inclui apenas o plano de aulas</p>
+          </TabsContent>
+          <TabsContent value="plano_material" className="mt-2">
+            <p className="text-sm text-gray-600">Valor inclui o plano de aulas + material didático</p>
+          </TabsContent>
+          <TabsContent value="plano_matricula" className="mt-2">
+            <p className="text-sm text-gray-600">Valor inclui o plano de aulas + taxa de matrícula</p>
+          </TabsContent>
+          <TabsContent value="plano_completo" className="mt-2">
+            <p className="text-sm text-gray-600">Valor inclui o plano de aulas + material + matrícula</p>
+          </TabsContent>
+        </Tabs>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

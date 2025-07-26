@@ -28,6 +28,7 @@ interface Plan {
   observacoes: string | null;
   ativo: boolean | null;
   idioma: 'Inglês' | 'Japonês' | 'Inglês/Japonês';
+  tipo_valor?: 'plano' | 'plano_material' | 'plano_matricula' | 'plano_completo';
   created_at: string;
   updated_at: string;
 }
@@ -112,7 +113,8 @@ const Plans = () => {
         permite_cancelamento: plan.permite_cancelamento ?? true,
         permite_parcelamento: plan.permite_parcelamento ?? true,
         ativo: plan.ativo ?? true,
-        idioma: plan.idioma as 'Inglês' | 'Japonês' | 'Inglês/Japonês'
+        idioma: plan.idioma as 'Inglês' | 'Japonês' | 'Inglês/Japonês',
+        tipo_valor: plan.tipo_valor as 'plano' | 'plano_material' | 'plano_matricula' | 'plano_completo' | undefined
       }));
       
       setPlans(typedPlansData);
@@ -255,6 +257,38 @@ const Plans = () => {
     setShowStudentsModal(true);
   };
 
+  // Função para formatar o tipo de valor
+  const formatTipoValor = (tipo?: string) => {
+    switch (tipo) {
+      case 'plano':
+        return 'Plano Básico';
+      case 'plano_material':
+        return 'Plano + Material';
+      case 'plano_matricula':
+        return 'Plano + Matrícula';
+      case 'plano_completo':
+        return 'Plano Completo';
+      default:
+        return 'Plano Básico';
+    }
+  };
+
+  // Função para cor do badge do tipo de valor
+  const getTipoValorColor = (tipo?: string) => {
+    switch (tipo) {
+      case 'plano':
+        return 'bg-blue-100 text-blue-800';
+      case 'plano_material':
+        return 'bg-green-100 text-green-800';
+      case 'plano_matricula':
+        return 'bg-orange-100 text-orange-800';
+      case 'plano_completo':
+        return 'bg-purple-100 text-purple-800';
+      default:
+        return 'bg-blue-100 text-blue-800';
+    }
+  };
+
 
 
   return (
@@ -345,6 +379,12 @@ const Plans = () => {
                       </Badge>
                     )}
                   </div>
+                </div>
+                {/* Badge do tipo de valor */}
+                <div className="mt-2">
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getTipoValorColor(plan.tipo_valor)}`}>
+                    {formatTipoValor(plan.tipo_valor)}
+                  </span>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">

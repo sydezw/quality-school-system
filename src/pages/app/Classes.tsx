@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, BookCopy } from 'lucide-react';
+import { Plus, Edit, Trash2, BookCopy, Calendar, Clock, Globe, Book, Users, GraduationCap, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 
 interface Class {
@@ -81,7 +81,17 @@ const Classes = () => {
   
       if (error) throw error;
       
-      setClasses(data || []);
+      // Converter os dados para o formato esperado pelo tipo Class
+      const formattedData = data?.map(item => ({
+        ...item,
+        materiais_ids: Array.isArray(item.materiais_ids) 
+          ? item.materiais_ids.map(id => String(id)) // Converter cada elemento para string
+          : item.materiais_ids 
+            ? [String(item.materiais_ids)] // Converter valor único para string e colocar em array
+            : [] // Array vazio se for null/undefined
+      })) || [];
+      
+      setClasses(formattedData);
     } catch (error) {
       console.error('Erro ao buscar turmas:', error);
       toast({
@@ -396,10 +406,10 @@ const Classes = () => {
                     className="mt-1"
                   />
                   {errors.nome && (
-                    <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
-                      <span className="text-red-500">⚠</span>
-                      {errors.nome.message}
-                    </p>
+                    <div className="mt-1 flex items-center gap-1">
+                      <AlertTriangle className="h-4 w-4 text-red-500" />
+                      <p className="text-sm text-red-600">{errors.nome.message}</p>
+                    </div>
                   )}
                 </div>
 
@@ -415,17 +425,25 @@ const Classes = () => {
                       <SelectValue placeholder="Selecione o idioma" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Inglês">🇺🇸 Inglês</SelectItem>
-                      <SelectItem value="Japonês">🇯🇵 Japonês</SelectItem>
-                      <SelectItem value="Espanhol">🇪🇸 Espanhol</SelectItem>
-                      <SelectItem value="Francês">🇫🇷 Francês</SelectItem>
+                      <SelectItem value="Inglês">
+                        <div className="flex items-center gap-2">
+                          <Globe className="h-4 w-4" />
+                          Inglês
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Japonês">
+                        <div className="flex items-center gap-2">
+                          <Globe className="h-4 w-4" />
+                          Japonês
+                        </div>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   {errors.idioma && (
-                    <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
-                      <span className="text-red-500">⚠</span>
-                      {errors.idioma.message}
-                    </p>
+                    <div className="mt-1 flex items-center gap-1">
+                      <AlertTriangle className="h-4 w-4 text-red-500" />
+                      <p className="text-sm text-red-600">{errors.idioma.message}</p>
+                    </div>
                   )}
                 </div>
 
@@ -441,23 +459,73 @@ const Classes = () => {
                       <SelectValue placeholder="Selecione o nível" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Book 1">📚 Book 1</SelectItem>
-                      <SelectItem value="Book 2">📚 Book 2</SelectItem>
-                      <SelectItem value="Book 3">📚 Book 3</SelectItem>
-                      <SelectItem value="Book 4">📚 Book 4</SelectItem>
-                      <SelectItem value="Book 5">📚 Book 5</SelectItem>
-                      <SelectItem value="Book 6">📚 Book 6</SelectItem>
-                      <SelectItem value="Book 7">📚 Book 7</SelectItem>
-                      <SelectItem value="Book 8">📚 Book 8</SelectItem>
-                      <SelectItem value="Book 9">📚 Book 9</SelectItem>
-                      <SelectItem value="Book 10">📚 Book 10</SelectItem>
+                      <SelectItem value="Book 1">
+                        <div className="flex items-center gap-2">
+                          <Book className="h-4 w-4" />
+                          Book 1
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Book 2">
+                        <div className="flex items-center gap-2">
+                          <Book className="h-4 w-4" />
+                          Book 2
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Book 3">
+                        <div className="flex items-center gap-2">
+                          <Book className="h-4 w-4" />
+                          Book 3
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Book 4">
+                        <div className="flex items-center gap-2">
+                          <Book className="h-4 w-4" />
+                          Book 4
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Book 5">
+                        <div className="flex items-center gap-2">
+                          <Book className="h-4 w-4" />
+                          Book 5
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Book 6">
+                        <div className="flex items-center gap-2">
+                          <Book className="h-4 w-4" />
+                          Book 6
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Book 7">
+                        <div className="flex items-center gap-2">
+                          <Book className="h-4 w-4" />
+                          Book 7
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Book 8">
+                        <div className="flex items-center gap-2">
+                          <Book className="h-4 w-4" />
+                          Book 8
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Book 9">
+                        <div className="flex items-center gap-2">
+                          <Book className="h-4 w-4" />
+                          Book 9
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Book 10">
+                        <div className="flex items-center gap-2">
+                          <Book className="h-4 w-4" />
+                          Book 10
+                        </div>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   {errors.nivel && (
-                    <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
-                      <span className="text-red-500">⚠</span>
-                      {errors.nivel.message}
-                    </p>
+                    <div className="mt-1 flex items-center gap-1">
+                      <AlertTriangle className="h-4 w-4 text-red-500" />
+                      <p className="text-sm text-red-600">{errors.nivel.message}</p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -537,18 +605,55 @@ const Classes = () => {
                         <SelectValue placeholder="Selecione o dia" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Segunda">🗓️ Segunda-feira</SelectItem>
-                        <SelectItem value="Terça">🗓️ Terça-feira</SelectItem>
-                        <SelectItem value="Quarta">🗓️ Quarta-feira</SelectItem>
-                        <SelectItem value="Quinta">🗓️ Quinta-feira</SelectItem>
-                        <SelectItem value="Sexta">🗓️ Sexta-feira</SelectItem>
+                        <SelectItem value="Segunda">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4" />
+                            Segunda-feira
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="Terça">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4" />
+                            Terça-feira
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="Quarta">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4" />
+                            Quarta-feira
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="Quinta">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4" />
+                            Quinta-feira
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="Sexta">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4" />
+                            Sexta-feira
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="Sábado">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4" />
+                            Sábado
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="Domingo">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4" />
+                            Domingo
+                          </div>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     {errors.dias_da_semana && (
-                      <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
-                        <span className="text-red-500">⚠</span>
-                        {errors.dias_da_semana.message}
-                      </p>
+                      <div className="mt-1 flex items-center gap-1">
+                        <AlertTriangle className="h-4 w-4 text-red-500" />
+                        <p className="text-sm text-red-600">{errors.dias_da_semana.message}</p>
+                      </div>
                     )}
                   </div>
                 
@@ -614,41 +719,16 @@ const Classes = () => {
                       
                       {/* Ícone de relógio */}
                       <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                        <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
+                        <Clock className="h-4 w-4 text-gray-400" />
                       </div>
                     </div>
                     
-                    {/* Exemplo visual */}
-                    <div className="mt-1 text-xs text-gray-500">
-                      💡 Digite: <span className="font-mono bg-gray-100 px-1 rounded">8:00</span> → automaticamente vira <span className="font-mono bg-gray-100 px-1 rounded">8:00 - </span> → complete com <span className="font-mono bg-gray-100 px-1 rounded">9:00</span>
-                    </div>
-                    
-                    {/* Sugestões rápidas */}
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      <span className="text-xs text-gray-500 mr-2">Rápido:</span>
-                      {[
-                        '8:00 - 9:30',
-                        '9:30 - 11:00', 
-                        '14:00 - 15:30',
-                        '19:00 - 20:30'
-                      ].map((suggestion) => (
-                        <button
-                          key={suggestion}
-                          type="button"
-                          onClick={() => setValue('horario', suggestion)}
-                          className="text-xs px-2 py-1 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors text-blue-700 border border-blue-200"
-                        >
-                          {suggestion}
-                        </button>
-                      ))}
-                    </div>
+
                     
                     {/* Mensagem de erro */}
                     {errors.horario && (
                       <div className="mt-1 flex items-center gap-1">
-                        <span className="text-red-500 text-sm">⚠</span>
+                        <AlertTriangle className="h-4 w-4 text-red-500" />
                         <p className="text-sm text-red-600">{errors.horario.message}</p>
                       </div>
                     )}
@@ -676,7 +756,7 @@ const Classes = () => {
                           
                           return (
                             <div className="mt-1 flex items-center gap-1 text-xs text-green-600">
-                              <span>✓</span>
+                              <CheckCircle className="h-3 w-3" />
                               <span>Duração: {durationText.trim()}</span>
                             </div>
                           );
@@ -706,14 +786,14 @@ const Classes = () => {
                     <SelectContent>
                       <SelectItem value="none">
                         <div className="flex items-center gap-2">
-                          <span className="text-gray-400">👤</span>
+                          <Users className="h-4 w-4 text-gray-400" />
                           Sem professor
                         </div>
                       </SelectItem>
                       {filteredTeachers.map((teacher) => (
                         <SelectItem key={teacher.id} value={teacher.id}>
                           <div className="flex items-center gap-2">
-                            <span className="text-green-600">👨‍🏫</span>
+                            <GraduationCap className="h-4 w-4 text-green-600" />
                             {teacher.nome}
                             <Badge variant="outline" className="text-xs ml-2">
                               {teacher.idiomas}
@@ -725,7 +805,7 @@ const Classes = () => {
                   </Select>
                   {selectedIdioma && filteredTeachers.length === 0 && (
                     <p className="text-sm text-amber-600 mt-1 flex items-center gap-1">
-                      <span className="text-amber-500">⚠</span>
+                      <AlertTriangle className="h-4 w-4 text-amber-500" />
                       Nenhum professor disponível para {selectedIdioma}
                     </p>
                   )}
@@ -754,7 +834,17 @@ const Classes = () => {
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
-                      {editingClass ? '✏️ Atualizar' : '➕ Criar'}
+                      {editingClass ? (
+                        <>
+                          <Edit className="h-4 w-4" />
+                          Atualizar
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4" />
+                          Criar
+                        </>
+                      )}
                     </div>
                   )}
                 </Button>

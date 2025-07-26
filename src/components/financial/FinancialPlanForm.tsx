@@ -16,24 +16,12 @@ import { cn } from '@/lib/utils';
 import DatePicker from '@/components/shared/DatePicker';
 import { format } from 'date-fns';
 import { criarParcelasComNumeracaoCorreta } from '@/utils/parcelaNumbering';
+import { PlanoGenerico } from '@/types/financial';
 
 // HELPER FUNCTION: Formatação de valores decimais para padrão brasileiro
 const formatarDecimalBR = (valor: number): string => {
   return valor.toFixed(2).replace('.', ',');
 };
-
-interface PlanoGenerico {
-  id: string;
-  nome: string;
-  valor_total: number | null;
-  valor_por_aula: number | null;
-  numero_aulas: number;
-  descricao?: string;
-  carga_horaria_total?: number;
-  frequencia_aulas?: any; // Alterado de 'string | number' para 'any' para aceitar Json
-  idioma?: string; // Adicionada propriedade idioma
-  observacao?: string; // Adicionada propriedade observacao
-}
 
 interface Student {
   id: string;
@@ -102,6 +90,27 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
     }
   }, [preSelectedStudent]);
 
+  // Novo useEffect para resetar valores quando o plano é alterado
+  useEffect(() => {
+    if (watchedValues.plano_id) {
+      const planoSelecionado = planosGenericos.find(p => p.id === watchedValues.plano_id);
+      const tipoValor = planoSelecionado?.tipo_valor;
+      
+      // Reset dos valores de matrícula e material baseado no tipo do plano
+      if (tipoValor === 'plano_matricula' || tipoValor === 'plano_completo') {
+        setValue('valor_matricula', '0');
+        setValue('forma_pagamento_matricula', 'boleto');
+        setValue('numero_parcelas_matricula', '');
+      }
+      
+      if (tipoValor === 'plano_material' || tipoValor === 'plano_completo') {
+        setValue('valor_material', '0');
+        setValue('forma_pagamento_material', 'boleto');
+        setValue('numero_parcelas_material', '');
+      }
+    }
+  }, [watchedValues.plano_id, planosGenericos]);
+
   const fetchStudents = async () => {
     try {
       const { data, error } = await supabase
@@ -126,7 +135,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
     try {
       const { data, error } = await supabase
         .from('planos')
-        .select('id, nome, valor_total, valor_por_aula, numero_aulas, descricao, carga_horaria_total, frequencia_aulas, idioma')
+        .select('id, nome, valor_total, valor_por_aula, numero_aulas, descricao, carga_horaria_total, frequencia_aulas, idioma, tipo_valor')
         .eq('ativo', true)
         .order('nome');
 
@@ -844,26 +853,64 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
         <div className="grid grid-cols-3 gap-4">
           <div>
             <Label htmlFor="valor_matricula">Valor da Matrícula</Label>
-            <Input
-              id="valor_matricula"
-              type="number"
-              step="0.01"
-              min="0"
-              {...register('valor_matricula')}
-              placeholder="0,00"
-            />
+            {(() => {
+              const planoSelecionado = planosGenericos.find(p => p.id === watchedValues.plano_id);
+              const tipoValor = planoSelecionado?.tipo_valor;
+              
+              if (tipoValor === 'plano_matricula' || tipoValor === 'plano_completo') {
+                return (
+                  <Input
+                    id="valor_matricula"
+                    type="text"
+                    value="Matrícula já incluída no plano"
+                    disabled
+                    className="bg-gray-100 text-gray-600"
+                  />
+                );
+              }
+              
+              return (
+                <Input
+                  id="valor_matricula"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  {...register('valor_matricula')}
+                  placeholder="0,00"
+                />
+              );
+            })()}
           </div>
           
           <div>
             <Label htmlFor="valor_material">Valor do Material</Label>
-            <Input
-              id="valor_material"
-              type="number"
-              step="0.01"
-              min="0"
-              {...register('valor_material')}
-              placeholder="0,00"
-            />
+            {(() => {
+              const planoSelecionado = planosGenericos.find(p => p.id === watchedValues.plano_id);
+              const tipoValor = planoSelecionado?.tipo_valor;
+              
+              if (tipoValor === 'plano_material' || tipoValor === 'plano_completo') {
+                return (
+                  <Input
+                    id="valor_material"
+                    type="text"
+                    value="Material já incluído no plano"
+                    disabled
+                    className="bg-gray-100 text-gray-600"
+                  />
+                );
+              }
+              
+              return (
+                <Input
+                  id="valor_material"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  {...register('valor_material')}
+                  placeholder="0,00"
+                />
+              );
+            })()}
           </div>
         </div>
 
@@ -1095,7 +1142,10 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
           </Button>
           <Button 
             type="submit" 
-            className="w-32" style={{backgroundColor: '#D90429'}} onMouseEnter={(e) => e.target.style.backgroundColor = '#B91C1C'} onMouseLeave={(e) => e.target.style.backgroundColor = '#D90429'}
+            className="w-32" 
+            style={{backgroundColor: '#D90429'}} 
+            onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#B91C1C'} 
+            onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = '#D90429'}
             disabled={loading}
           >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

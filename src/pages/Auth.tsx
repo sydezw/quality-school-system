@@ -57,8 +57,8 @@ const Auth = () => {
       await signUp({
         nome: registerName,
         email: registerEmail,
-        cargo_desejado: registerCargo,
-        motivo: 'Solicitação via sistema'
+        senha: registerPassword,
+        cargo: registerCargo as 'Secretária' | 'Gerente' | 'Admin'
       });
       
       toast.success('Cadastro realizado com sucesso! Aguarde a aprovação do administrador.');
@@ -177,7 +177,8 @@ const Auth = () => {
                       required
                     >
                       <option value="Secretária">Secretária</option>
-                      <option value="Administrador">Administrador</option>
+                      <option value="Gerente">Gerente</option>
+                      <option value="Admin">Admin</option>
                     </select>
                   </div>
                   <Button 

@@ -198,7 +198,7 @@ export const EditarParcelaHistoricoModal: React.FC<EditarParcelaHistoricoModalPr
           <Button variant="outline" onClick={onClose} disabled={loading}>
             Cancelar
           </Button>
-          <Button onClick={salvarEdicao} disabled={loading} className="" style={{background: 'linear-gradient(to right, #D90429, #1F2937)'}} onMouseEnter={(e) => e.target.style.background = 'linear-gradient(to right, #B91C1C, #111827)'} onMouseLeave={(e) => e.target.style.background = 'linear-gradient(to right, #D90429, #1F2937)'}>
+          <Button onClick={salvarEdicao} disabled={loading} className="" style={{background: 'linear-gradient(to right, #D90429, #1F2937)'}} onMouseEnter={(e) => (e.target as HTMLElement).style.background = 'linear-gradient(to right, #B91C1C, #111827)'} onMouseLeave={(e) => (e.target as HTMLElement).style.background = 'linear-gradient(to right, #D90429, #1F2937)'}>
             {loading ? 'Salvando...' : 'Salvar Alterações'}
           </Button>
         </div>

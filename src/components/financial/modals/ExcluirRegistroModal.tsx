@@ -275,7 +275,7 @@ export const ExcluirRegistroModal: React.FC<ExcluirRegistroModalProps> = ({
             <Button 
               onClick={handleExcluir}
               disabled={confirmText !== 'excluir' || !entendeuConsequencias || loading}
-              className="" style={{backgroundColor: '#D90429'}} onMouseEnter={(e) => e.target.style.backgroundColor = '#B91C1C'} onMouseLeave={(e) => e.target.style.backgroundColor = '#D90429'}
+              className="" style={{backgroundColor: '#D90429'}} onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#B91C1C'} onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = '#D90429'}
             >
               {loading ? (
                 'Excluindo...'

@@ -329,7 +329,7 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                       <Button 
                         variant="outline" 
                         onClick={limparFiltros}
-                        className="transition-all duration-200" onMouseEnter={(e) => {e.target.style.backgroundColor = '#FEF2F2'; e.target.style.borderColor = '#FECACA'}} onMouseLeave={(e) => {e.target.style.backgroundColor = ''; e.target.style.borderColor = ''}}
+                        className="transition-all duration-200" onMouseEnter={(e) => {(e.target as HTMLElement).style.backgroundColor = '#FEF2F2'; (e.target as HTMLElement).style.borderColor = '#FECACA'}} onMouseLeave={(e) => {(e.target as HTMLElement).style.backgroundColor = ''; (e.target as HTMLElement).style.borderColor = ''}}
                       >
                         <Filter className="h-4 w-4 mr-2" />
                         Limpar Filtros
@@ -420,7 +420,7 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                                     initial={{ opacity: 0, x: -20 }}
                                     animate={{ opacity: 1, x: 0 }}
                                     transition={{ duration: 0.3, delay: index * 0.05 }}
-                                    className="transition-colors duration-200 border-b" style={{borderBottomColor: '#F3F4F6'}} onMouseEnter={(e) => e.target.style.backgroundColor = '#FEF2F2'} onMouseLeave={(e) => e.target.style.backgroundColor = ''}
+                                    className="transition-colors duration-200 border-b" style={{borderBottomColor: '#F3F4F6'}} onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#FEF2F2'} onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = ''}
                                   >
                                     <TableCell className="font-medium py-4 text-base">
                                       <div className="flex items-center gap-2">
@@ -485,7 +485,7 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                                               <Button
                                                 size="sm"
                                                 onClick={() => abrirModalEdicao(parcela)}
-                                                className="text-white h-8 w-8 p-0" style={{background: 'linear-gradient(to right, #D90429, #1F2937)'}} onMouseEnter={(e) => e.target.style.background = 'linear-gradient(to right, #B91C1C, #111827)'} onMouseLeave={(e) => e.target.style.background = 'linear-gradient(to right, #D90429, #1F2937)'}
+                                                className="text-white h-8 w-8 p-0" style={{background: 'linear-gradient(to right, #D90429, #1F2937)'}} onMouseEnter={(e) => (e.target as HTMLElement).style.background = 'linear-gradient(to right, #B91C1C, #111827)'} onMouseLeave={(e) => (e.target as HTMLElement).style.background = 'linear-gradient(to right, #D90429, #1F2937)'}
                                               >
                                                 <Edit className="h-4 w-4" />
                                               </Button>
@@ -593,7 +593,7 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
               <Button 
                 variant="outline" 
                 onClick={onClose}
-                className="transition-all duration-200" onMouseEnter={(e) => {e.target.style.backgroundColor = '#FEF2F2'; e.target.style.borderColor = '#FECACA'}} onMouseLeave={(e) => {e.target.style.backgroundColor = ''; e.target.style.borderColor = ''}}
+                className="transition-all duration-200" onMouseEnter={(e) => {(e.target as HTMLElement).style.backgroundColor = '#FEF2F2'; (e.target as HTMLElement).style.borderColor = '#FECACA'}} onMouseLeave={(e) => {(e.target as HTMLElement).style.backgroundColor = ''; (e.target as HTMLElement).style.borderColor = ''}}
               >
                 Fechar
               </Button>
