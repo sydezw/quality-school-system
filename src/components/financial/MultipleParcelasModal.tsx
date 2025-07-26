@@ -24,19 +24,24 @@ interface NovaParcelaForm {
   forma_pagamento?: string;
 }
 
+interface Aluno {
+  id: string;
+  nome: string;
+  registro_financeiro_id: string;
+  // Adicionar outras propriedades conforme necessário
+}
+
 interface MultipleParcelasModalProps {
   isOpen: boolean;
   onClose: () => void;
-  registroFinanceiroId: string;
-  idiomaRegistro: 'Inglês' | 'Japonês';
+  aluno: Aluno | null;
   onSuccess: () => void;
 }
 
 export const MultipleParcelasModal: React.FC<MultipleParcelasModalProps> = ({
   isOpen,
   onClose,
-  registroFinanceiroId,
-  idiomaRegistro,
+  aluno,
   onSuccess
 }) => {
   const [activeTab, setActiveTab] = useState<'single' | 'multiple'>('single');
@@ -45,13 +50,13 @@ export const MultipleParcelasModal: React.FC<MultipleParcelasModalProps> = ({
 
   // Estados para parcela única
   const [singleParcela, setSingleParcela] = useState<NovaParcelaForm>({
-    registro_financeiro_id: registroFinanceiroId,
+    registro_financeiro_id: aluno?.registro_financeiro_id || '',
     tipo_item: 'plano',
     numero_parcela: 1,
     valor: 0,
     data_vencimento: '',
     status_pagamento: 'pendente',
-    idioma_registro: idiomaRegistro,
+    idioma_registro: 'Inglês',
     descricao_item: '',
     observacoes: '',
     forma_pagamento: 'boleto'
@@ -70,14 +75,14 @@ export const MultipleParcelasModal: React.FC<MultipleParcelasModalProps> = ({
   });
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && aluno) {
       setSingleParcela(prev => ({
         ...prev,
-        registro_financeiro_id: registroFinanceiroId,
-        idioma_registro: idiomaRegistro
+        registro_financeiro_id: aluno.registro_financeiro_id,
+        idioma_registro: 'Inglês'
       }));
     }
-  }, [isOpen, registroFinanceiroId, idiomaRegistro]);
+  }, [isOpen, aluno]);
 
   const calcularDatasMultiplas = () => {
     const datas: string[] = [];
@@ -101,8 +106,21 @@ export const MultipleParcelasModal: React.FC<MultipleParcelasModalProps> = ({
   const criarParcelaUnica = async () => {
     setLoading(true);
     try {
+      if (!aluno?.registro_financeiro_id) {
+        throw new Error('ID do registro financeiro não encontrado');
+      }
+
+      // Validar campos obrigatórios
+      if (!singleParcela.data_vencimento) {
+        throw new Error('Data de vencimento é obrigatória');
+      }
+
+      if (singleParcela.valor <= 0) {
+        throw new Error('Valor deve ser maior que zero');
+      }
+
       const proximoNumero = await getProximoNumeroParcela(
-        registroFinanceiroId,
+        aluno.registro_financeiro_id,
         singleParcela.tipo_item
       );
 
@@ -126,7 +144,7 @@ export const MultipleParcelasModal: React.FC<MultipleParcelasModalProps> = ({
       console.error('Erro ao criar parcela:', error);
       toast({
         title: "Erro",
-        description: "Erro ao criar parcela. Tente novamente.",
+        description: error.message || "Erro ao criar parcela. Tente novamente.",
         variant: "destructive",
       });
     } finally {
@@ -137,23 +155,40 @@ export const MultipleParcelasModal: React.FC<MultipleParcelasModalProps> = ({
   const criarMultiplasParcelas = async () => {
     setLoading(true);
     try {
+      if (!aluno?.registro_financeiro_id) {
+        throw new Error('ID do registro financeiro não encontrado');
+      }
+
+      // Validar campos obrigatórios
+      if (!multipleParcelas.data_inicial) {
+        throw new Error('Data inicial é obrigatória');
+      }
+
+      if (multipleParcelas.valor_total <= 0) {
+        throw new Error('Valor deve ser maior que zero');
+      }
+
+      if (multipleParcelas.quantidade < 2) {
+        throw new Error('Quantidade deve ser pelo menos 2 parcelas');
+      }
+
       const datas = calcularDatasMultiplas();
       // Usar o valor_total diretamente para cada parcela, não dividir
       const valorPorParcela = multipleParcelas.valor_total;
       
       const proximoNumero = await getProximoNumeroParcela(
-        registroFinanceiroId,
+        aluno.registro_financeiro_id,
         multipleParcelas.tipo_item
       );
 
       const parcelasParaInserir = datas.map((data, index) => ({
-        registro_financeiro_id: registroFinanceiroId,
+        registro_financeiro_id: aluno.registro_financeiro_id,
         tipo_item: multipleParcelas.tipo_item,
         numero_parcela: proximoNumero + index,
         valor: valorPorParcela,
         data_vencimento: data,
         status_pagamento: 'pendente' as const,
-        idioma_registro: idiomaRegistro,
+        idioma_registro: 'Inglês',
         descricao_item: multipleParcelas.descricao_item || null,
         observacoes: multipleParcelas.observacoes || null,
         forma_pagamento: multipleParcelas.forma_pagamento
@@ -176,7 +211,7 @@ export const MultipleParcelasModal: React.FC<MultipleParcelasModalProps> = ({
       console.error('Erro ao criar múltiplas parcelas:', error);
       toast({
         title: "Erro",
-        description: "Erro ao criar parcelas. Tente novamente.",
+        description: error.message || "Erro ao criar parcelas. Tente novamente.",
         variant: "destructive",
       });
     } finally {
@@ -186,13 +221,13 @@ export const MultipleParcelasModal: React.FC<MultipleParcelasModalProps> = ({
 
   const resetForm = () => {
     setSingleParcela({
-      registro_financeiro_id: registroFinanceiroId,
+      registro_financeiro_id: aluno?.registro_financeiro_id || '',
       tipo_item: 'plano',
       numero_parcela: 1,
       valor: 0,
       data_vencimento: '',
       status_pagamento: 'pendente',
-      idioma_registro: idiomaRegistro,
+      idioma_registro: 'Inglês',
       descricao_item: '',
       observacoes: '',
       forma_pagamento: 'boleto'

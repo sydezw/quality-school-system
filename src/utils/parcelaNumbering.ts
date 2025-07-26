@@ -27,6 +27,11 @@ export const getProximoNumeroParcela = async (
   tipoItem: TipoItem
 ): Promise<number> => {
   try {
+    // Validar se o registroFinanceiroId é válido
+    if (!registroFinanceiroId || registroFinanceiroId === 'undefined' || registroFinanceiroId.trim() === '') {
+      throw new Error('ID do registro financeiro é obrigatório e não pode estar vazio');
+    }
+    
     console.log('Buscando próximo número para:', { registroFinanceiroId, tipoItem });
     
     const { data: parcelas, error } = await supabase
