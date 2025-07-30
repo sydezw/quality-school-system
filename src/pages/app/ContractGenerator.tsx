@@ -1,12 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Printer, FileText } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Printer, FileText, Edit, Save, X, Check, ChevronsUpDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-
-
+import { cn } from '@/lib/utils';
+import './contract-styles.css';
+import teenSpeechSignature from '@/assets/signatures/teen-speech-assinatura.png';
+import testemunha1Signature from '@/assets/signatures/testemunha1.png';
+import testemunha2Signature from '@/assets/signatures/testemunha2.png';
 
 interface Student {
   id: string;
@@ -25,36 +33,132 @@ interface Student {
 }
 
 const ContractGenerator = () => {
+  const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
+  const [allStudents, setAllStudents] = useState<Student[]>([]);
+  const [plans, setPlans] = useState<any[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [selectedLanguage, setSelectedLanguage] = useState<string>('Inglês');
+  const [selectedContract, setSelectedContract] = useState<string>('');
+
   const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editableContent, setEditableContent] = useState('');
+  const [savedContent, setSavedContent] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedPlan, setSelectedPlan] = useState('all');
+
+  const [open, setOpen] = useState(false);
+  const editableRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
+  // Derived data from selected student
+  const planData = selectedStudent?.financeiro_alunos && selectedStudent.financeiro_alunos.length > 0 ? selectedStudent.financeiro_alunos[0].planos : null;
+  const financialData = selectedStudent?.financeiro_alunos && selectedStudent.financeiro_alunos.length > 0 ? selectedStudent.financeiro_alunos[0] : null;
+
+  useEffect(() => {
+    fetchStudents();
+    fetchPlans();
+  }, []);
+
+  useEffect(() => {
+    filterStudents();
+  }, [searchTerm, selectedPlan, allStudents]);
+
+  const fetchPlans = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('planos')
+        .select('*')
+        .order('nome');
+
+      if (error) throw error;
+      setPlans(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar planos:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao carregar planos',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const filterStudents = () => {
+    let filtered = allStudents;
+
+    // Filtro por nome com busca inteligente
+    if (searchTerm) {
+      const queryNorm = searchTerm.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      const queryNumbers = searchTerm.replace(/\D/g, "");
+      
+      filtered = filtered.filter(student => {
+        const nomeNorm = student.nome ? student.nome.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "";
+        const cpfNorm = student.cpf ? student.cpf.replace(/\D/g, "") : "";
+        const telefoneNorm = student.telefone ? student.telefone.replace(/\D/g, "") : "";
+
+        // Busca inteligente: início do nome completo, início de qualquer palavra, CPF ou telefone
+        const nomeWords = nomeNorm.split(' ').filter(word => word.length > 0);
+        const queryMatches = (
+          // Começa com a query
+          nomeNorm.startsWith(queryNorm) ||
+          // Qualquer palavra começa com a query
+          nomeWords.some(word => word.startsWith(queryNorm)) ||
+          // CPF contém os números
+          (cpfNorm && cpfNorm.includes(queryNumbers)) ||
+          // Telefone contém os números
+          (telefoneNorm && telefoneNorm.includes(queryNumbers))
+        );
+
+        return queryMatches;
+      });
+    }
+
+    // Filtro por plano
+    if (selectedPlan && selectedPlan !== 'all') {
+      filtered = filtered.filter(student => 
+        student.financeiro_alunos?.some(financeiro => 
+          financeiro.planos?.nome === selectedPlan
+        )
+      );
+    }
+
+    setStudents(filtered);
+    
+    // Auto-select first student if there are filtered results
+    if (filtered.length > 0 && (searchTerm || (selectedPlan && selectedPlan !== 'all'))) {
+      setSelectedStudent(filtered[0]);
+      setSelectedContract('contrato1');
+    } else if (filtered.length === 0) {
+      setSelectedStudent(null);
+    }
+  };
 
   const fetchStudents = async () => {
     try {
-      setLoading(true);
-      
-      const { data: studentsData, error } = await supabase
+      const { data, error } = await supabase
         .from('alunos')
         .select(`
-          id,
-          nome,
-          cpf,
-          idioma,
-          responsavel_id,
-          status,
-          telefone,
-          turmas:turma_id(nome),
-          responsaveis:responsavel_id(nome)
+          *,
+          turmas(nome),
+          responsaveis(nome, cpf, telefone, email, endereco, numero_endereco),
+          financeiro_alunos(
+            plano_id,
+            valor_plano,
+            numero_parcelas_plano,
+            planos(
+              nome,
+              valor_total,
+              numero_aulas,
+              frequencia_aulas,
+              descricao
+            )
+          )
         `)
-        .eq('status', 'Ativo')
-        .order('nome', { ascending: true });
+        .order('nome');
 
       if (error) throw error;
-
-      setStudents(studentsData || []);
+      setAllStudents(data || []);
+      setStudents(data || []);
     } catch (error) {
       console.error('Erro ao buscar alunos:', error);
       toast({
@@ -67,105 +171,476 @@ const ContractGenerator = () => {
     }
   };
 
-  useEffect(() => {
-    fetchStudents();
-  }, []);
-
   const handleStudentSelect = (studentId: string) => {
     const student = students.find(s => s.id === studentId);
     setSelectedStudent(student || null);
     if (student) {
-      setSelectedLanguage(student.idioma);
+      setSelectedContract('contrato1');
+
     }
+    setIsEditing(false);
+    setEditableContent('');
   };
 
   const getContractTitle = () => {
-    return selectedLanguage === 'Japonês' 
-      ? 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS EDUCACIONAIS – CURSO DE JAPONÊS'
-      : 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS EDUCACIONAIS – CURSO DE INGLÊS';
+    return selectedContract === 'contrato2' 
+      ? 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS EDUCACIONAIS – CONTRATO 2'
+      : `CONTRATO DE PRESTAÇÃO DE SERVIÇOS EDUCACIONAIS – ${planData?.nome || 'PLANO PADRÃO'}`;
   };
 
-  const handlePrint = () => {
-    if (!selectedStudent) {
+  const generateContractContent = () => {
+    if (!selectedStudent) return '';
+    
+    // Nova logo como base64
+    const logoBase64 = "data:image/svg+xml;base64,PCFET0NUWVBFIHN2ZyBQVUJMSUMgIi0vL1czQy8vRFREIFNWRyAyMDAxMDkwNC8vRU4iCiAiaHR0cDovL3d3dy53My5vcmcvVFIvMjAwMS9SRUMtU1ZHLTIwMDEwOTA0L0RURC9zdmcxMC5kdGQiPgo8c3ZnIHZlcnNpb249IjEuMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIgogd2lkdGg9IjE5My4wMDAwMDBwdCIgaGVpZ2h0PSIxMzEuMDAwMDAwcHQiIHZpZXdCb3g9IjAgMCAxOTMuMDAwMDAwIDEzMS4wMDAwMDAiCiBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJ4TWlkWU1pZCBtZWV0Ij4KCjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDAuMDAwMDAwLDEzMS4wMDAwMDApIHNjYWxlKDAuMTAwMDAwLC0wLjEwMDAwMCkiCmZpbGw9IiMwMDAwMDAiIHN0cm9rZT0ibm9uZSI+CjxwYXRoIGQ9Ik00NzggMTEyNCBjLTQwIC0yMSAtNDQgLTUzIC0xNSAtMTI2IDI5IC03MyA0MiAtMTIyIDUyIC0xOTMgNCAtMjcKMTUgLTY5IDI1IC05MiAxNyAtMzkgMjIgLTQzIDU0IC00MyAyNSAwIDM2IC00IDM2IC0xNSAwIC04IC02IC0xNSAtMTQgLTE1Ci0yMCAwIC02MSAtODcgLTQ4IC0xMDMgMTcgLTIyIDIwIC01NiA2IC02OCAtMTIgLTEwIC05IC0xNSAxNiAtMzEgMjUgLTE1IDMxCi0yNCAyOCAtNDggLTIgLTE5IDUgLTM3IDE5IC01MiAxMSAtMTMgMjQgLTMyIDI3IC00NCA3IC0yMSAtMjQgLTEyMyAtNDkgLTE2MAotMTIgLTE5IC0xMiAtMjQgMCAtMzQgMTYgLTE0IDEzIC0xOSA0MSA2OCAyMiA2OCA0MCA4OSA2MyA2OSAxNCAtMTMgNDYgLTIzCjkxIC0zMCA4IC0xIDE1IDUgMTYgMTMgMyAzNiA1IDQwIDIzIDQwIDE1IDAgMjUgMjEgNTAgMTAzIDE4IDU2IDQyIDEzNCA1NQoxNzIgbDIzIDcwIDcgLTU1IGM0IC0zMCAxMiAtNzEgMTkgLTkwIGwxMSAtMzUgNyAzMCBjNCAxNyA3IDUwIDggNzUgMiA2NyAxNwo4MyAyOCAzMCA3IC0zNiAxNCAtNDYgNDYgLTYzIDM1IC0xOCA0MCAtMTggNTQgLTQgMjMgMjIgMTIgNDAgLTUxIDgyIC03OSA1Mgo5MCA5MyAtNDkgMTgyIDI1IDU0IDEyMiA4MSAxODggNTEgMjggLTEzIDUwIC03NSA0MSAtMTE0IC02IC0yMSAtMTIgLTI0IC01MAotMjQgLTQ1IDAgLTU2IDEwIC01NiA1MSAwIDEyIC01IDE2IC0xNSAxMyAtMjIgLTkgLTE4IC00OCA4IC03MiAxMyAtMTIgMjgKLTIyIDMzIC0yMiAyNSAwIDY2IC02MCA3MSAtMTA0IDEwIC04OCAtNjAgLTE0OCAtMTU1IC0xMzIgbC0zNCA1IDcgLTQ3IGMxMAotNjggMzAgLTEwMiA2MCAtMTAyIDIyIDAgMjUgLTQgMjUgLTM1IDAgLTM0IDIwIC00OSAzNSAtMjUgMyA1IDE3IDEwIDMwIDEwCjEzIDAgMjcgNSAzMCAxMCAxMCAxNiAzMyAxMiA1NSAtMTAgMTQgLTE0IDIwIC0zMyAyMCAtNjQgMCAtMjYgNiAtNDggMTUgLTU2CjI2IC0yMSAyOSAxNCA2IDc1IC0yNyA3MyAtMjggMTM5IC0xIDE2MiAxMyAxMiAyMCAzMCAyMCA1NSAwIDI2IDYgNDEgMjEgNTIKMTUgMTAgMjAgMjEgMTYgMzYgLTMgMTIgLTEgMzUgNSA1MSA5IDI1IDYgMzQgLTE0IDYyIC0xMyAxNyAtMjkgNDQgLTM2IDYwCi0xMSAyNiAtMTAgMjcgMTcgMjcgMTYgMCAzOCA4IDUwIDE4IDI0IDE5IDcxIDEzOCA3MSAxNzggMCAxMyA5IDU5IDIxIDEwMSAxMQo0MiAxOSA5MiAxNyAxMTIgLTMgMzIgLTcgMzcgLTQwIDQ4IC0zMiAxMCAtNDYgOSAtOTUgLTcgLTMyIC0xMSAtNzQgLTI4IC05MwotMzggLTg3IC00MyAtMjMwIC0xNzkgLTI3MCAtMjU3IC0yMiAtNDIgLTQwIC01OCAtNDAgLTM1IDAgNiAtNCAxMCAtOSAxMCAtNgowIC0xMSAtMTUgLTEzIC0zMiAtMyAtMzIgLTUgLTMzIC01MCAtMzYgbC00OCAtMyAwIC02MiBjLTEgLTc5IC0xMCAtMjM4IC0xNgotMjU1IC0yIC05IC0xOSAtMTIgLTUxIC0xMCBsLTQ4IDMgNCAxNTkgMyAxNTkgLTIzIC04IGMtMzkgLTEyIC03NCAtMTEgLTczIDMKMSA2IDIgMzIgMyA1NyBsMSA0NSAxMjQgMCAxMjUgMCAtMTIgMjMgYy0yMSAzOSAtOTYgMTI4IC0xNDUgMTcxIC01OSA1MyAtMTEzCjgxIC0yMDUgMTA2IC04NCAyMyAtNzUgMjMgLTEwOSA0eiIvPgo8L2c+Cjwvc3ZnPgo=";
+
+    return `
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+  <div style="width: 80px; height: 80px;">
+    <img src="${logoBase64}" alt="Teen Speech Logo" style="width: 80px; height: 80px;" />
+  </div>
+  <div style="text-align: center; flex-grow: 1;">
+    <h1 style="font-size: 18px; font-weight: bold; margin: 0;">TEEN SPEECH - ESCOLA DE IDIOMAS</h1>
+  </div>
+</div>
+
+${getContractTitle()}
+
+CONTRATO DE PRESTAÇÃO DE SERVIÇOS EDUCACIONAIS
+
+O contrato de prestação de serviços educacionais que entre si celebram, de um lado, o(a) aluno(a) abaixo qualificado(a), doravante denominado(a) CONTRATANTE, e, de outro lado, a TEEN SPEECH, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 30.857.093/0001-36, com sede na Avenida Armando Bei, nº 465, Vila Nova Bonsucesso, Guarulhos/SP, doravante denominada CONTRATADA, têm entre si justo e contratado o seguinte:
+
+<div style="text-align: center; font-weight: bold;">01. Identificação do CONTRATANTE:</div>
+
+<div style="border: 1px solid #000; padding: 10px; margin-bottom: 15px;">
+  <table style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="width: 15%; padding: 5px; font-weight: bold;">CPF:</td>
+      <td style="width: 35%; padding: 5px; border-bottom: 1px solid #000;">${selectedStudent.cpf || '<span class="placeholder-text">CPF</span>'}</td>
+      <td style="width: 15%; padding: 5px; font-weight: bold;">Nome:</td>
+      <td style="width: 35%; padding: 5px; border-bottom: 1px solid #000;">${selectedStudent.nome}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Data de nascimento:</td>
+      <td colspan="3" style="padding: 5px; border-bottom: 1px solid #000;">${selectedStudent.data_nascimento ? new Date(selectedStudent.data_nascimento).toLocaleDateString('pt-BR') : '<span class="placeholder-text">Data de nascimento</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Endereço:</td>
+      <td colspan="3" style="padding: 5px; border-bottom: 1px solid #000;">${selectedStudent.endereco ? `${selectedStudent.endereco}, nº ${selectedStudent.numero_endereco || '<span class="placeholder-text">número</span>'}` : '<span class="placeholder-text">Endereço completo</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Telefone:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${selectedStudent.telefone || '<span class="placeholder-text">Telefone</span>'}</td>
+      <td style="padding: 5px; font-weight: bold;">E-mail:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${selectedStudent.email || '<span class="placeholder-text">E-mail</span>'}</td>
+    </tr>
+  </table>
+</div>
+
+<div style="border: 1px solid #000; padding: 10px; margin-bottom: 15px;">
+  <table style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="width: 30%; padding: 5px; font-weight: bold;">RESPONSÁVEL (para menores de idade):</td>
+      <td style="width: 70%; padding: 5px; border-bottom: 1px solid #000;">${selectedStudent.responsaveis?.nome || '<span class="placeholder-text">Nome do responsável</span>'}</td>
+    </tr>
+
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">CPF:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${selectedStudent.responsaveis?.cpf || '<span class="placeholder-text">CPF do responsável</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Telefone:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${selectedStudent.responsaveis?.telefone || '<span class="placeholder-text">Telefone do responsável</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Email:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${selectedStudent.responsaveis?.email || '<span class="placeholder-text">E-mail do responsável</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Endereço:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${selectedStudent.responsaveis?.endereco ? `${selectedStudent.responsaveis.endereco}, nº ${selectedStudent.responsaveis.numero_endereco || '<span class="placeholder-text">número</span>'}` : '<span class="placeholder-text">Endereço do responsável</span>'}</td>
+    </tr>
+  </table>
+</div>
+
+
+
+<div style="border: 1px solid #000; padding: 10px; margin-bottom: 15px;">
+  <h4 style="text-align: center; margin: 10px 0; font-size: 14px; font-weight: bold;">TODOS OS PLANOS ASSOCIADOS</h4>
+  <table style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="width: 30%; padding: 5px; font-weight: bold;">Nome do Plano:</td>
+      <td style="width: 70%; padding: 5px; border-bottom: 1px solid #000;">${planData?.nome || 'Módulo de curso'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Valor Total:</td>
+      <td style="width: 70%; padding: 5px; border-bottom: 1px solid #000;">R$ ${planData?.valor_total ? planData.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor total</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Número de Aulas:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${planData?.numero_aulas || '<span class="placeholder-text">número de aulas</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Frequência:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${planData?.frequencia || '<span class="placeholder-text">frequência</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Descrição:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${planData?.descricao || '<span class="placeholder-text">descrição do plano</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Valor Pago:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">R$ ${financialData?.valor_pago ? financialData.valor_pago.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor pago</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Parcelas:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${financialData?.numero_parcelas_plano || '<span class="placeholder-text">número de parcelas</span>'}</td>
+    </tr>
+  </table>
+</div>
+
+<div style="border: 1px solid #000; padding: 10px; margin-bottom: 15px;">
+  <table style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="width: 30%; padding: 5px; font-weight: bold;">Valores do Curso e Condições de Pagamento:</td>
+      <td style="width: 70%; padding: 5px; border-bottom: 1px solid #000;">Semestral: R$ ${planData?.valor_total ? planData.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor semestral</span>'} / Mensal: R$ ${financialData?.valor_plano ? financialData.valor_plano.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor mensal</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Benefício:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;"><span class="placeholder-text">benefício</span></td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Forma de pagamento e validade do período:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${financialData?.numero_parcelas_plano && financialData.numero_parcelas_plano > 1 ? `${financialData.numero_parcelas_plano} parcelas de R$ ${financialData.valor_plano ? financialData.valor_plano.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor da parcela</span>'}` : `Pagamento mensal de R$ <span class="placeholder-text">valor mensal</span>`}</td>
+    </tr>
+  </table>
+</div>
+
+<p style="text-align: justify; margin-bottom: 15px;">Por este Instrumento Particular de Contrato de Prestação de Serviços, de um lado TEEN SPEECH, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 30.857.093/0001-36, com sede na Avenida Armando Bei, nº 465, Vila Nova Bonsucesso, Guarulhos/SP, doravante denominada CONTRATADA, e, de outro lado, o(a) aluno(a) acima qualificado(a), doravante denominado(a) CONTRATANTE, têm entre si justo e contratado o seguinte:</p>
+
+<h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">1. CLÁUSULA PRIMEIRA - DA IDENTIFICAÇÃO DAS PARTES E DO OBJETO</h4>
+
+<p style="text-align: justify; margin-bottom: 10px;"><strong>1.1 CONTRATANTE:</strong> ${selectedStudent.nome}, portador(a) do CPF nº ${selectedStudent.cpf || '<span class="placeholder-text">CPF</span>'}, nascido(a) em ${selectedStudent.data_nascimento ? new Date(selectedStudent.data_nascimento).toLocaleDateString('pt-BR') : '<span class="placeholder-text">data de nascimento</span>'}, residente e domiciliado(a) na ${selectedStudent.endereco || '<span class="placeholder-text">endereço</span>'}, nº ${selectedStudent.numero_endereco || '<span class="placeholder-text">número</span>'}, telefone ${selectedStudent.telefone || '<span class="placeholder-text">telefone</span>'}, e-mail: ${selectedStudent.email || '<span class="placeholder-text">e-mail</span>'}.</p>
+
+<p style="text-align: justify; margin-bottom: 10px;"><strong>1.2 CONTRATADA:</strong> TEEN SPEECH - ESCOLA DE IDIOMAS, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 30.857.093/0001-36, com sede na cidade de Guarulhos - SP, na Avenida Armando Bei, nº 465, Vila Nova Bonsucesso, telefone (11) 4372-1271, e-mail: <span class="placeholder-text">e-mail da escola</span>.</p>
+
+<p style="text-align: justify; margin-bottom: 15px;"><strong>1.3 OBJETO:</strong> O presente contrato tem por objeto a prestação de serviços educacionais conforme ${selectedContract === 'contrato2' ? 'Contrato 2' : planData?.nome || 'Plano Padrão'}, na modalidade presencial/online, conforme as condições estabelecidas nas cláusulas seguintes.</p>
+
+<h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">2. CLÁUSULA SEGUNDA - DA DURAÇÃO DO CURSO E CARGA HORÁRIA</h4>
+
+<p style="text-align: justify; margin-bottom: 10px;"><strong>2.1</strong> O curso conforme ${selectedContract === 'contrato2' ? 'Contrato 2' : planData?.nome || 'Plano Padrão'} terá duração de ${planData?.numero_aulas && planData?.frequencia_aulas ? Math.ceil(planData.numero_aulas / (planData.frequencia_aulas.toLowerCase().includes('semanal') ? 4 : planData.frequencia_aulas.toLowerCase().includes('mensal') ? 1 : 4)) : '<span class="placeholder-text">duração em meses</span>'} meses, com início em <span class="placeholder-text">data de início</span> e término previsto para <span class="placeholder-text">data de término</span>, totalizando ${planData?.numero_aulas || '<span class="placeholder-text">total de horas</span>'} horas/aula.</p>
+
+<p style="text-align: justify; margin-bottom: 10px;"><strong>2.2</strong> As aulas serão ministradas ${planData?.frequencia_aulas?.toLowerCase().includes('semanal') ? planData.frequencia_aulas.match(/\d+/)?.[0] || '1' : planData?.frequencia_aulas?.toLowerCase().includes('mensal') ? '4' : '<span class="placeholder-text">frequência semanal</span>'} vezes por semana, com duração de ${planData?.descricao?.match(/\d+/)?.[0] || '55'} minutos cada, nos dias <span class="placeholder-text">dias da semana</span> e horários <span class="placeholder-text">horários das aulas</span>.</p>
+
+<p style="text-align: justify; margin-bottom: 15px;"><strong>2.3</strong> O cronograma das aulas poderá sofrer alterações mediante comunicação prévia de no mínimo 48 (quarenta e oito) horas.</p>
+
+<h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">3. CLÁUSULA TERCEIRA - DO VALOR E FORMA DE PAGAMENTO</h4>
+
+<p style="text-align: justify; margin-bottom: 10px;"><strong>3.1</strong> O valor total do curso é de R$ ${planData?.valor_total ? planData.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor total</span>'} (${planData?.valor_total ? 'valor por extenso' : '<span class="placeholder-text">valor por extenso</span>'} reais).</p>
+
+<p style="text-align: justify; margin-bottom: 10px;"><strong>3.2</strong> O pagamento será efetuado da seguinte forma:</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">${financialData?.numero_parcelas_plano && financialData.numero_parcelas_plano > 1 ? `- Parcelado em ${financialData.numero_parcelas_plano} (${financialData.numero_parcelas_plano === 2 ? 'duas' : financialData.numero_parcelas_plano === 3 ? 'três' : financialData.numero_parcelas_plano === 4 ? 'quatro' : financialData.numero_parcelas_plano === 5 ? 'cinco' : financialData.numero_parcelas_plano === 6 ? 'seis' : 'várias'}) parcelas mensais de R$ ${financialData.valor_plano ? financialData.valor_plano.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor da parcela</span>'}` : `- Pagamento mensal de R$ <span class="placeholder-text">valor mensal</span>`}</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">- Vencimento: todo dia <span class="placeholder-text">dia do vencimento</span> de cada mês</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 10px;">- Primeira parcela: <span class="placeholder-text">data da primeira parcela</span></p>
+
+<p style="text-align: justify; margin-bottom: 10px;"><strong>3.3</strong> O não pagamento na data do vencimento implicará em:</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">a) Multa de 2% (dois por cento) sobre o valor da parcela;</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">b) Juros de mora de 1% (um por cento) ao mês;</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 10px;">c) Atualização monetária pelo IGPM ou índice que vier a substituí-lo.</p>
+
+<p style="text-align: justify; margin-bottom: 15px;"><strong>3.4</strong> O atraso superior a 30 (trinta) dias no pagamento de qualquer parcela facultará à CONTRATADA a rescisão imediata do contrato, independentemente de notificação judicial ou extrajudicial.</p>
+
+<h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">4. CLÁUSULA QUARTA - DAS OBRIGAÇÕES DA CONTRATADA</h4>
+
+<p style="text-align: justify; margin-bottom: 10px;"><strong>4.1</strong> Ministrar as aulas conforme cronograma estabelecido, utilizando metodologia adequada conforme ${selectedContract === 'contrato2' ? 'Contrato 2' : planData?.nome || 'Plano Padrão'}.</p>
+
+<p style="text-align: justify; margin-bottom: 10px;"><strong>4.2</strong> Disponibilizar professores qualificados e material didático necessário para o desenvolvimento do curso.</p>
+
+<p style="text-align: justify; margin-bottom: 10px;"><strong>4.3</strong> Fornecer certificado de conclusão ao aluno que obtiver frequência mínima de 75% (setenta e cinco por cento) e aproveitamento satisfatório.</p>
+
+<p style="text-align: justify; margin-bottom: 10px;"><strong>4.4</strong> Comunicar previamente qualquer alteração de horário, data ou local das aulas.</p>
+
+<p style="text-align: justify; margin-bottom: 15px;"><strong>4.5</strong> Manter sigilo sobre as informações pessoais do CONTRATANTE.</p>
+
+<h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">5. CLÁUSULA QUINTA - DAS OBRIGAÇÕES DO CONTRATANTE</h4>
+
+<p style="text-align: justify; margin-bottom: 10px;"><strong>5.1</strong> Efetuar o pagamento das mensalidades nas datas estabelecidas.</p>
+
+<p style="text-align: justify; margin-bottom: 10px;"><strong>5.2</strong> Comparecer às aulas com pontualidade e assiduidade.</p>
+
+<p style="text-align: justify; margin-bottom: 10px;"><strong>5.3</strong> Zelar pela conservação do material didático e das instalações da escola.</p>
+
+<p style="text-align: justify; margin-bottom: 10px;"><strong>5.4</strong> Comunicar previamente eventuais faltas ou impossibilidade de comparecimento às aulas.</p>
+
+<p style="text-align: justify; margin-bottom: 15px;"><strong>5.5</strong> Respeitar o regulamento interno da escola e as normas de convivência.</p>
+
+<h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">6. CLÁUSULA SEXTA - DA REPOSIÇÃO DE AULAS</h4>
+
+<p style="text-align: justify; margin-bottom: 10px;"><strong>6.1</strong> O CONTRATANTE terá direito à reposição de aulas em caso de falta justificada, mediante comunicação prévia de no mínimo 24 (vinte e quatro) horas.</p>
+
+<p style="text-align: justify; margin-bottom: 10px;"><strong>6.2</strong> As aulas de reposição deverão ser agendadas com antecedência e realizadas conforme disponibilidade da CONTRATADA.</p>
+
+<p style="text-align: justify; margin-bottom: 15px;"><strong>6.3</strong> Não haverá reposição de aulas em caso de faltas não justificadas ou comunicadas fora do prazo estabelecido.</p>
+
+<h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">7. CLÁUSULA SÉTIMA - DA RESCISÃO CONTRATUAL</h4>
+
+<p style="text-align: justify; margin-bottom: 10px;"><strong>7.1</strong> O presente contrato poderá ser rescindido:</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">a) Por mútuo acordo entre as partes;</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">b) Por inadimplemento de qualquer das cláusulas contratuais;</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 10px;">c) Por iniciativa de qualquer das partes, mediante aviso prévio de 30 (trinta) dias.</p>
+
+<p style="text-align: justify; margin-bottom: 10px;"><strong>7.2</strong> Em caso de rescisão por parte do CONTRATANTE, não haverá devolução dos valores já pagos, salvo em caso de impossibilidade da CONTRATADA em cumprir suas obrigações.</p>
+
+<p style="text-align: justify; margin-bottom: 15px;"><strong>7.3</strong> A rescisão não exime o CONTRATANTE do pagamento das parcelas vencidas até a data da rescisão.</p>
+
+<h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">8. CLÁUSULA OITAVA - DAS DISPOSIÇÕES GERAIS</h4>
+
+<p style="text-align: justify; margin-bottom: 10px;"><strong>8.1</strong> O presente contrato obriga as partes e seus sucessores a qualquer título.</p>
+
+<p style="text-align: justify; margin-bottom: 10px;"><strong>8.2</strong> Qualquer alteração deste contrato deverá ser feita por escrito e assinada por ambas as partes.</p>
+
+<p style="text-align: justify; margin-bottom: 10px;"><strong>8.3</strong> A tolerância de uma parte para com o descumprimento das cláusulas e condições deste contrato não importará em novação ou renúncia ao direito de exigir o seu cumprimento.</p>
+
+<p style="text-align: justify; margin-bottom: 15px;"><strong>8.4</strong> Se qualquer disposição deste contrato for considerada inválida ou inexequível, as demais disposições permanecerão em pleno vigor e efeito.</p>
+
+<h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">9. CLÁUSULA NONA - DO FORO</h4>
+
+<p style="text-align: justify; margin-bottom: 15px;"><strong>9.1</strong> As partes elegem o foro da COMARCA de Guarulhos, como único competente para decidir qualquer questão oriunda do presente contrato, em detrimento de qualquer outro por mais privilegiado que possa ser.</p>
+
+<h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">10. CLÁUSULA DÉCIMA - DA PROTEÇÃO DE DADOS PESSOAIS</h4>
+
+<p style="text-align: justify; margin-bottom: 10px;"><strong>10.1</strong> A CONTRATADA compromete-se a realizar o tratamento dos dados pessoais do CONTRATANTE e do ESTUDANTE em estrita conformidade com a Lei Geral de Proteção de Dados Pessoais (LGPD - Lei nº 13.709/2018) e demais legislações aplicáveis do ordenamento jurídico brasileiro.</p>
+
+<p style="text-align: justify; margin-bottom: 15px;"><strong>10.2</strong> O tratamento de dados ocorrerá exclusivamente para as finalidades específicas para as quais foram coletados (como a prestação de serviços educacionais, gestão de matrículas, comunicação e cumprimento de obrigações legais), utilizando-se apenas os dados estritamente necessários para tais fins.</p>
+
+<h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">11. CLÁUSULA DÉCIMA PRIMEIRA - DAS DESPESAS COM A COBRANÇA E EXECUÇÃO</h4>
+
+<p style="text-align: justify; margin-bottom: 10px;">Em caso de inadimplemento contratual que enseje a necessidade de cobrança (judicial ou extrajudicial) ou a execução do presente contrato, a parte que deu causa ao inadimplemento será responsável por arcar com todas as despesas decorrentes, incluindo, mas não se limitando a:</p>
+
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">a) Custas processuais e taxas judiciárias;</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">b) Despesas com notificações extrajudiciais e protestos;</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">c) Honorários advocatícios, arbitrados em 20% (vinte por cento) sobre o valor total do débito (principal, juros, multa e atualização monetária), caso seja necessária a atuação de advogado para a cobrança ou defesa dos direitos da parte contrária; e</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 15px;">d) Outras despesas comprovadamente realizadas para a recuperação do crédito ou a defesa do cumprimento do contrato.</p>
+
+Estando as duas partes de acordo, declaram ciência através da assinatura deste, em duas vias de igual teor.
+
+Guarulhos, <span class="placeholder-text">dia</span> de <span class="placeholder-text">mês</span> de <span class="placeholder-text">ano</span>.
+
+Ciente e de acordo,
+
+
+<div style="text-align: center; margin: 20px 0;">
+  <div style="margin-bottom: 30px;">
+    <div style="border-bottom: 1px solid #000; width: 300px; margin: 0 auto 10px; height: 80px; display: flex; align-items: end; justify-content: center;">
+      <!-- Espaço para assinatura do contratante -->
+    </div>
+    <div>CONTRATANTE</div>
+    <div>${selectedStudent.nome}</div>
+    <div>CPF: ${selectedStudent.cpf || '<span class="placeholder-text">CPF</span>'}</div>
+  </div>
+  
+  <div style="margin-bottom: 30px;">
+    <div style="border-bottom: 1px solid #000; width: 300px; margin: 0 auto 10px; height: 80px; display: flex; align-items: end; justify-content: center;">
+      <img src="${teenSpeechSignature}" alt="Assinatura Teen Speech" style="max-width: 280px; max-height: 70px;" />
+    </div>
+    <div>TEEN SPEECH</div>
+    <div>CNPJ: 30.857.093/0001-36</div>
+  </div>
+</div>
+
+
+TESTEMUNHAS:
+
+<div style="display: flex; justify-content: space-between; margin-top: 30px;">
+  <div style="text-align: center; width: 45%;">
+    <div style="border-bottom: 1px solid #000; width: 200px; margin: 0 auto 10px; height: 80px; display: flex; align-items: end; justify-content: center;">
+      <img src="${testemunha1Signature}" alt="Assinatura Testemunha 1" style="max-width: 180px; max-height: 70px;" />
+    </div>
+    <div style="padding-top: 5px;">
+        Testemunha 1<br/>
+        CPF: 567.641.218-69
+      </div>
+    </div>
+    <div style="text-align: center; width: 45%;">
+      <div style="border-bottom: 1px solid #000; width: 200px; margin: 0 auto 10px; height: 80px; display: flex; align-items: end; justify-content: center;">
+        <img src="${testemunha2Signature}" alt="Assinatura Testemunha 2" style="max-width: 180px; max-height: 70px;" />
+      </div>
+      <div style="padding-top: 5px;">
+        Testemunha 2<br/>
+        RG: 34.537.017-X
+      </div>
+    </div>
+  </div>
+      </div>
+    `;
+  };
+
+  const handleEdit = () => {
+    if (!selectedStudent) return;
+    
+    // Usar o conteúdo HTML formatado do contrato original - todo o texto será editável
+    const currentContent = savedContent || generateContractContent();
+    setEditableContent(currentContent);
+    setIsEditing(true);
+  };
+
+  const generateEditableContractContent = () => {
+    if (!selectedStudent) return '';
+    
+    let content = generateContractContent();
+    
+    // Substituir underscores por inputs editáveis
+    content = content.replace(/_________________________/g, '<input type="text" style="border: none; border-bottom: 1px solid #000; background: transparent; width: 200px; font-family: inherit; font-size: inherit;" placeholder="Preencher..." />');
+    content = content.replace(/_____/g, '<input type="text" style="border: none; border-bottom: 1px solid #000; background: transparent; width: 60px; font-family: inherit; font-size: inherit;" placeholder="..." />');
+    content = content.replace(/___\.___.___-__/g, '<input type="text" style="border: none; border-bottom: 1px solid #000; background: transparent; width: 120px; font-family: inherit; font-size: inherit;" placeholder="000.000.000-00" />');
+    content = content.replace(/___\/___\/_____/g, '<input type="date" style="border: none; border-bottom: 1px solid #000; background: transparent; width: 120px; font-family: inherit; font-size: inherit;" />');
+    content = content.replace(/\(___\) _____-____/g, '<input type="tel" style="border: none; border-bottom: 1px solid #000; background: transparent; width: 140px; font-family: inherit; font-size: inherit;" placeholder="(11) 99999-9999" />');
+    content = content.replace(/____/g, '<input type="text" style="border: none; border-bottom: 1px solid #000; background: transparent; width: 50px; font-family: inherit; font-size: inherit;" placeholder="..." />');
+    
+    return content;
+  };
+
+  const handleSave = () => {
+    setSavedContent(editableContent);
+    setIsEditing(false);
+    toast({
+      title: "Contrato salvo",
+      description: "As alterações foram salvas com sucesso.",
+    });
+  };
+
+  const handlePrint = async () => {
+    if (!selectedStudent) return;
+    
+    try {
+      // Importar jsPDF dinamicamente
+      const { jsPDF } = await import('jspdf');
+      const html2canvas = (await import('html2canvas')).default;
+      
+      // Criar um elemento temporário com o conteúdo do contrato
+      const contentToPrint = isEditing ? editableContent : (savedContent || generateContractContent());
+      
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = contentToPrint;
+      tempDiv.style.position = 'absolute';
+      tempDiv.style.left = '-9999px';
+      tempDiv.style.top = '0';
+      tempDiv.style.width = '800px';
+      tempDiv.style.fontFamily = 'Arial, sans-serif';
+      tempDiv.style.fontSize = '14px';
+      tempDiv.style.lineHeight = '1.5';
+      tempDiv.style.color = '#000';
+      tempDiv.style.backgroundColor = '#fff';
+      tempDiv.style.padding = '20px';
+      
+      document.body.appendChild(tempDiv);
+      
+      // Aguardar um pouco para as imagens carregarem
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Converter para canvas
+      const canvas = await html2canvas(tempDiv, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: 800,
+        height: tempDiv.scrollHeight
+      });
+      
+      // Remover elemento temporário
+      document.body.removeChild(tempDiv);
+      
+      // Criar PDF
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const imgWidth = 210; // A4 width in mm
+      const pageHeight = 295; // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      
+      let position = 0;
+      
+      // Adicionar primeira página
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      
+      // Adicionar páginas adicionais se necessário
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
+      // Salvar o PDF
+      const fileName = `Contrato_${selectedStudent.nome.replace(/\s+/g, '_')}_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`;
+      pdf.save(fileName);
+      
       toast({
-        title: "Atenção",
-        description: "Selecione um aluno para gerar o contrato.",
+        title: "PDF gerado com sucesso!",
+        description: `O arquivo ${fileName} foi baixado.`,
+      });
+      
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      toast({
+        title: "Erro ao gerar PDF",
+        description: "Não foi possível gerar o PDF. Tente novamente.",
         variant: "destructive",
       });
-      return;
+      
+      // Fallback para impressão tradicional
+      const contentToPrint = isEditing ? editableContent : (savedContent || generateContractContent());
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) return;
+
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Contrato - ${selectedStudent.nome}</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; }
+              .contract { max-width: 800px; margin: 0 auto; }
+              img { max-width: 100%; height: auto; }
+              @media print {
+                body { margin: 0; }
+                .no-print { display: none; }
+                img { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="contract">
+              ${contentToPrint}
+            </div>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.print();
     }
+  };
 
-    const printContent = document.getElementById('contract-content');
-    if (!printContent) return;
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Contrato - ${selectedStudent.nome}</title>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              line-height: 1.6;
-              margin: 40px;
-              color: #333;
-            }
-            .contract-header {
-              text-align: center;
-              margin-bottom: 30px;
-            }
-            .contract-title {
-              font-size: 18px;
-              font-weight: bold;
-              margin-bottom: 20px;
-            }
-            .contract-section {
-              margin-bottom: 20px;
-            }
-            .contract-section h3 {
-              font-size: 14px;
-              font-weight: bold;
-              margin-bottom: 10px;
-            }
-            .contract-field {
-              margin-bottom: 8px;
-            }
-            .signature-section {
-              margin-top: 50px;
-              display: flex;
-              justify-content: space-between;
-            }
-            .signature-line {
-              border-top: 1px solid #333;
-              width: 200px;
-              text-align: center;
-              padding-top: 5px;
-            }
-            @media print {
-              body { margin: 20px; }
-            }
-          </style>
-        </head>
-        <body>
-          ${printContent.innerHTML}
-        </body>
-      </html>
-    `);
-
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-    printWindow.close();
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditableContent('');
+    // Não limpa o savedContent para manter as alterações salvas anteriormente
   };
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="h-8 bg-gray-100 animate-pulse rounded w-48"></div>
-        <div className="h-64 bg-gray-100 animate-pulse rounded"></div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-red border-t-transparent mx-auto"></div>
+          <p className="mt-2 text-gray-600">Carregando alunos...</p>
+        </div>
       </div>
     );
   }
@@ -175,173 +650,535 @@ const ContractGenerator = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Gerador de Contratos</h1>
-          <Button 
-            onClick={handlePrint}
-            disabled={!selectedStudent}
-            className="flex items-center gap-2"
-          >
-            <Printer className="h-4 w-4" />
-            Imprimir
-          </Button>
+          <div className="flex gap-2">
+            {selectedStudent && !isEditing && (
+              <Button 
+                onClick={handleEdit}
+                className="flex items-center gap-2"
+                variant="outline"
+              >
+                <Edit className="h-4 w-4" />
+                Editar
+              </Button>
+            )}
+            {isEditing && (
+              <>
+                <Button 
+                  onClick={handleSave}
+                  className="flex items-center gap-2"
+                >
+                  <Save className="h-4 w-4" />
+                  Salvar
+                </Button>
+                <Button 
+                  onClick={handleCancelEdit}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  <X className="h-4 w-4" />
+                  Cancelar
+                </Button>
+              </>
+            )}
+            <Button 
+              onClick={handlePrint}
+              disabled={!selectedStudent}
+              className="flex items-center gap-2"
+            >
+              <Printer className="h-4 w-4" />
+              Imprimir
+            </Button>
+          </div>
         </div>
 
-      {/* Seleção de Aluno */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Selecionar Aluno
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">
-                  Escolha um aluno para gerar o contrato:
-                </label>
-                <Select onValueChange={handleStudentSelect}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selecione um aluno..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {students.map((student) => (
-                      <SelectItem key={student.id} value={student.id}>
-                        {student.nome} - {student.idioma}
-                        {student.turmas?.nome && ` (${student.turmas.nome})`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            {selectedStudent && (
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <h3 className="font-medium text-blue-900 mb-2">Aluno Selecionado:</h3>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div><strong>Nome:</strong> {selectedStudent.nome}</div>
-                  <div><strong>CPF:</strong> {selectedStudent.cpf || 'Não informado'}</div>
-                  <div><strong>Idioma:</strong> {selectedStudent.idioma}</div>
-                  <div><strong>Turma:</strong> {selectedStudent.turmas?.nome || 'Não informado'}</div>
-                  <div><strong>Responsável:</strong> {selectedStudent.responsaveis?.nome || 'Não informado'}</div>
-                  <div><strong>Status:</strong> {selectedStudent.status}</div>
-                  <div><strong>Contato:</strong> {selectedStudent.telefone || 'Não informado'}</div>
-                </div>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Contrato Gerado */}
-      {selectedStudent && (
+        {/* Seleção de Aluno */}
         <Card>
           <CardHeader>
-            <CardTitle>Contrato Gerado</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Selecionar Aluno
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div id="contract-content" className="space-y-6 p-6 bg-white border rounded-lg">
-              <div className="contract-header text-center">
-                <div className="mb-4 flex justify-center gap-2">
-                  <Button
-                    variant={selectedLanguage === 'Inglês' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setSelectedLanguage('Inglês')}
-                  >
-                    Inglês
-                  </Button>
-                  <Button
-                    variant={selectedLanguage === 'Japonês' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setSelectedLanguage('Japonês')}
-                  >
-                    Japonês
-                  </Button>
-                </div>
-                <h1 className="contract-title text-xl font-bold mb-4">
-                  {getContractTitle()}
-                </h1>
-              </div>
-
-              <div className="contract-section">
-                <h3 className="font-bold mb-3">CONTRATANTE:</h3>
-                <div className="contract-field"><strong>Nome:</strong> {selectedStudent.nome}</div>
-                <div className="contract-field"><strong>CPF:</strong> {selectedStudent.cpf || '_______________________'}</div>
-                <div className="contract-field"><strong>Responsável:</strong> {selectedStudent.responsaveis?.nome || '_______________________'}</div>
-                <div className="contract-field"><strong>Contato:</strong> {selectedStudent.telefone || '_______________________'}</div>
-              </div>
-
-              <div className="contract-section">
-                <h3 className="font-bold mb-3">CONTRATADA:</h3>
-                <p>TS SCHOOL – CURSO DE IDIOMAS, inscrita no CNPJ nº 00.000.000/0001-00, com sede na Rua _________________________, nº _____, Bairro ___________________, Cidade de _____________________, Estado de ________.</p>
-              </div>
-
-              <div className="contract-section">
-                <h3 className="font-bold mb-3">1. OBJETO DO CONTRATO</h3>
-                <p>O presente contrato tem como objeto a prestação de serviços educacionais referentes ao curso de <strong>{selectedLanguage}</strong>, ministrado pela CONTRATADA na turma <strong>{selectedStudent.turmas?.nome || '_______________________'}</strong>, conforme cronograma e metodologia estabelecida.</p>
-              </div>
-
-              <div className="contract-section">
-                <h3 className="font-bold mb-3">2. DURAÇÃO DO CONTRATO</h3>
-                <p>O curso terá duração conforme o plano contratado, iniciando em ___/___/____, com término previsto para ___/___/____, podendo ser renovado mediante novo acordo entre as partes.</p>
-              </div>
-
-              <div className="contract-section">
-                <h3 className="font-bold mb-3">3. VALOR E FORMA DE PAGAMENTO</h3>
-                <p>3.1. Pela prestação dos serviços objeto deste contrato, o CONTRATANTE pagará à CONTRATADA o valor de R$ ________ (________________________ reais) mensais.</p>
-                <p>3.2. O vencimento da mensalidade ocorrerá todo dia ______ de cada mês.</p>
-                <p>3.3. O não pagamento até a data de vencimento acarretará multa de 2% (dois por cento) sobre o valor da parcela, juros de 1% (um por cento) ao mês e atualização monetária.</p>
-              </div>
-
-              <div className="contract-section">
-                <h3 className="font-bold mb-3">4. OBRIGAÇÕES DA CONTRATADA</h3>
-                <p>4.1. Oferecer aulas do curso contratado, de acordo com os dias e horários definidos para a turma <strong>{selectedStudent.turmas?.nome || '_______________________'}</strong>.</p>
-                <p>4.2. Disponibilizar material didático (quando incluso no contrato) e suporte pedagógico.</p>
-                <p>4.3. Comunicar ao CONTRATANTE qualquer alteração referente às aulas, horários ou cronograma.</p>
-              </div>
-
-              <div className="contract-section">
-                <h3 className="font-bold mb-3">5. OBRIGAÇÕES DO CONTRATANTE</h3>
-                <p>5.1. Cumprir com os pagamentos nas datas acordadas.</p>
-                <p>5.2. Zelar pelo bom uso das dependências e materiais fornecidos pela CONTRATADA.</p>
-                <p>5.3. Comparecer às aulas com pontualidade e disciplina.</p>
-              </div>
-
-              <div className="contract-section">
-                <h3 className="font-bold mb-3">6. STATUS DO CONTRATO</h3>
-                <p><strong>Status:</strong> {selectedStudent.status}</p>
-              </div>
-
-              <div className="contract-section">
-                <h3 className="font-bold mb-3">7. RESCISÃO CONTRATUAL</h3>
-                <p>7.1. Este contrato poderá ser rescindido a qualquer tempo, por ambas as partes, mediante aviso prévio de 30 (trinta) dias.</p>
-                <p>7.2. A ausência prolongada do aluno sem justificativa não o exime do pagamento das mensalidades vincendas até a data da rescisão formal.</p>
-              </div>
-
-              <div className="contract-section">
-                <h3 className="font-bold mb-3">8. FORO</h3>
-                <p>Fica eleito o foro da cidade de _____________________________, Estado de _________, para dirimir quaisquer controvérsias oriundas deste contrato.</p>
-              </div>
-
-              <div className="contract-section">
-                <p className="text-center mb-8">Guarulhos, ____ de ______________ de 2025.</p>
-              </div>
-
-              <div className="signature-section flex justify-between mt-16">
-                <div className="text-center">
-                  <div className="border-t border-black w-64 mb-2"></div>
-                  <p><strong>CONTRATANTE: {selectedStudent.nome}</strong></p>
-                </div>
-                <div className="text-center">
-                  <div className="border-t border-black w-64 mb-2"></div>
-                  <p><strong>CONTRATADA: TS SCHOOL – CURSO DE IDIOMAS</strong></p>
+            <div className="space-y-4">
+              {/* Filtro por plano */}
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div>
+                  <label className="text-sm font-medium mb-2 block text-blue-800">
+                    Filtrar por plano:
+                  </label>
+                  <Select value={selectedPlan} onValueChange={setSelectedPlan}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Todos os planos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                       <SelectItem value="all">Todos os planos</SelectItem>
+                       {plans.map((plan) => (
+                         <SelectItem key={plan.id} value={plan.nome}>
+                           {plan.nome}
+                         </SelectItem>
+                       ))}
+                     </SelectContent>
+                  </Select>
                 </div>
               </div>
+              
+              <div className="w-1/2">
+                <label className="text-sm font-medium mb-2 block">
+                  Pesquisar por nome:
+                </label>
+                <Popover open={open} onOpenChange={setOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={open}
+                      className="w-full justify-between"
+                    >
+                      {selectedStudent
+                        ? `${selectedStudent.nome} - ${selectedStudent.idioma}${selectedStudent.turmas?.nome ? ` (${selectedStudent.turmas.nome})` : ''}`
+                        : "Digite o nome do aluno..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[400px] p-0">
+                    <Command>
+                      <CommandInput
+                        placeholder="Buscar aluno..."
+                        value={searchTerm}
+                        onValueChange={setSearchTerm}
+                      />
+                      <CommandList className="max-h-[300px] overflow-y-auto">
+                        <CommandEmpty>Nenhum aluno encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value=""
+                            onSelect={() => {
+                              setSelectedStudent(null);
+                              localStorage.removeItem('selectedStudent');
+                              setSelectedContract('');
+                              setOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                !selectedStudent ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            Sem aluno selecionado
+                          </CommandItem>
+                          {students.map(student => (
+                            <CommandItem
+                              key={student.id}
+                              value={student.nome}
+                              onSelect={() => {
+                                setSelectedStudent(student);
+                                localStorage.setItem('selectedStudent', JSON.stringify(student));
+                                setSelectedContract('contrato1');
+                                setOpen(false);
+                              }}
+                            >
+                              <div className="flex items-center w-full">
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    selectedStudent?.id === student.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex-1">
+                                  <div className="font-medium">{student.nome} - {student.idioma}</div>
+                                  {student.turmas?.nome && (
+                                    <div className="text-sm text-gray-500">Turma: {student.turmas.nome}</div>
+                                  )}
+                                  {student.cpf && (
+                                    <div className="text-sm text-gray-500">CPF: {student.cpf}</div>
+                                  )}
+                                </div>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {selectedStudent && (
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                  <h3 className="font-semibold mb-2">Aluno Selecionado:</h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium">Nome:</span> {selectedStudent.nome}
+                    </div>
+                    <div>
+                      <span className="font-medium">CPF:</span> {selectedStudent.cpf || 'Não informado'}
+                    </div>
+                    <div>
+                      <span className="font-medium">Idioma:</span> {selectedStudent.idioma}
+                    </div>
+                    <div>
+                      <span className="font-medium">Turma:</span> {selectedStudent.turmas?.nome || 'Não informado'}
+                    </div>
+                    <div>
+                      <span className="font-medium">Status:</span> {selectedStudent.status}
+                    </div>
+                    <div>
+                      <span className="font-medium">Responsável:</span> {selectedStudent.responsaveis?.nome || 'Não informado'}
+                    </div>
+                  </div>
+                  
+
+                  
+                  {/* Informações dos Planos Disponíveis */}
+                  {selectedStudent.financeiro_alunos && selectedStudent.financeiro_alunos.length > 0 && (
+                    <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <h4 className="font-semibold mb-2 text-gray-800">Todos os Planos Associados:</h4>
+                      {selectedStudent.financeiro_alunos.map((financeiro, index) => (
+                        <div key={index} className="grid grid-cols-2 gap-2 text-sm">
+                          {financeiro.planos && (
+                            <>
+                              <div>
+                                <span className="font-medium">Nome do Plano:</span> {financeiro.planos.nome}
+                              </div>
+                              <div>
+                                <span className="font-medium">Valor Total:</span> R$ {financeiro.planos.valor_total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || 'Não informado'}
+                              </div>
+                              <div>
+                                <span className="font-medium">Número de Aulas:</span> {financeiro.planos.numero_aulas || 'Não informado'}
+                              </div>
+                              <div>
+                                <span className="font-medium">Frequência:</span> {financeiro.planos.frequencia_aulas || 'Não informado'}
+                              </div>
+                              <div className="col-span-2">
+                                <span className="font-medium">Descrição:</span> {financeiro.planos.descricao || 'Não informado'}
+                              </div>
+                              <div>
+                                <span className="font-medium">Valor Pago:</span> R$ {financeiro.valor_plano?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || 'Não informado'}
+                              </div>
+                              <div>
+                                <span className="font-medium">Parcelas:</span> {financeiro.numero_parcelas_plano || 'Não informado'}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {(!selectedStudent.financeiro_alunos || selectedStudent.financeiro_alunos.length === 0) && (
+                    <div className="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <p className="text-yellow-800 text-sm">
+                        <span className="font-medium">Atenção:</span> Este aluno não possui plano financeiro associado.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
-      )}
+
+        {/* Seleção de Tipo de Contrato */}
+        {selectedStudent && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Tipo de Contrato</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-4">
+                <Button
+                  variant={selectedContract === 'contrato1' ? 'default' : 'outline'}
+                  onClick={() => setSelectedContract('contrato1')}
+                >
+                  {planData?.nome || 'Plano Padrão'}
+                </Button>
+                <Button
+                  variant={selectedContract === 'contrato2' ? 'default' : 'outline'}
+                  onClick={() => navigate('/contract-generator-2')}
+                >
+                  CONTRATO DE PRESTAÇÃO
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+
+
+        {/* Contrato Gerado */}
+        {selectedStudent && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Contrato Gerado</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isEditing ? (
+                <div 
+                  ref={editableRef}
+                  className="min-h-[600px] text-sm p-4 border rounded-lg bg-white editable-contract"
+                  style={{ 
+                    fontFamily: 'Garamond, serif', 
+                    fontSize: '14pt', 
+                    lineHeight: '1.6',
+                    scrollBehavior: 'auto',
+                    overflowAnchor: 'none'
+                  }}
+                  contentEditable={true}
+                  dangerouslySetInnerHTML={{ __html: editableContent }}
+                  onKeyDown={(e) => {
+                    // Encontrar o placeholder mais próximo do cursor
+                    const selection = window.getSelection();
+                    if (selection && selection.rangeCount > 0) {
+                      const range = selection.getRangeAt(0);
+                      let node = range.startContainer;
+                      
+                      // Procurar o elemento placeholder mais próximo
+                      while (node && node !== e.currentTarget) {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                          const element = node as Element;
+                          if (element.classList.contains('placeholder-text')) {
+                            // Verificar se é um campo de data
+                            const isDateField = element.textContent?.includes('data') || 
+                                              element.textContent?.includes('nascimento') || 
+                                              element.textContent?.includes('início') || 
+                                              element.textContent?.includes('término') || 
+                                              element.textContent?.includes('primeira parcela') ||
+                                              element.textContent?.includes('dia') ||
+                                              element.textContent?.includes('mês') ||
+                                              element.textContent?.includes('ano');
+                            
+                            if (isDateField && e.key.match(/[0-9]/)) {
+                              e.preventDefault();
+                              element.textContent = 'dd/mm/yyyy';
+                              element.classList.remove('placeholder-text');
+                              element.style.color = '#333';
+                              element.style.fontStyle = 'normal';
+                              
+                              // Posicionar cursor no início
+                              setTimeout(() => {
+                                const newRange = document.createRange();
+                                const textNode = element.firstChild;
+                                if (textNode) {
+                                  newRange.setStart(textNode, 0);
+                                  newRange.collapse(true);
+                                  selection.removeAllRanges();
+                                  selection.addRange(newRange);
+                                }
+                              }, 0);
+                            } else if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
+                              element.classList.remove('placeholder-text');
+                              element.style.color = '#333';
+                              element.style.fontStyle = 'normal';
+                              if (e.key !== 'Backspace' && e.key !== 'Delete') {
+                                element.textContent = '';
+                              }
+                            }
+                            break;
+                          }
+                        } else if (node.nodeType === Node.TEXT_NODE && node.parentElement) {
+                          const parentElement = node.parentElement;
+                          if (parentElement.classList.contains('placeholder-text')) {
+                            // Verificar se é um campo de data
+                            const isDateField = parentElement.textContent?.includes('data') || 
+                                              parentElement.textContent?.includes('nascimento') || 
+                                              parentElement.textContent?.includes('início') || 
+                                              parentElement.textContent?.includes('término') || 
+                                              parentElement.textContent?.includes('primeira parcela') ||
+                                              parentElement.textContent?.includes('dia') ||
+                                              parentElement.textContent?.includes('mês') ||
+                                              parentElement.textContent?.includes('ano');
+                            
+                            if (isDateField && e.key.match(/[0-9]/)) {
+                              e.preventDefault();
+                              parentElement.textContent = 'dd/mm/yyyy';
+                              parentElement.classList.remove('placeholder-text');
+                              parentElement.style.color = '#333';
+                              parentElement.style.fontStyle = 'normal';
+                              
+                              // Posicionar cursor no início
+                              setTimeout(() => {
+                                const newRange = document.createRange();
+                                const textNode = parentElement.firstChild;
+                                if (textNode) {
+                                  newRange.setStart(textNode, 0);
+                                  newRange.collapse(true);
+                                  selection.removeAllRanges();
+                                  selection.addRange(newRange);
+                                }
+                              }, 0);
+                            } else if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
+                              parentElement.classList.remove('placeholder-text');
+                              parentElement.style.color = '#333';
+                              parentElement.style.fontStyle = 'normal';
+                              if (e.key !== 'Backspace' && e.key !== 'Delete') {
+                                parentElement.textContent = '';
+                              }
+                            }
+                            break;
+                          }
+                        }
+                        node = node.parentNode;
+                      }
+                    }
+                  }}
+                  onBlur={(e) => {
+                    // Não precisamos fazer nada no onBlur agora
+                    // Os placeholders são removidos permanentemente quando editados
+                  }}
+                  onInput={(e) => {
+                    // Verificar se estamos editando um campo de data
+                    const selection = window.getSelection();
+                    if (selection && selection.rangeCount > 0) {
+                      const range = selection.getRangeAt(0);
+                      let node = range.startContainer;
+                      
+                      // Procurar se estamos em um elemento de data
+                      while (node && node !== e.currentTarget) {
+                        if (node.nodeType === Node.TEXT_NODE && node.parentElement) {
+                          const parentElement = node.parentElement;
+                          const content = parentElement.textContent || '';
+                          
+                          // Verificar se o conteúdo parece ser uma data
+                          const isDateContent = content.includes('dd/mm/yyyy') || 
+                                               content.match(/^\d{1,2}(\/\d{0,2})?(\/\d{0,4})?$/) ||
+                                               content.match(/^\d{4,8}$/);
+                          
+                          if (isDateContent) {
+                            // Extrair apenas números
+                            let numbers = content.replace(/\D/g, '');
+                            
+                            // Limitar a 8 dígitos (ddmmaaaa)
+                            if (numbers.length > 8) {
+                              numbers = numbers.substring(0, 8);
+                            }
+                            
+                            let formattedValue = '';
+                            
+                            if (numbers.length > 0) {
+                              // Aplicar formatação dd/mm/yyyy
+                              if (numbers.length <= 2) {
+                                formattedValue = numbers;
+                              } else if (numbers.length <= 4) {
+                                formattedValue = numbers.substring(0, 2) + '/' + numbers.substring(2);
+                              } else {
+                                formattedValue = numbers.substring(0, 2) + '/' + 
+                                               numbers.substring(2, 4) + '/' + 
+                                               numbers.substring(4);
+                              }
+                            }
+                            
+                            if (formattedValue !== content) {
+                              parentElement.textContent = formattedValue;
+                              
+                              // Reposicionar cursor no final
+                              const newRange = document.createRange();
+                              const textNode = parentElement.firstChild;
+                              if (textNode) {
+                                const cursorPos = formattedValue.length;
+                                newRange.setStart(textNode, cursorPos);
+                                newRange.collapse(true);
+                                selection.removeAllRanges();
+                                selection.addRange(newRange);
+                              }
+                              return;
+                            }
+                          }
+                        }
+                        node = node.parentNode;
+                      }
+                    }
+                    
+                    // Salvar posição do scroll antes da edição
+                    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+                    
+                    // Salvar posição do cursor
+                    const range = selection?.getRangeAt(0);
+                    const startOffset = range?.startOffset;
+                    const startContainer = range?.startContainer;
+                    
+                    // Atualizar conteúdo
+                    setEditableContent(e.currentTarget.innerHTML);
+                    
+                    // Restaurar posição do cursor e scroll após o próximo render
+                    setTimeout(() => {
+                      // Restaurar scroll para a posição original
+                      window.scrollTo(scrollLeft, scrollTop);
+                      
+                      if (selection && startContainer && typeof startOffset === 'number' && editableRef.current) {
+                        try {
+                          const newRange = document.createRange();
+                          // Encontrar o nó correspondente no DOM atualizado
+                          const walker = document.createTreeWalker(
+                            editableRef.current,
+                            NodeFilter.SHOW_TEXT,
+                            null
+                          );
+                          
+                          let currentNode;
+                          let found = false;
+                          while (currentNode = walker.nextNode()) {
+                            if (currentNode.textContent === startContainer.textContent) {
+                              newRange.setStart(currentNode, Math.min(startOffset, currentNode.textContent?.length || 0));
+                              newRange.collapse(true);
+                              selection.removeAllRanges();
+                              selection.addRange(newRange);
+                              found = true;
+                              break;
+                            }
+                          }
+                          
+                          // Se não encontrou o nó exato, posicionar no final do conteúdo
+                          if (!found) {
+                            newRange.selectNodeContents(editableRef.current);
+                            newRange.collapse(false);
+                            selection.removeAllRanges();
+                            selection.addRange(newRange);
+                          }
+                          
+                          // Garantir que o cursor permaneça visível sem scroll desnecessário
+                          const rect = newRange.getBoundingClientRect();
+                          const viewportHeight = window.innerHeight;
+                          const isVisible = rect.top >= 0 && rect.bottom <= viewportHeight;
+                          
+                          if (!isVisible) {
+                            // Apenas fazer scroll se o cursor estiver fora da área visível
+                            newRange.startContainer.parentElement?.scrollIntoView({
+                              behavior: 'smooth',
+                              block: 'center',
+                              inline: 'nearest'
+                            });
+                          }
+                        } catch (error) {
+                          console.log('Erro ao restaurar cursor:', error);
+                        }
+                      }
+                    }, 0);
+                  }}
+                  onFocus={() => {
+                    // Prevenir scroll automático ao focar
+                    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+                    setTimeout(() => {
+                      window.scrollTo(scrollLeft, scrollTop);
+                    }, 0);
+                  }}
+                  suppressContentEditableWarning={true}
+                />
+              ) : (
+                savedContent ? (
+                  <div id="contract-content" className="contract-preview whitespace-pre-wrap text-sm p-4 border rounded-lg bg-white" style={{ fontFamily: 'Garamond, serif', fontSize: '14pt', lineHeight: '1.6' }} dangerouslySetInnerHTML={{ __html: savedContent }}>
+                  </div>
+                ) : (
+                  <div id="contract-content" className="contract-preview whitespace-pre-wrap text-sm p-4 border rounded-lg bg-white" style={{ fontFamily: 'Garamond, serif', fontSize: '14pt', lineHeight: '1.6' }} dangerouslySetInnerHTML={{ __html: generateContractContent() }}>
+                  </div>
+                )
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

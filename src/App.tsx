@@ -19,6 +19,7 @@ import Materials from "./pages/app/Materials";
 import Documents from "./pages/app/Documents";
 import Contracts from "./pages/app/Contracts";
 import ContractGenerator from "./pages/app/ContractGenerator";
+import ContractGenerator2 from "./pages/app/ContractGenerator2";
 import Plans from "./pages/app/Plans";
 import Birthdays from "./pages/app/Birthdays";
 import ApproveLogins from "./pages/app/ApproveLogins";
@@ -67,6 +68,7 @@ const App = () => {
                                 <Route path="/documents" element={<Documents />} />
                                 <Route path="/contracts" element={<Contracts />} />
                                 <Route path="/contract-generator" element={<ContractGenerator />} />
+          <Route path="/contract-generator-2" element={<ContractGenerator2 />} />
                                 <Route path="/plans" element={<Plans />} />
                                 <Route path="/birthdays" element={<Birthdays />} />
                                 <Route path="/approve-logins" element={<ApproveLogins />} />
