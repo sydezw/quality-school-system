@@ -154,16 +154,47 @@ export const useStudents = () => {
       }
   
       // Só incluir turma_id se tiver valor UUID válido
-      if (data.turma_id && data.turma_id !== 'none' && data.turma_id !== '' && data.turma_id.length > 10) {
+      if (data.turma_id && data.turma_id !== 'none' && data.turma_id !== '') {
+        // Verificar se a turma de destino já tem 10 alunos
+        const { data: currentStudents, error: countError } = await supabase
+          .from('alunos')
+          .select('id')
+          .eq('turma_id', data.turma_id)
+          .eq('status', 'Ativo');
+
+        if (countError) {
+          console.error('Erro ao verificar limite da turma:', countError);
+          throw new Error('Erro ao verificar limite da turma');
+        }
+
+        const currentCount = currentStudents?.length || 0;
+        const maxStudents = 10;
+
+        // Se estamos editando um aluno, não contar ele mesmo se já estiver na turma
+        const isStudentAlreadyInClass = editingStudent && editingStudent.turma_id === data.turma_id;
+        const effectiveCount = isStudentAlreadyInClass ? currentCount - 1 : currentCount;
+
+        if (effectiveCount >= maxStudents) {
+          throw new Error(`Esta turma já possui o máximo de ${maxStudents} alunos. Escolha outra turma ou remova alunos desta turma primeiro.`);
+        }
+
         submitData.turma_id = data.turma_id;
+      } else if (data.turma_id === 'none' || data.turma_id === '') {
+        // Explicitamente definir como null para remover a turma
+        submitData.turma_id = null;
       }
   
       // Só incluir responsavel_id se tiver valor UUID válido
-      if (data.responsavel_id && data.responsavel_id !== 'none' && data.responsavel_id !== '' && data.responsavel_id.length > 10) {
+      if (data.responsavel_id && data.responsavel_id !== 'none' && data.responsavel_id !== '') {
         submitData.responsavel_id = data.responsavel_id;
+      } else if (data.responsavel_id === 'none' || data.responsavel_id === '') {
+        // Explicitamente definir como null para remover o responsável
+        submitData.responsavel_id = null;
       }
   
-      console.log('Dados que serão enviados:', submitData);
+      console.log('Dados recebidos do formulário:', data);
+      console.log('Dados que serão enviados para o banco:', submitData);
+      console.log('Editando aluno:', editingStudent?.id, editingStudent?.nome);
   
       if (editingStudent) {
         const { error } = await supabase

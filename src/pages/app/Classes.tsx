@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, BookCopy, Calendar, Clock, Globe, Book, Users, GraduationCap, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, BookCopy, Calendar, Clock, Globe, Book, Users, GraduationCap, AlertTriangle, CheckCircle, X } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 
 interface Class {
@@ -48,6 +48,19 @@ const Classes = () => {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [classToDelete, setClassToDelete] = useState<Class | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isStudentsDialogOpen, setIsStudentsDialogOpen] = useState(false);
+  const [selectedClassForStudents, setSelectedClassForStudents] = useState<Class | null>(null);
+  const [classStudents, setClassStudents] = useState<any[]>([]);
+  const [loadingStudents, setLoadingStudents] = useState(false);
+  const [allStudents, setAllStudents] = useState<any[]>([]);
+  const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
+  const [selectedStudentsToAdd, setSelectedStudentsToAdd] = useState<string[]>([]);
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const { toast } = useToast();
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm({
@@ -62,6 +75,102 @@ const Classes = () => {
   });
 
   const selectedIdioma = watch('idioma');
+
+  // Função para gerenciar seleção de dias
+  const handleDayToggle = (day: string) => {
+    setSelectedDays(prev => {
+      const newDays = prev.includes(day)
+        ? prev.filter(d => d !== day)
+        : [...prev, day];
+      
+      // Atualizar o campo dias_da_semana com os dias concatenados
+      const daysString = newDays.join(' e ');
+      setValue('dias_da_semana', daysString);
+      
+      return newDays;
+    });
+  };
+
+  // Função para aumentar nível da turma
+  const increaseClassLevel = async (classItem: Class) => {
+    try {
+      // Extrair número do nível atual
+      const currentLevelMatch = classItem.nivel?.match(/Book (\d+)/);
+      if (!currentLevelMatch) {
+        toast({
+          title: "Erro",
+          description: "Não foi possível identificar o nível atual da turma.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const currentLevel = parseInt(currentLevelMatch[1]);
+      if (currentLevel >= 10) {
+        toast({
+          title: "Aviso",
+          description: "A turma já está no nível máximo (Book 10).",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const nextLevel = currentLevel + 1;
+      const newNivel = `Book ${nextLevel}`;
+
+      // Buscar material correspondente ao novo nível
+      let materialName;
+      if (nextLevel === 10) {
+        // Caso especial para Book 10 que está como "English Book 9,9"
+        materialName = "English Book 9,9";
+      } else {
+        materialName = `English Book ${nextLevel}`;
+      }
+
+      const { data: newMaterial, error: materialError } = await supabase
+        .from('materiais')
+        .select('id')
+        .eq('nome', materialName)
+        .eq('idioma', classItem.idioma)
+        .eq('status', 'disponivel')
+        .single();
+
+      if (materialError || !newMaterial) {
+        toast({
+          title: "Erro",
+          description: `Material "${materialName}" não encontrado ou não disponível.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Atualizar turma com novo nível e material
+      const { error: updateError } = await supabase
+        .from('turmas')
+        .update({
+          nivel: newNivel,
+          materiais_ids: [newMaterial.id]
+        })
+        .eq('id', classItem.id);
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "Sucesso",
+        description: `Turma atualizada para ${newNivel} com material ${materialName}.`,
+      });
+
+      // Recarregar lista de turmas
+      fetchClasses();
+    } catch (error) {
+      console.error('Erro ao aumentar nível da turma:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível aumentar o nível da turma.",
+        variant: "destructive",
+      });
+    }
+  };
 
   useEffect(() => {
     fetchClasses();
@@ -202,6 +311,181 @@ const Classes = () => {
     }
   };
 
+  const openDeleteDialog = (classItem: Class) => {
+    setClassToDelete(classItem);
+    setDeleteConfirmation('');
+    setIsDeleteDialogOpen(true);
+  };
+
+  const fetchClassStudents = async (classId: string) => {
+    try {
+      setLoadingStudents(true);
+      const { data, error } = await supabase
+        .from('alunos')
+        .select('id, nome, email, telefone, status')
+        .eq('turma_id', classId)
+        .order('nome');
+
+      if (error) throw error;
+      setClassStudents(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar alunos da turma:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar os alunos da turma.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingStudents(false);
+    }
+  };
+
+  const fetchAllStudents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('alunos')
+        .select('id, nome, email, status, turma_id')
+        .eq('status', 'Ativo')
+        .is('turma_id', null)
+        .order('nome');
+
+      if (error) throw error;
+      setAllStudents(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar alunos sem turma:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar a lista de alunos sem turma.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const openStudentsDialog = async (classItem: Class) => {
+    setSelectedClassForStudents(classItem);
+    setIsStudentsDialogOpen(true);
+    await fetchClassStudents(classItem.id);
+  };
+
+  const openAddStudentDialog = async () => {
+    setIsAddStudentDialogOpen(true);
+    await fetchAllStudents();
+  };
+
+  const addStudentsToClass = async () => {
+    if (!selectedClassForStudents || selectedStudentsToAdd.length === 0) return;
+
+    try {
+      // Verificar quantos alunos já estão na turma
+      const { data: currentStudents, error: countError } = await supabase
+        .from('alunos')
+        .select('id, turma_id')
+        .eq('turma_id', selectedClassForStudents.id)
+        .eq('status', 'Ativo');
+
+      if (countError) throw countError;
+
+      const currentCount = currentStudents?.length || 0;
+      const maxStudents = 10;
+      const availableSlots = maxStudents - currentCount;
+
+      if (availableSlots <= 0) {
+        toast({
+          title: "Limite Atingido",
+          description: "Esta turma já possui o máximo de 10 alunos.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (selectedStudentsToAdd.length > availableSlots) {
+        toast({
+          title: "Limite Excedido",
+          description: `Esta turma só pode receber mais ${availableSlots} aluno(s). Máximo de 10 alunos por turma.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Atualizar cada aluno individualmente para evitar problemas com campos obrigatórios
+       for (const studentId of selectedStudentsToAdd) {
+         const { error: updateError } = await supabase
+           .from('alunos')
+           .update({ turma_id: selectedClassForStudents.id })
+           .eq('id', studentId);
+         
+         if (updateError) throw updateError;
+       }
+
+      toast({
+        title: "Sucesso",
+        description: `${selectedStudentsToAdd.length} aluno(s) adicionado(s) à turma com sucesso!`,
+      });
+
+      setIsAddStudentDialogOpen(false);
+      setSelectedStudentsToAdd([]);
+      setStudentSearchQuery('');
+      await fetchClassStudents(selectedClassForStudents.id);
+    } catch (error) {
+      console.error('Erro ao adicionar alunos à turma:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível adicionar os alunos à turma.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const removeStudentFromClass = async (studentId: string) => {
+    try {
+      const { error } = await supabase
+        .from('alunos')
+        .update({ turma_id: null })
+        .eq('id', studentId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Aluno removido da turma com sucesso!",
+      });
+
+      if (selectedClassForStudents) {
+        await fetchClassStudents(selectedClassForStudents.id);
+      }
+    } catch (error) {
+      console.error('Erro ao remover aluno da turma:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível remover o aluno da turma.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (deleteConfirmation !== 'SIM' || !classToDelete) {
+      toast({
+        title: "Confirmação inválida",
+        description: "Digite 'SIM' para confirmar a exclusão.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await deleteClass(classToDelete.id);
+      setIsDeleteDialogOpen(false);
+      setClassToDelete(null);
+      setDeleteConfirmation('');
+    } catch (error) {
+      // Erro já tratado na função deleteClass
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const deleteClass = async (id: string) => {
     try {
       // Verificar se a turma existe
@@ -215,61 +499,88 @@ const Classes = () => {
         throw new Error('Turma não encontrada.');
       }
 
-      // Verificar se existem aulas relacionadas
+      // Excluir aulas relacionadas automaticamente
       const { data: relatedAulas, error: aulasError } = await supabase
         .from('aulas')
         .select('id')
-        .eq('turma_id', id)
-        .limit(1);
+        .eq('turma_id', id);
 
       if (aulasError) {
         throw new Error('Erro ao verificar aulas relacionadas.');
       }
 
       if (relatedAulas && relatedAulas.length > 0) {
-        throw new Error('Não é possível excluir esta turma pois existem aulas cadastradas. Exclua primeiro todas as aulas desta turma.');
+        console.log(`Excluindo ${relatedAulas.length} aulas relacionadas à turma...`);
+        const { error: deleteAulasError } = await supabase
+          .from('aulas')
+          .delete()
+          .eq('turma_id', id);
+
+        if (deleteAulasError) {
+          throw new Error(`Erro ao excluir aulas relacionadas: ${deleteAulasError.message}`);
+        }
       }
 
-      // Verificar se existem outros registros relacionados que impedem a exclusão
+      // Excluir registros relacionados automaticamente
+      
+      // Excluir pesquisas de satisfação relacionadas
       const { data: relatedRecords, error: checkError } = await supabase
         .from('pesquisas_satisfacao')
         .select('id')
-        .eq('turma_id', id)
-        .limit(1);
+        .eq('turma_id', id);
 
       if (checkError) {
         console.warn('Erro ao verificar pesquisas relacionadas:', checkError);
+      } else if (relatedRecords && relatedRecords.length > 0) {
+        console.log(`Excluindo ${relatedRecords.length} pesquisas de satisfação relacionadas...`);
+        const { error: deletePesquisasError } = await supabase
+          .from('pesquisas_satisfacao')
+          .delete()
+          .eq('turma_id', id);
+        
+        if (deletePesquisasError) {
+          console.warn('Erro ao excluir pesquisas relacionadas:', deletePesquisasError);
+        }
       }
 
+      // Excluir planos de aula relacionados
       const { data: relatedPlanos, error: planosError } = await supabase
         .from('planos_aula')
         .select('id')
-        .eq('turma_id', id)
-        .limit(1);
+        .eq('turma_id', id);
 
       if (planosError) {
         console.warn('Erro ao verificar planos relacionados:', planosError);
+      } else if (relatedPlanos && relatedPlanos.length > 0) {
+        console.log(`Excluindo ${relatedPlanos.length} planos de aula relacionados...`);
+        const { error: deletePlanosError } = await supabase
+          .from('planos_aula')
+          .delete()
+          .eq('turma_id', id);
+        
+        if (deletePlanosError) {
+          console.warn('Erro ao excluir planos relacionados:', deletePlanosError);
+        }
       }
 
+      // Excluir ranking relacionado
       const { data: relatedRanking, error: rankingError } = await supabase
         .from('ranking')
         .select('id')
-        .eq('turma_id', id)
-        .limit(1);
+        .eq('turma_id', id);
 
       if (rankingError) {
         console.warn('Erro ao verificar ranking relacionado:', rankingError);
-      }
-
-      // Se existem outros registros relacionados, informar ao usuário
-      const hasRelatedRecords = (
-        (relatedRecords && relatedRecords.length > 0) ||
-        (relatedPlanos && relatedPlanos.length > 0) ||
-        (relatedRanking && relatedRanking.length > 0)
-      );
-
-      if (hasRelatedRecords) {
-        throw new Error('Não é possível excluir esta turma pois existem registros relacionados (pesquisas, planos de aula ou ranking). Remova primeiro estes registros.');
+      } else if (relatedRanking && relatedRanking.length > 0) {
+        console.log(`Excluindo ${relatedRanking.length} registros de ranking relacionados...`);
+        const { error: deleteRankingError } = await supabase
+          .from('ranking')
+          .delete()
+          .eq('turma_id', id);
+        
+        if (deleteRankingError) {
+          console.warn('Erro ao excluir ranking relacionado:', deleteRankingError);
+        }
       }
 
       // Tentar excluir a turma
@@ -312,6 +623,10 @@ const Classes = () => {
       professor_id: classItem.professor_id || 'none'
     });
     
+    // Carregar dias selecionados a partir da string
+    const daysArray = classItem.dias_da_semana ? classItem.dias_da_semana.split(' e ') : [];
+    setSelectedDays(daysArray);
+    
     // Carregar materiais selecionados
     setSelectedMaterials(classItem.materiais_ids || []);
     setIsDialogOpen(true);
@@ -328,6 +643,7 @@ const Classes = () => {
       professor_id: 'none'
     });
     setSelectedMaterials([]);
+    setSelectedDays([]);
     setIsDialogOpen(true);
   };
 
@@ -594,61 +910,43 @@ const Classes = () => {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="dias_da_semana" className="text-sm font-medium text-gray-700">
-                      Dia da Semana *
+                    <Label className="text-sm font-medium text-gray-700">
+                      Dias da Semana *
                     </Label>
-                    <Select 
-                      onValueChange={(value) => setValue('dias_da_semana', value)} 
-                      value={watch('dias_da_semana')}
-                    >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Selecione o dia" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Segunda">
-                          <div className="flex items-center gap-2">
+                    <div className="mt-2 space-y-2">
+                      {[
+                        { value: 'Segunda', label: 'Segunda-feira' },
+                        { value: 'Terça', label: 'Terça-feira' },
+                        { value: 'Quarta', label: 'Quarta-feira' },
+                        { value: 'Quinta', label: 'Quinta-feira' },
+                        { value: 'Sexta', label: 'Sexta-feira' },
+                        { value: 'Sábado', label: 'Sábado' },
+                        { value: 'Domingo', label: 'Domingo' }
+                      ].map((day) => (
+                        <div key={day.value} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={day.value}
+                            checked={selectedDays.includes(day.value)}
+                            onCheckedChange={() => handleDayToggle(day.value)}
+                            className="h-4 w-4"
+                          />
+                          <Label 
+                            htmlFor={day.value} 
+                            className="text-sm font-normal cursor-pointer flex items-center gap-2"
+                          >
                             <Calendar className="h-4 w-4" />
-                            Segunda-feira
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="Terça">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4" />
-                            Terça-feira
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="Quarta">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4" />
-                            Quarta-feira
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="Quinta">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4" />
-                            Quinta-feira
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="Sexta">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4" />
-                            Sexta-feira
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="Sábado">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4" />
-                            Sábado
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="Domingo">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4" />
-                            Domingo
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                            {day.label}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                    {selectedDays.length > 0 && (
+                      <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                        <p className="text-sm text-blue-800">
+                          <strong>Dias selecionados:</strong> {selectedDays.join(' e ')}
+                        </p>
+                      </div>
+                    )}
                     {errors.dias_da_semana && (
                       <div className="mt-1 flex items-center gap-1">
                         <AlertTriangle className="h-4 w-4 text-red-500" />
@@ -884,7 +1182,7 @@ const Classes = () => {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="text-sm">
+                    <Badge variant="outline" className="text-sm bg-red-50 text-red-700 border-red-200">
                       {classItem.nivel || 'Não definido'}
                     </Badge>
                   </TableCell>
@@ -909,6 +1207,25 @@ const Classes = () => {
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => openStudentsDialog(classItem)}
+                        className="text-blue-600 hover:text-blue-700"
+                        title="Ver alunos da turma"
+                      >
+                        <Users className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => increaseClassLevel(classItem)}
+                        className="text-green-600 hover:text-green-700"
+                        title="Aumentar nível da turma"
+                        disabled={classItem.nivel === 'Book 10'}
+                      >
+                        <GraduationCap className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => openEditDialog(classItem)}
                       >
                         <Edit className="h-4 w-4" />
@@ -916,7 +1233,7 @@ const Classes = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => deleteClass(classItem.id)}
+                        onClick={() => openDeleteDialog(classItem)}
                         className="text-red-600 hover:text-red-700"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -929,6 +1246,321 @@ const Classes = () => {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Modal de Confirmação de Exclusão */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              Confirmar Exclusão
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+               <p className="text-sm text-red-800">
+                 <strong>Atenção:</strong> Esta ação não pode ser desfeita!
+               </p>
+               <p className="text-sm text-red-700 mt-2">
+                 Você está prestes a excluir a turma:
+               </p>
+               <p className="font-semibold text-red-900 mt-1">
+                 {classToDelete?.nome} - {classToDelete?.idioma} ({classToDelete?.nivel})
+               </p>
+               <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                 <p className="text-xs text-yellow-800">
+                   <strong>Importante:</strong> Todos os registros relacionados a esta turma também serão excluídos automaticamente:
+                 </p>
+                 <ul className="text-xs text-yellow-700 mt-1 ml-4 list-disc">
+                   <li>Aulas cadastradas</li>
+                   <li>Pesquisas de satisfação</li>
+                   <li>Planos de aula</li>
+                   <li>Registros de ranking</li>
+                 </ul>
+               </div>
+             </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="delete-confirmation" className="text-sm font-medium">
+                Para confirmar, digite <strong>SIM</strong> no campo abaixo:
+              </Label>
+              <Input
+                id="delete-confirmation"
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                placeholder="Digite SIM para confirmar"
+                className="text-center font-semibold"
+              />
+            </div>
+            
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsDeleteDialogOpen(false);
+                  setClassToDelete(null);
+                  setDeleteConfirmation('');
+                }}
+                disabled={isDeleting}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteConfirm}
+                disabled={deleteConfirmation !== 'SIM' || isDeleting}
+                className="min-w-[100px]"
+              >
+                {isDeleting ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Excluindo...
+                  </div>
+                ) : (
+                  'Excluir Turma'
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+       </Dialog>
+
+       {/* Modal de Visualização de Alunos da Turma */}
+       <Dialog open={isStudentsDialogOpen} onOpenChange={setIsStudentsDialogOpen}>
+         <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto">
+           <DialogHeader>
+             <DialogTitle className="flex items-center gap-2 text-blue-600">
+               <Users className="h-5 w-5" />
+               Alunos da Turma: {selectedClassForStudents?.nome}
+             </DialogTitle>
+           </DialogHeader>
+           <div className="space-y-4">
+             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+               <div className="flex items-center justify-between">
+                 <div>
+                   <p className="font-semibold text-blue-900">
+                     {selectedClassForStudents?.nome} - {selectedClassForStudents?.idioma}
+                   </p>
+                   <p className="text-sm text-blue-700">
+                     Nível: {selectedClassForStudents?.nivel} | Total de alunos: {classStudents.length}
+                   </p>
+                 </div>
+                 <Button
+                   onClick={openAddStudentDialog}
+                   className="bg-blue-600 hover:bg-blue-700"
+                   size="sm"
+                 >
+                   <Plus className="h-4 w-4 mr-2" />
+                   Adicionar Alunos
+                 </Button>
+               </div>
+             </div>
+
+             {loadingStudents ? (
+               <div className="flex items-center justify-center py-8">
+                 <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                 <span className="ml-2 text-gray-600">Carregando alunos...</span>
+               </div>
+             ) : classStudents.length === 0 ? (
+               <div className="text-center py-8">
+                 <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                 <p className="text-gray-600">Nenhum aluno cadastrado nesta turma</p>
+                 <Button
+                   onClick={openAddStudentDialog}
+                   className="mt-4 bg-blue-600 hover:bg-blue-700"
+                   size="sm"
+                 >
+                   <Plus className="h-4 w-4 mr-2" />
+                   Adicionar Primeiro Aluno
+                 </Button>
+               </div>
+             ) : (
+               <div className="space-y-2">
+                 <h3 className="font-semibold text-gray-900">Lista de Alunos ({classStudents.length})</h3>
+                 <div className="border rounded-lg">
+                   <Table>
+                     <TableHeader>
+                       <TableRow>
+                         <TableHead>Nome</TableHead>
+                         <TableHead>Email</TableHead>
+                         <TableHead>Telefone</TableHead>
+                         <TableHead>Status</TableHead>
+                         <TableHead>Ações</TableHead>
+                       </TableRow>
+                     </TableHeader>
+                     <TableBody>
+                       {classStudents.map((student) => (
+                         <TableRow key={student.id}>
+                           <TableCell className="font-medium">{student.nome}</TableCell>
+                           <TableCell>{student.email || '-'}</TableCell>
+                           <TableCell>{student.telefone || '-'}</TableCell>
+                           <TableCell>
+                             <Badge variant={student.status === 'Ativo' ? 'default' : 'secondary'}>
+                               {student.status}
+                             </Badge>
+                           </TableCell>
+                           <TableCell>
+                             <Button
+                               variant="outline"
+                               size="sm"
+                               onClick={() => removeStudentFromClass(student.id)}
+                               className="text-red-600 hover:text-red-700"
+                               title="Remover da turma"
+                             >
+                               <X className="h-4 w-4" />
+                             </Button>
+                           </TableCell>
+                         </TableRow>
+                       ))}
+                     </TableBody>
+                   </Table>
+                 </div>
+               </div>
+             )}
+           </div>
+         </DialogContent>
+       </Dialog>
+
+       {/* Modal de Adicionar Alunos à Turma */}
+       <Dialog open={isAddStudentDialogOpen} onOpenChange={setIsAddStudentDialogOpen}>
+         <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+           <DialogHeader>
+             <DialogTitle className="flex items-center gap-2 text-green-600">
+               <Plus className="h-5 w-5" />
+               Adicionar Alunos à Turma: {selectedClassForStudents?.nome}
+             </DialogTitle>
+           </DialogHeader>
+           <div className="space-y-4">
+             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+               <p className="text-sm text-green-800">
+                 Selecione os alunos que deseja adicionar à turma. Apenas alunos ativos sem turma são exibidos.
+               </p>
+             </div>
+
+             {/* Informação sobre limite de alunos */}
+             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+               <div className="flex items-center justify-between">
+                 <p className="text-sm text-blue-800">
+                   <strong>Limite de alunos:</strong> Máximo 10 alunos por turma
+                 </p>
+                 <p className="text-sm text-blue-600 font-medium">
+                   {classStudents.length}/10 alunos na turma
+                 </p>
+               </div>
+               {classStudents.length >= 10 && (
+                 <p className="text-sm text-red-600 mt-2 font-medium">
+                   ⚠️ Esta turma já atingiu o limite máximo de alunos.
+                 </p>
+               )}
+             </div>
+
+             {/* Barra de Pesquisa */}
+             <div className="space-y-2">
+               <Label htmlFor="student-search" className="text-sm font-medium">
+                 Pesquisar Alunos
+               </Label>
+               <Input
+                 id="student-search"
+                 placeholder="Digite o nome do aluno..."
+                 value={studentSearchQuery}
+                 onChange={(e) => setStudentSearchQuery(e.target.value)}
+                 className="w-full"
+               />
+             </div>
+
+             {allStudents.length === 0 ? (
+               <div className="text-center py-8">
+                 <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                 <p className="text-gray-600">Nenhum aluno disponível para adicionar</p>
+               </div>
+             ) : (
+               <div className="space-y-4">
+                 <div className="flex items-center justify-between">
+                   <h3 className="font-semibold text-gray-900">
+                     Alunos Disponíveis ({allStudents.filter(student => 
+                       student.nome.toLowerCase().includes(studentSearchQuery.toLowerCase())
+                     ).length})
+                   </h3>
+                   <p className="text-sm text-gray-600">
+                     {selectedStudentsToAdd.length} selecionado(s)
+                   </p>
+                 </div>
+                 
+                 <div className="border rounded-lg max-h-96 overflow-y-auto">
+                   <Table>
+                     <TableHeader>
+                         <TableRow>
+                           <TableHead className="w-12">Selecionar</TableHead>
+                           <TableHead>Nome</TableHead>
+                           <TableHead>Email</TableHead>
+                           <TableHead>Status</TableHead>
+                         </TableRow>
+                       </TableHeader>
+                     <TableBody>
+                       {allStudents
+                         .filter(student => 
+                           student.nome.toLowerCase().includes(studentSearchQuery.toLowerCase())
+                         )
+                         .map((student) => (
+                         <TableRow key={student.id}>
+                           <TableCell>
+                             <Checkbox
+                               checked={selectedStudentsToAdd.includes(student.id)}
+                               onCheckedChange={(checked) => {
+                                 if (checked) {
+                                   setSelectedStudentsToAdd(prev => [...prev, student.id]);
+                                 } else {
+                                   setSelectedStudentsToAdd(prev => prev.filter(id => id !== student.id));
+                                 }
+                               }}
+                             />
+                           </TableCell>
+                           <TableCell className="font-medium">{student.nome}</TableCell>
+                           <TableCell>{student.email || '-'}</TableCell>
+                           <TableCell>
+                             <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-200">
+                               {student.status}
+                             </Badge>
+                           </TableCell>
+                         </TableRow>
+                       ))}
+                     </TableBody>
+                   </Table>
+                 </div>
+
+                 <div className="flex gap-2 justify-end">
+                   <Button
+                     variant="outline"
+                     onClick={() => {
+                       setIsAddStudentDialogOpen(false);
+                       setSelectedStudentsToAdd([]);
+                       setStudentSearchQuery('');
+                     }}
+                   >
+                     Cancelar
+                   </Button>
+                   <Button
+                     onClick={addStudentsToClass}
+                     disabled={
+                       selectedStudentsToAdd.length === 0 || 
+                       classStudents.length >= 10 ||
+                       selectedStudentsToAdd.length > (10 - classStudents.length)
+                     }
+                     className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400"
+                   >
+                     {classStudents.length >= 10 
+                       ? 'Turma Lotada (10/10)'
+                       : selectedStudentsToAdd.length > (10 - classStudents.length)
+                       ? `Excede limite (${selectedStudentsToAdd.length}/${10 - classStudents.length} vagas)`
+                       : `Adicionar ${selectedStudentsToAdd.length} Aluno(s)`
+                     }
+                   </Button>
+                 </div>
+               </div>
+             )}
+           </div>
+         </DialogContent>
+       </Dialog>
     </div>
   );
 };
