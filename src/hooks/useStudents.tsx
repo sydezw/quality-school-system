@@ -50,6 +50,8 @@ export const useStudents = () => {
           data_cancelamento,
           data_conclusao,
           data_exclusao,
+          aulas_particulares,
+          aulas_turma,
           turmas(nome, idioma),
           responsaveis(nome, telefone)
         `);
@@ -87,6 +89,8 @@ export const useStudents = () => {
         data_cancelamento: item.data_cancelamento,
         data_conclusao: item.data_conclusao,
         data_exclusao: item.data_exclusao,
+        aulas_particulares: item.aulas_particulares || false,
+        aulas_turma: item.aulas_turma !== null ? item.aulas_turma : true,
         turmas: item.turmas ? {
           nome: item.turmas.nome,
           idioma: item.turmas.idioma || ''
@@ -145,7 +149,9 @@ export const useStudents = () => {
         cidade: data.cidade || null,
         estado: data.estado || null,
         nivel: data.nivel && data.nivel !== 'none' ? data.nivel : null,
-        status: data.status || 'Ativo'
+        status: data.status || 'Ativo',
+        aulas_particulares: data.aulas_particulares || false,
+        aulas_turma: data.aulas_turma !== undefined ? data.aulas_turma : true
       };
   
       // Só incluir idioma se tiver valor válido
@@ -155,27 +161,31 @@ export const useStudents = () => {
   
       // Só incluir turma_id se tiver valor UUID válido
       if (data.turma_id && data.turma_id !== 'none' && data.turma_id !== '') {
-        // Verificar se a turma de destino já tem 10 alunos
-        const { data: currentStudents, error: countError } = await supabase
-          .from('alunos')
-          .select('id')
-          .eq('turma_id', data.turma_id)
-          .eq('status', 'Ativo');
+        // Verificar se a turma de destino já tem 10 alunos (apenas para novos alunos ou mudança de turma)
+        const shouldCheckLimit = !editingStudent || editingStudent.turma_id !== data.turma_id;
+        
+        if (shouldCheckLimit) {
+          const { data: currentStudents, error: countError } = await supabase
+            .from('alunos')
+            .select('id')
+            .eq('turma_id', data.turma_id)
+            .eq('status', 'Ativo');
 
-        if (countError) {
-          console.error('Erro ao verificar limite da turma:', countError);
-          throw new Error('Erro ao verificar limite da turma');
-        }
+          if (countError) {
+            console.error('Erro ao verificar limite da turma:', countError);
+            throw new Error('Erro ao verificar limite da turma');
+          }
 
-        const currentCount = currentStudents?.length || 0;
-        const maxStudents = 10;
+          const currentCount = currentStudents?.length || 0;
+          const maxStudents = 10;
 
-        // Se estamos editando um aluno, não contar ele mesmo se já estiver na turma
-        const isStudentAlreadyInClass = editingStudent && editingStudent.turma_id === data.turma_id;
-        const effectiveCount = isStudentAlreadyInClass ? currentCount - 1 : currentCount;
+          // Se estamos editando um aluno, não contar ele mesmo se já estiver na turma
+          const isStudentAlreadyInClass = editingStudent && editingStudent.turma_id === data.turma_id;
+          const effectiveCount = isStudentAlreadyInClass ? currentCount - 1 : currentCount;
 
-        if (effectiveCount >= maxStudents) {
-          throw new Error(`Esta turma já possui o máximo de ${maxStudents} alunos. Escolha outra turma ou remova alunos desta turma primeiro.`);
+          if (effectiveCount >= maxStudents) {
+            throw new Error(`Esta turma já possui o máximo de ${maxStudents} alunos. Escolha outra turma ou remova alunos desta turma primeiro.`);
+          }
         }
 
         submitData.turma_id = data.turma_id;

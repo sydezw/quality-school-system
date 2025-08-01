@@ -4,6 +4,8 @@ import StudentSelectField from "./StudentSelectField";
 import { Control, useWatch } from "react-hook-form";
 import { StudentFormValues } from "@/lib/validators/student";
 import { useEffect } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 interface Class {
   id: string;
@@ -166,6 +168,56 @@ const AcademicFields = ({ control, classes, selectedIdioma, setValue }: Academic
           );
         }}
       />
+      {/* Seção de Tipos de Aula */}
+      <div className="space-y-4">
+        <div className="border-t pt-4">
+          <h3 className="text-sm font-medium text-gray-900 mb-3">Tipos de Aula</h3>
+          <div className="space-y-3">
+            <FormField
+              control={control}
+              name="aulas_turma"
+              render={({ field }) => (
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="aulas_turma"
+                    checked={field.value || false}
+                    onCheckedChange={field.onChange}
+                  />
+                  <Label
+                    htmlFor="aulas_turma"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Aulas de Turma (Regulares)
+                  </Label>
+                </div>
+              )}
+            />
+            <FormField
+              control={control}
+              name="aulas_particulares"
+              render={({ field }) => (
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="aulas_particulares"
+                    checked={field.value || false}
+                    onCheckedChange={field.onChange}
+                  />
+                  <Label
+                    htmlFor="aulas_particulares"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Aulas Particulares
+                  </Label>
+                </div>
+              )}
+            />
+          </div>
+          <p className="text-xs text-gray-500 mt-2">
+            Selecione os tipos de aula que o aluno irá frequentar. É possível selecionar ambos.
+          </p>
+        </div>
+      </div>
+      
       <FormField
         control={control}
         name="status"

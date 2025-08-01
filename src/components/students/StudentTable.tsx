@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Database } from '@/integrations/supabase/types';
-import { Edit, Trash2, DollarSign } from 'lucide-react';
+import { Edit, Trash2, DollarSign, Users } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import AdvancedStudentDeleteDialog from './AdvancedStudentDeleteDialog';
+import { MultipleEnrollmentsView } from './MultipleEnrollmentsView';
 import { formatCPF } from '@/utils/formatters';
 
 // Definir o tipo Student baseado na tabela alunos do banco
@@ -32,6 +33,8 @@ interface StudentTableProps {
 const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, isDeleting }: StudentTableProps) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+  const [enrollmentsViewOpen, setEnrollmentsViewOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
   const handleDeleteClick = (student: Student) => {
     setStudentToDelete(student);
@@ -49,6 +52,11 @@ const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, isDel
   const handleDeleteCancel = () => {
     setDeleteDialogOpen(false);
     setStudentToDelete(null);
+  };
+
+  const handleViewEnrollments = (student: Student) => {
+    setSelectedStudent(student);
+    setEnrollmentsViewOpen(true);
   };
   
   const getStatusColor = (student: Student) => {
@@ -123,6 +131,15 @@ const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, isDel
                       <DollarSign className="h-4 w-4" />
                     </Button>
                   )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleViewEnrollments(student)}
+                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                    title="Ver Múltiplas Matrículas"
+                  >
+                    <Users className="h-4 w-4" />
+                  </Button>
                   {onDelete && (
                     <Button
                       variant="outline"
@@ -146,6 +163,12 @@ const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, isDel
         onClose={handleDeleteCancel}
         onConfirm={handleDeleteConfirm}
         isLoading={isDeleting}
+      />
+      
+      <MultipleEnrollmentsView
+        student={selectedStudent}
+        isOpen={enrollmentsViewOpen}
+        onClose={() => setEnrollmentsViewOpen(false)}
       />
     </div>
   );

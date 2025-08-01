@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import StudentDialog from '@/components/students/StudentDialog';
 import StudentTable from '@/components/students/StudentTable';
@@ -22,6 +23,7 @@ type Student = Database['public']['Tables']['alunos']['Row'] & {
 const STUDENTS_PER_PAGE = 20;
 
 const Students = () => {
+  const navigate = useNavigate();
   const { students, classes, loading, isDeleting, saveStudent, deleteStudentWithPlan } = useStudents();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -44,6 +46,11 @@ const Students = () => {
       if (success) {
         setIsDialogOpen(false);
         setEditingStudent(null);
+        
+        // Se aulas particulares foi selecionada, navegar para página de turmas
+        if (data.aulas_particulares) {
+          navigate('/classes');
+        }
       }
     } catch (error) {
       console.error('Erro ao salvar aluno:', error);
@@ -74,6 +81,13 @@ const Students = () => {
 
   const handleFinancialPlanSuccess = () => {
     console.log('Plano financeiro criado com sucesso!');
+  };
+
+  const handleCloseWithPrivateClasses = () => {
+    setIsDialogOpen(false);
+    setEditingStudent(null);
+    // Navegar para a página de turmas
+    navigate('/classes');
   };
 
   const handleFilterChange = (newFilters: StudentFilters) => {
@@ -217,6 +231,7 @@ const Students = () => {
           onSubmit={handleSubmit}
           onOpenCreate={handleCreate}
           hideButton={true}
+          onCloseWithPrivateClasses={handleCloseWithPrivateClasses}
         />
 
         <Card>

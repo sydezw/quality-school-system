@@ -43,6 +43,7 @@ interface StudentDialogProps {
   onSubmit: (data: any) => void;
   onOpenCreate: () => void;
   hideButton?: boolean;
+  onCloseWithPrivateClasses?: () => void;
 }
 
 const StudentDialog = ({ 
@@ -52,7 +53,8 @@ const StudentDialog = ({
   onOpenChange, 
   onSubmit, 
   onOpenCreate,
-  hideButton = false
+  hideButton = false,
+  onCloseWithPrivateClasses
 }: StudentDialogProps) => {
   // Se está editando, usa Sheet (mantém animação)
   if (editingStudent) {
@@ -69,6 +71,7 @@ const StudentDialog = ({
             classes={classes}
             onSubmit={onSubmit}
             onCancel={() => onOpenChange(false)}
+            onCloseWithPrivateClasses={onCloseWithPrivateClasses}
           />
         </SheetContent>
       </Sheet>
@@ -97,6 +100,7 @@ const StudentDialog = ({
           classes={classes}
           onSubmit={onSubmit}
           onCancel={() => onOpenChange(false)}
+          onCloseWithPrivateClasses={onCloseWithPrivateClasses}
         />
       </DialogContent>
     </Dialog>

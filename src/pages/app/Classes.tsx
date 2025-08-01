@@ -344,18 +344,17 @@ const Classes = () => {
     try {
       const { data, error } = await supabase
         .from('alunos')
-        .select('id, nome, email, status, turma_id')
+        .select('id, nome, email, status, turma_id, aulas_particulares, aulas_turma')
         .eq('status', 'Ativo')
-        .is('turma_id', null)
         .order('nome');
 
       if (error) throw error;
       setAllStudents(data || []);
     } catch (error) {
-      console.error('Erro ao buscar alunos sem turma:', error);
+      console.error('Erro ao buscar alunos:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível carregar a lista de alunos sem turma.",
+        description: "Não foi possível carregar a lista de alunos.",
         variant: "destructive",
       });
     }
@@ -398,7 +397,20 @@ const Classes = () => {
         return;
       }
 
-      if (selectedStudentsToAdd.length > availableSlots) {
+      // Filtrar alunos que já estão nesta turma específica
+      const studentsAlreadyInClass = currentStudents?.map(s => s.id) || [];
+      const studentsToAdd = selectedStudentsToAdd.filter(id => !studentsAlreadyInClass.includes(id));
+      
+      if (studentsToAdd.length === 0) {
+        toast({
+          title: "Aviso",
+          description: "Todos os alunos selecionados já estão matriculados nesta turma.",
+          variant: "default",
+        });
+        return;
+      }
+
+      if (studentsToAdd.length > availableSlots) {
         toast({
           title: "Limite Excedido",
           description: `Esta turma só pode receber mais ${availableSlots} aluno(s). Máximo de 10 alunos por turma.`,
@@ -407,20 +419,79 @@ const Classes = () => {
         return;
       }
 
-      // Atualizar cada aluno individualmente para evitar problemas com campos obrigatórios
-       for (const studentId of selectedStudentsToAdd) {
-         const { error: updateError } = await supabase
-           .from('alunos')
-           .update({ turma_id: selectedClassForStudents.id })
-           .eq('id', studentId);
-         
-         if (updateError) throw updateError;
-       }
+      // Processar cada aluno individualmente para múltiplas matrículas
+      let successCount = 0;
+      let warningMessages: string[] = [];
+      
+      for (const studentId of studentsToAdd) {
+        // Buscar dados atuais do aluno
+        const { data: studentData, error: studentError } = await supabase
+          .from('alunos')
+          .select('turma_id, aulas_particulares, aulas_turma, nome')
+          .eq('id', studentId)
+          .single();
+          
+        if (studentError) {
+          console.error(`Erro ao buscar dados do aluno ${studentId}:`, studentError);
+          continue;
+        }
+        
+        // Se o aluno não tem turma principal, definir esta como principal
+        if (!studentData.turma_id) {
+          const { error: updateError } = await supabase
+            .from('alunos')
+            .update({ 
+              turma_id: selectedClassForStudents.id,
+              aulas_turma: true 
+            })
+            .eq('id', studentId);
+            
+          if (updateError) {
+            console.error(`Erro ao matricular aluno ${studentId}:`, updateError);
+            continue;
+          }
+          
+          successCount++;
+        } else if (studentData.turma_id !== selectedClassForStudents.id) {
+          // Aluno já tem uma turma principal diferente
+          // Por enquanto, apenas marcar que faz aulas de turma
+          const { error: updateError } = await supabase
+            .from('alunos')
+            .update({ aulas_turma: true })
+            .eq('id', studentId);
+            
+          if (updateError) {
+            console.error(`Erro ao atualizar aluno ${studentId}:`, updateError);
+            continue;
+          }
+          
+          warningMessages.push(`${studentData.nome} já possui turma principal. Múltiplas turmas regulares requerem implementação completa da tabela de relacionamento.`);
+        }
+      }
 
-      toast({
-        title: "Sucesso",
-        description: `${selectedStudentsToAdd.length} aluno(s) adicionado(s) à turma com sucesso!`,
-      });
+      // Mostrar mensagens de resultado
+      if (successCount > 0) {
+        toast({
+          title: "Sucesso",
+          description: `${successCount} aluno(s) matriculado(s) com sucesso!`,
+        });
+      }
+      
+      if (warningMessages.length > 0) {
+        toast({
+          title: "Avisos",
+          description: warningMessages.join(' '),
+          variant: "default",
+        });
+      }
+      
+      if (successCount === 0 && warningMessages.length === 0) {
+        toast({
+          title: "Erro",
+          description: "Nenhum aluno pôde ser matriculado.",
+          variant: "destructive",
+        });
+      }
 
       setIsAddStudentDialogOpen(false);
       setSelectedStudentsToAdd([]);
@@ -1433,7 +1504,11 @@ const Classes = () => {
            <div className="space-y-4">
              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                <p className="text-sm text-green-800">
-                 Selecione os alunos que deseja adicionar à turma. Apenas alunos ativos sem turma são exibidos.
+                 <strong>Múltiplas Matrículas:</strong> Alunos podem estar em várias turmas simultaneamente.
+               </p>
+               <p className="text-xs text-green-700 mt-1">
+                 • Alunos sem turma: serão matriculados como turma principal<br/>
+                 • Alunos com turma: serão marcados para múltiplas matrículas
                </p>
              </div>
 
@@ -1493,6 +1568,7 @@ const Classes = () => {
                            <TableHead className="w-12">Selecionar</TableHead>
                            <TableHead>Nome</TableHead>
                            <TableHead>Email</TableHead>
+                           <TableHead>Turma Atual</TableHead>
                            <TableHead>Status</TableHead>
                          </TableRow>
                        </TableHeader>
@@ -1517,6 +1593,24 @@ const Classes = () => {
                            </TableCell>
                            <TableCell className="font-medium">{student.nome}</TableCell>
                            <TableCell>{student.email || '-'}</TableCell>
+                           <TableCell>
+                             {student.turma_id ? (
+                               <div className="flex flex-col gap-1">
+                                 <Badge variant="outline" className="text-xs">
+                                   Tem turma principal
+                                 </Badge>
+                                 {student.aulas_particulares && (
+                                   <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700">
+                                     + Aulas particulares
+                                   </Badge>
+                                 )}
+                               </div>
+                             ) : (
+                               <Badge variant="secondary" className="text-xs">
+                                 {student.aulas_particulares ? 'Só particulares' : 'Sem turma'}
+                               </Badge>
+                             )}
+                           </TableCell>
                            <TableCell>
                              <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-200">
                                {student.status}

@@ -19,7 +19,9 @@ export const studentFormSchema = z.object({
   turma_id: z.string().optional(),
   responsavel_id: z.string().optional().nullable(),
   status: z.enum(["Ativo", "Inativo", "Suspenso", "Trancado"]).optional(),
-  observacoes: z.string().optional()
+  observacoes: z.string().optional(),
+  aulas_particulares: z.boolean().optional(), // Campo para aulas particulares
+  aulas_turma: z.boolean().optional() // Campo para aulas de turma
 });
 
 export type StudentFormValues = z.infer<typeof studentFormSchema>;

@@ -36,6 +36,8 @@ interface Student {
   responsavel_id: string;
   status: string;
   observacoes: string;
+  aulas_particulares?: boolean;
+  aulas_turma?: boolean;
 }
 import { 
   User, 
@@ -63,9 +65,10 @@ interface StudentFormProps {
   classes: Class[];
   onSubmit: (data: any) => void;
   onCancel: () => void;
+  onCloseWithPrivateClasses?: () => void;
 }
 
-const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFormProps): JSX.Element => {
+const StudentForm = ({ editingStudent, classes, onSubmit, onCancel, onCloseWithPrivateClasses }: StudentFormProps): JSX.Element => {
   const { toast } = useToast();
   const { responsibles, saveResponsible } = useResponsibles();
   const [selectedIdioma, setSelectedIdioma] = useState<string>('');
@@ -93,14 +96,26 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
       turma_id: '',
       responsavel_id: '',
       status: 'Ativo',
-      observacoes: ''
+      observacoes: '',
+      aulas_particulares: false,
+      aulas_turma: true // Por padrão, alunos fazem aulas de turma
     }
   });
 
   const { handleSubmit, formState, setValue, watch } = form;
 
-  // Watch para mudanças no idioma
+  // Watch para mudanças no idioma e aulas particulares
   const watchedIdioma = watch('idioma');
+  const watchedAulasParticulares = watch('aulas_particulares');
+
+  // Função personalizada de cancelamento
+  const handleCancel = () => {
+    if (watchedAulasParticulares && onCloseWithPrivateClasses) {
+      onCloseWithPrivateClasses();
+    } else {
+      onCancel();
+    }
+  };
   
   useEffect(() => {
     setSelectedIdioma(watchedIdioma || '');
@@ -132,7 +147,9 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
         turma_id: editingStudent.turma_id || '',
         responsavel_id: editingStudent.responsavel_id || '',
         status: (editingStudent.status as "Ativo" | "Inativo" | "Suspenso") || 'Ativo',
-        observacoes: editingStudent.observacoes || ''
+        observacoes: editingStudent.observacoes || '',
+        aulas_particulares: editingStudent.aulas_particulares || false,
+        aulas_turma: editingStudent.aulas_turma !== undefined ? editingStudent.aulas_turma : true
       });
       
       setSelectedIdioma(editingStudent.idioma || '');
@@ -158,6 +175,8 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
       setValue('turma_id', editingStudent.turma_id || '');
       setValue('responsavel_id', editingStudent.responsavel_id || '');
       setValue('status', (editingStudent.status as "Ativo" | "Inativo" | "Suspenso" | "Trancado") || 'Ativo');
+      setValue('aulas_particulares', editingStudent.aulas_particulares || false);
+      setValue('aulas_turma', editingStudent.aulas_turma !== undefined ? editingStudent.aulas_turma : true);
       
       setSelectedIdioma(editingStudent.idioma || '');
     }
@@ -388,7 +407,7 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={onCancel}
+                      onClick={handleCancel}
                       disabled={isSubmitting}
                       className="px-4 py-2 text-sm font-medium transition-all duration-200 hover:bg-gray-50 z-20"
                     >
