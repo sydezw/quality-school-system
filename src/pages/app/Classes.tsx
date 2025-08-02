@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, BookCopy, Calendar, Clock, Globe, Book, Users, GraduationCap, AlertTriangle, CheckCircle, X, CalendarDays, Search, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { getIdiomaColor } from '@/utils/idiomaColors';
 import { calculateEndDate, calculateEndDateWithHolidays, parseDaysOfWeek, formatDateForDisplay, isHoliday } from '@/utils/dateCalculations';
 import HolidayModal from '@/components/classes/HolidayModal';
@@ -82,7 +82,7 @@ const Classes = () => {
   const [classDataFim, setClassDataFim] = useState<string>('');
   const { toast } = useToast();
 
-  const { register, handleSubmit, reset, setValue, watch, getValues, formState: { errors } } = useForm({
+  const { register, handleSubmit, reset, setValue, watch, getValues, control, formState: { errors } } = useForm({
     defaultValues: {
       nome: '',
       idioma: '',
@@ -494,66 +494,97 @@ const Classes = () => {
 
   const onSubmit = async (data: any) => {
     try {
-      // Validar campos obrigatórios
-      if (!data.nome || !data.idioma || !data.nivel || !data.dias_da_semana || !data.horario) {
+      setLoading(true);
+      
+      // Validação básica dos campos obrigatórios
+      const requiredFields = {
+        nome: 'Nome da turma',
+        idioma: 'Idioma',
+        nivel: 'Nível',
+        dias_da_semana: 'Dias da semana',
+        horario: 'Horário'
+      };
+      
+      const missingFields = [];
+      for (const [field, label] of Object.entries(requiredFields)) {
+        if (!data[field] || data[field].trim() === '') {
+          missingFields.push(label);
+        }
+      }
+      
+      if (missingFields.length > 0) {
         toast({
-          title: "Erro",
-          description: "Por favor, preencha todos os campos obrigatórios.",
+          title: "Campos obrigatórios",
+          description: `Por favor, preencha: ${missingFields.join(', ')}`,
           variant: "destructive",
         });
         return;
       }
   
-      // Convert "none" back to null for database
-      const submitData = {
-        nome: data.nome,
-        idioma: data.idioma,
-        nivel: data.nivel,
-        dias_da_semana: data.dias_da_semana,
-        horario: data.horario,
-        professor_id: data.professor_id === 'none' ? null : data.professor_id,
-        materiais_ids: selectedMaterials,
-        tipo_turma: data.tipo_turma,
-        data_inicio: data.data_inicio || null,
-        data_fim: data.data_fim || null,
-        total_aulas: data.total_aulas || null
-      };
-
       if (editingClass) {
+        // Atualizar turma existente - mantém todos os campos
+        const updateData = {
+          nome: data.nome.trim(),
+          idioma: data.idioma,
+          nivel: data.nivel,
+          dias_da_semana: data.dias_da_semana,
+          horario: data.horario.trim(),
+          professor_id: data.professor_id === 'none' ? null : data.professor_id,
+          materiais_ids: selectedMaterials.length > 0 ? selectedMaterials : [],
+          tipo_turma: data.tipo_turma || 'Turma',
+          data_inicio: data.data_inicio || null,
+          data_fim: data.data_fim || null,
+          total_aulas: data.total_aulas ? parseInt(data.total_aulas) : null,
+          plano_id: selectedPlan && selectedPlan !== 'none' ? selectedPlan : null,
+          status: 'ativa'
+        };
+
         const { error } = await supabase
           .from('turmas')
-          .update(submitData)
+          .update(updateData)
           .eq('id', editingClass.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Erro ao atualizar turma:', error);
+          throw error;
+        }
+        
         toast({
           title: "Sucesso",
           description: "Turma atualizada com sucesso!",
         });
       } else {
+        // Criar nova turma - apenas campos especificados
+        const insertData = {
+          nome: data.nome.trim(),
+          idioma: data.idioma,
+          dias_da_semana: data.dias_da_semana,
+          horario: data.horario.trim(),
+          professor_id: data.professor_id === 'none' ? null : data.professor_id,
+          sala_id: null, // Campo disponível mas não implementado no form
+          materiais_ids: selectedMaterials.length > 0 ? selectedMaterials : [],
+          nivel: data.nivel,
+          tipo_turma: data.tipo_turma || 'Turma',
+          status: 'ativa'
+          // Campos ignorados: data_inicio, data_fim, total_aulas, plano_id
+        };
+
         const { error } = await supabase
           .from('turmas')
-          .insert({
-            nome: submitData.nome,
-            idioma: submitData.idioma,
-            nivel: submitData.nivel,
-            dias_da_semana: submitData.dias_da_semana,
-            horario: submitData.horario,
-            professor_id: submitData.professor_id,
-            materiais_ids: submitData.materiais_ids,
-            tipo_turma: submitData.tipo_turma,
-            data_inicio: submitData.data_inicio,
-            data_fim: submitData.data_fim,
-            total_aulas: submitData.total_aulas
-          });
+          .insert(insertData);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Erro ao criar turma:', error);
+          throw error;
+        }
+        
         toast({
           title: "Sucesso",
           description: "Turma criada com sucesso!",
         });
       }
 
+      // Reset após sucesso
       setIsDialogOpen(false);
       setEditingClass(null);
       reset();
@@ -561,14 +592,34 @@ const Classes = () => {
       setSelectedDays([]);
       setCalculatedEndDate('');
       setDetectedHolidays([]);
-      fetchClasses();
+      setSelectedPlan('');
+      setClassDataInicio('');
+      setClassDataFim('');
+      
+      // Recarregar lista de turmas
+      await fetchClasses();
+      
     } catch (error) {
       console.error('Erro ao salvar turma:', error);
+      
+      // Tratamento de erros
+      let errorMessage = "Não foi possível salvar a turma.";
+      
+      if (error.code === '23505') {
+        errorMessage = "Já existe uma turma com este nome.";
+      } else if (error.code === '23503') {
+        errorMessage = "Erro de referência: verifique se o professor selecionado existe.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Erro",
-        description: "Não foi possível salvar a turma.",
+        description: errorMessage,
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1063,6 +1114,8 @@ const Classes = () => {
 
   const openCreateDialog = () => {
     setEditingClass(null);
+    
+    // Reset completo do formulário com valores padrão alinhados ao banco
     reset({
       nome: '',
       idioma: '',
@@ -1070,15 +1123,22 @@ const Classes = () => {
       dias_da_semana: '',
       horario: '',
       professor_id: 'none',
-      tipo_turma: 'Turma',
+      tipo_turma: 'Turma', // Valor padrão do banco
       data_inicio: '',
-      total_aulas: 20,
-      data_fim: ''
+      data_fim: '',
+      total_aulas: 20
     });
+    
+    // Reset de todos os estados relacionados
     setSelectedMaterials([]);
     setSelectedDays([]);
     setCalculatedEndDate('');
     setDetectedHolidays([]);
+    setSelectedPlan('');
+    setClassDataInicio('');
+    setClassDataFim('');
+    
+    // Abrir o modal
     setIsDialogOpen(true);
   };
 
@@ -1162,28 +1222,32 @@ const Classes = () => {
                   <Label htmlFor="idioma" className="text-sm font-medium text-gray-700">
                     Idioma *
                   </Label>
-                  <Select 
-                    onValueChange={(value) => setValue('idioma', value)} 
-                    value={watch('idioma')}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Selecione o idioma" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Inglês">
-                        <div className="flex items-center gap-2">
-                          <Globe className="h-4 w-4" />
-                          Inglês
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="Japonês">
-                        <div className="flex items-center gap-2">
-                          <Globe className="h-4 w-4" />
-                          Japonês
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Controller
+                    name="idioma"
+                    control={control}
+                    rules={{ required: 'Idioma é obrigatório' }}
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Selecione o idioma" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Inglês">
+                            <div className="flex items-center gap-2">
+                              <Globe className="h-4 w-4" />
+                              Inglês
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Japonês">
+                            <div className="flex items-center gap-2">
+                              <Globe className="h-4 w-4" />
+                              Japonês
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                   {errors.idioma && (
                     <div className="mt-1 flex items-center gap-1">
                       <AlertTriangle className="h-4 w-4 text-red-500" />
@@ -1196,14 +1260,16 @@ const Classes = () => {
                   <Label htmlFor="nivel" className="text-sm font-medium text-gray-700">
                     Nível *
                   </Label>
-                  <Select 
-                    onValueChange={(value) => setValue('nivel', value)} 
-                    value={watch('nivel')}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Selecione o nível" />
-                    </SelectTrigger>
-                    <SelectContent>
+                  <Controller
+                    name="nivel"
+                    control={control}
+                    rules={{ required: 'Nível é obrigatório' }}
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Selecione o nível" />
+                        </SelectTrigger>
+                        <SelectContent>
                       <SelectItem value="Book 1">
                         <div className="flex items-center gap-2">
                           <Book className="h-4 w-4" />
@@ -1264,8 +1330,10 @@ const Classes = () => {
                           Book 10
                         </div>
                       </SelectItem>
-                    </SelectContent>
-                  </Select>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                   {errors.nivel && (
                     <div className="mt-1 flex items-center gap-1">
                       <AlertTriangle className="h-4 w-4 text-red-500" />
@@ -1283,14 +1351,16 @@ const Classes = () => {
                   <Label htmlFor="tipo_turma" className="text-sm font-medium text-gray-700">
                     Tipo de Turma *
                   </Label>
-                  <Select 
-                    onValueChange={(value) => setValue('tipo_turma', value)} 
-                    value={watch('tipo_turma')}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Selecione o tipo" />
-                    </SelectTrigger>
-                    <SelectContent>
+                  <Controller
+                    name="tipo_turma"
+                    control={control}
+                    rules={{ required: 'Tipo de turma é obrigatório' }}
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Selecione o tipo" />
+                        </SelectTrigger>
+                        <SelectContent>
                       <SelectItem value="Turma">
                         <div className="flex items-center gap-2">
                           <Users className="h-4 w-4" />
@@ -1303,8 +1373,10 @@ const Classes = () => {
                           Turma Particular
                         </div>
                       </SelectItem>
-                    </SelectContent>
-                  </Select>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                 </div>
               </div>
               
@@ -1494,9 +1566,12 @@ const Classes = () => {
                     )}
                     
                     {/* Indicador de duração (só aparece quando horário está completo e válido) */}
-                    {watch('horario') && !errors.horario && (() => {
+                    {(() => {
+                      const horario = watch('horario');
+                      if (!horario || errors.horario) return null;
+                      
                       const timeRegex = /^([0-1]?[0-9]|2[0-3]):([0-5][0-9])\s*-\s*([0-1]?[0-9]|2[0-3]):([0-5][0-9])$/;
-                      const match = watch('horario').match(timeRegex);
+                      const match = horario.match(timeRegex);
                       if (match) {
                         const startHour = parseInt(match[1]);
                         const startMin = parseInt(match[2]);
@@ -1536,33 +1611,36 @@ const Classes = () => {
                   <Label htmlFor="professor_id" className="text-sm font-medium text-gray-700">
                     Professor
                   </Label>
-                  <Select 
-                    onValueChange={(value) => setValue('professor_id', value)} 
-                    value={watch('professor_id')}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Selecione um professor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">
-                        <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4 text-gray-400" />
-                          Sem professor
-                        </div>
-                      </SelectItem>
-                      {filteredTeachers.map((teacher) => (
-                        <SelectItem key={teacher.id} value={teacher.id}>
-                          <div className="flex items-center gap-2">
-                            <GraduationCap className="h-4 w-4 text-green-600" />
-                            {teacher.nome}
-                            <Badge variant="outline" className="text-xs ml-2">
-                              {teacher.idiomas}
-                            </Badge>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Controller
+                    name="professor_id"
+                    control={control}
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Selecione um professor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">
+                            <div className="flex items-center gap-2">
+                              <Users className="h-4 w-4 text-gray-400" />
+                              Sem professor
+                            </div>
+                          </SelectItem>
+                          {filteredTeachers.map((teacher) => (
+                            <SelectItem key={teacher.id} value={teacher.id}>
+                              <div className="flex items-center gap-2">
+                                <GraduationCap className="h-4 w-4 text-green-600" />
+                                {teacher.nome}
+                                <Badge variant="outline" className="text-xs ml-2">
+                                  {teacher.idiomas}
+                                </Badge>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                   {selectedIdioma && filteredTeachers.length === 0 && (
                     <p className="text-sm text-amber-600 mt-1 flex items-center gap-1">
                       <AlertTriangle className="h-4 w-4 text-amber-500" />
@@ -1572,40 +1650,54 @@ const Classes = () => {
                 </div>
               </div>
               
-              {/* Botões de Ação */}
-              <div className="flex justify-end space-x-3 pt-6 border-t">
+              {/* Botões de Ação - Reorganizados */}
+              <div className="flex justify-between items-center pt-6 border-t">
                 <Button 
                   type="button" 
                   variant="outline" 
-                  onClick={() => setIsDialogOpen(false)}
-                  className="px-6"
+                  onClick={() => {
+                    setIsDialogOpen(false);
+                    setEditingClass(null);
+                    reset();
+                    setSelectedMaterials([]);
+                    setSelectedDays([]);
+                  }}
+                  className="px-6 flex items-center gap-2"
+                  disabled={loading}
                 >
+                  <X className="h-4 w-4" />
                   Cancelar
                 </Button>
+                
                 <Button 
-                  type="submit" 
-                  className="bg-brand-red hover:bg-brand-red/90 px-6"
+                  type="button"
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    const formData = getValues();
+                    await onSubmit(formData);
+                  }}
+                  className="bg-brand-red hover:bg-brand-red/90 px-6 flex items-center gap-2"
                   disabled={loading}
                 >
                   {loading ? (
-                    <div className="flex items-center gap-2">
+                    <>
                       <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
                       Processando...
-                    </div>
+                    </>
                   ) : (
-                    <div className="flex items-center gap-2">
+                    <>
                       {editingClass ? (
                         <>
                           <Edit className="h-4 w-4" />
-                          Atualizar
+                          Atualizar Turma
                         </>
                       ) : (
                         <>
                           <Plus className="h-4 w-4" />
-                          Criar
+                          Criar Turma
                         </>
                       )}
-                    </div>
+                    </>
                   )}
                 </Button>
               </div>
@@ -2027,7 +2119,9 @@ const Classes = () => {
                    </div>
 
                    {/* Informações do Plano Selecionado */}
-                   {selectedPlan && selectedPlan !== 'none' && (() => {
+                   {(() => {
+                     if (!selectedPlan || selectedPlan === 'none') return null;
+                     
                      const plan = plans.find(p => p.id === selectedPlan);
                      return plan ? (
                        <div className="bg-white rounded-lg p-3 border">
