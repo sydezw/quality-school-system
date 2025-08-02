@@ -9,7 +9,7 @@ export const studentFormSchema = z.object({
   telefone: z.string().optional(),
   email: z.string().optional(),
   endereco: z.string().optional(),
-  numero_endereco: z.string().optional(), // Campo para número do endereço
+  numero_endereco: z.string().optional(),
   bairro: z.string().optional(),
   cidade: z.string().optional(),
   estado: z.string().optional(),
@@ -17,6 +17,7 @@ export const studentFormSchema = z.object({
   idioma: z.string().optional(),
   nivel: z.string().optional(),
   turma_id: z.string().optional(),
+  turma_particular_id: z.string().optional(),
   responsavel_id: z.string().optional().nullable(),
   status: z.enum(["Ativo", "Inativo", "Suspenso", "Trancado"]).optional(),
   observacoes: z.string().optional(),

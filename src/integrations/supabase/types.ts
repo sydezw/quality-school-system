@@ -85,6 +85,8 @@ export type Database = {
       }
       alunos: {
         Row: {
+          aulas_particulares: boolean | null
+          aulas_turma: boolean | null
           bairro: string | null
           cep: string | null
           cidade: string | null
@@ -106,9 +108,12 @@ export type Database = {
           status: Database["public"]["Enums"]["status_aluno"]
           telefone: string | null
           turma_id: string | null
+          turma_particular_id: string | null
           updated_at: string
         }
         Insert: {
+          aulas_particulares?: boolean | null
+          aulas_turma?: boolean | null
           bairro?: string | null
           cep?: string | null
           cidade?: string | null
@@ -130,9 +135,12 @@ export type Database = {
           status?: Database["public"]["Enums"]["status_aluno"]
           telefone?: string | null
           turma_id?: string | null
+          turma_particular_id?: string | null
           updated_at?: string
         }
         Update: {
+          aulas_particulares?: boolean | null
+          aulas_turma?: boolean | null
           bairro?: string | null
           cep?: string | null
           cidade?: string | null
@@ -154,6 +162,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["status_aluno"]
           telefone?: string | null
           turma_id?: string | null
+          turma_particular_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1524,6 +1533,8 @@ export type Database = {
       turmas: {
         Row: {
           created_at: string
+          data_fim: string | null
+          data_inicio: string | null
           dias_da_semana: string
           horario: string
           id: string
@@ -1534,10 +1545,14 @@ export type Database = {
           professor_id: string | null
           sala_id: string | null
           status: string
+          tipo_turma: Database["public"]["Enums"]["tipo_turma"] | null
+          total_aulas: number | null
           updated_at: string
         }
         Insert: {
           created_at?: string
+          data_fim?: string | null
+          data_inicio?: string | null
           dias_da_semana: string
           horario: string
           id?: string
@@ -1548,10 +1563,14 @@ export type Database = {
           professor_id?: string | null
           sala_id?: string | null
           status?: string
+          tipo_turma?: Database["public"]["Enums"]["tipo_turma"] | null
+          total_aulas?: number | null
           updated_at?: string
         }
         Update: {
           created_at?: string
+          data_fim?: string | null
+          data_inicio?: string | null
           dias_da_semana?: string
           horario?: string
           id?: string
@@ -1562,6 +1581,8 @@ export type Database = {
           professor_id?: string | null
           sala_id?: string | null
           status?: string
+          tipo_turma?: Database["public"]["Enums"]["tipo_turma"] | null
+          total_aulas?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -1885,7 +1906,7 @@ export const Constants = {
       cargo_usuario: ["Secretária", "Gerente", "Admin"],
       categoria_despesa: ["salário", "aluguel", "material", "manutenção"],
       competencia: ["Listening", "Speaking", "Writing", "Reading"],
-      idioma: ["Inglês", "Japonês", "Inglês/Japonês"],
+      idioma: ["Inglês", "Japonês", "Inglês/Japonês", "particular"],
       idioma_registro_financeiro: ["Inglês", "Japonês"],
       migrado: ["sim", "nao"],
       nivel: [
@@ -1917,6 +1938,7 @@ export const Constants = {
       status_pagamento: ["pago", "pendente", "vencido", "cancelado"],
       status_presenca: ["Presente", "Falta", "Justificada"],
       tipo_arquivamento: ["renovacao", "cancelamento", "conclusao"],
+      tipo_turma: ["Turma particular", "Turma"],
       tipo_documento: [
         "contrato",
         "declaracao_matricula",

@@ -24,7 +24,10 @@ interface Student {
   responsavel_id: string | null;
   status: string;
   telefone: string | null;
-  turmas?: {
+  turma_regular?: {
+    nome: string;
+  } | null;
+  turma_particular?: {
     nome: string;
   } | null;
   responsaveis?: {
@@ -139,7 +142,8 @@ const ContractGenerator = () => {
         .from('alunos')
         .select(`
           *,
-          turmas(nome),
+          turma_regular:turmas!turma_id(nome),
+          turma_particular:turmas!turma_particular_id(nome),
           responsaveis(nome, cpf, telefone, email, endereco, numero_endereco),
           financeiro_alunos(
             plano_id,
@@ -154,6 +158,7 @@ const ContractGenerator = () => {
             )
           )
         `)
+        .eq('status', 'Ativo')
         .order('nome');
 
       if (error) throw error;
@@ -736,7 +741,7 @@ TESTEMUNHAS:
                       className="w-full justify-between"
                     >
                       {selectedStudent
-                        ? `${selectedStudent.nome} - ${selectedStudent.idioma}${selectedStudent.turmas?.nome ? ` (${selectedStudent.turmas.nome})` : ''}`
+                        ? `${selectedStudent.nome} - ${selectedStudent.idioma}${selectedStudent.turma_regular?.nome || selectedStudent.turma_particular?.nome ? ` (${selectedStudent.turma_regular?.nome || selectedStudent.turma_particular?.nome})` : ''}`
                         : "Digite o nome do aluno..."}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -788,8 +793,8 @@ TESTEMUNHAS:
                                 />
                                 <div className="flex-1">
                                   <div className="font-medium">{student.nome} - {student.idioma}</div>
-                                  {student.turmas?.nome && (
-                                    <div className="text-sm text-gray-500">Turma: {student.turmas.nome}</div>
+                                  {(student.turma_regular?.nome || student.turma_particular?.nome) && (
+                                    <div className="text-sm text-gray-500">Turma: {student.turma_regular?.nome || student.turma_particular?.nome}</div>
                                   )}
                                   {student.cpf && (
                                     <div className="text-sm text-gray-500">CPF: {student.cpf}</div>
@@ -819,7 +824,7 @@ TESTEMUNHAS:
                       <span className="font-medium">Idioma:</span> {selectedStudent.idioma}
                     </div>
                     <div>
-                      <span className="font-medium">Turma:</span> {selectedStudent.turmas?.nome || 'Não informado'}
+                      <span className="font-medium">Turma:</span> {selectedStudent.turma_regular?.nome || selectedStudent.turma_particular?.nome || 'Não informado'}
                     </div>
                     <div>
                       <span className="font-medium">Status:</span> {selectedStudent.status}
@@ -939,76 +944,20 @@ TESTEMUNHAS:
                         if (node.nodeType === Node.ELEMENT_NODE) {
                           const element = node as Element;
                           if (element.classList.contains('placeholder-text')) {
-                            // Verificar se é um campo de data
-                            const isDateField = element.textContent?.includes('data') || 
-                                              element.textContent?.includes('nascimento') || 
-                                              element.textContent?.includes('início') || 
-                                              element.textContent?.includes('término') || 
-                                              element.textContent?.includes('primeira parcela') ||
-                                              element.textContent?.includes('dia') ||
-                                              element.textContent?.includes('mês') ||
-                                              element.textContent?.includes('ano');
-                            
-                            if (isDateField && e.key.match(/[0-9]/)) {
-                              e.preventDefault();
-                              element.textContent = 'dd/mm/yyyy';
-                              element.classList.remove('placeholder-text');
-                              element.style.color = '#333';
-                              element.style.fontStyle = 'normal';
-                              
-                              // Posicionar cursor no início
-                              setTimeout(() => {
-                                const newRange = document.createRange();
-                                const textNode = element.firstChild;
-                                if (textNode) {
-                                  newRange.setStart(textNode, 0);
-                                  newRange.collapse(true);
-                                  selection.removeAllRanges();
-                                  selection.addRange(newRange);
-                                }
-                              }, 0);
-                            } else if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
-                              element.classList.remove('placeholder-text');
-                              element.style.color = '#333';
-                              element.style.fontStyle = 'normal';
-                              if (e.key !== 'Backspace' && e.key !== 'Delete') {
-                                element.textContent = '';
-                              }
+                          if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
+                            element.classList.remove('placeholder-text');
+                            element.style.color = '#333';
+                            element.style.fontStyle = 'normal';
+                            if (e.key !== 'Backspace' && e.key !== 'Delete') {
+                              element.textContent = '';
                             }
-                            break;
                           }
+                          break;
+                        }
                         } else if (node.nodeType === Node.TEXT_NODE && node.parentElement) {
                           const parentElement = node.parentElement;
                           if (parentElement.classList.contains('placeholder-text')) {
-                            // Verificar se é um campo de data
-                            const isDateField = parentElement.textContent?.includes('data') || 
-                                              parentElement.textContent?.includes('nascimento') || 
-                                              parentElement.textContent?.includes('início') || 
-                                              parentElement.textContent?.includes('término') || 
-                                              parentElement.textContent?.includes('primeira parcela') ||
-                                              parentElement.textContent?.includes('dia') ||
-                                              parentElement.textContent?.includes('mês') ||
-                                              parentElement.textContent?.includes('ano');
-                            
-                            if (isDateField && e.key.match(/[0-9]/)) {
-                              e.preventDefault();
-                              parentElement.textContent = 'dd/mm/yyyy';
-                              parentElement.classList.remove('placeholder-text');
-                              parentElement.style.color = '#333';
-                              parentElement.style.fontStyle = 'normal';
-                              
-                              // Posicionar cursor no início
-                              setTimeout(() => {
-                                const newRange = document.createRange();
-                                const textNode = parentElement.firstChild;
-                                if (textNode) {
-                                  newRange.setStart(textNode, 0);
-                                  newRange.collapse(true);
-                                  selection.removeAllRanges();
-                                  selection.addRange(newRange);
-                                }
-                              }, 0);
-                            } else if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
+                            if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
                               parentElement.classList.remove('placeholder-text');
                               parentElement.style.color = '#333';
                               parentElement.style.fontStyle = 'normal';

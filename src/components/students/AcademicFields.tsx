@@ -12,6 +12,7 @@ interface Class {
   nome: string;
   idioma: string;
   nivel: string;
+  tipo_turma?: string;
 }
 
 interface AcademicFieldsProps {
@@ -30,6 +31,8 @@ const AcademicFields = ({ control, classes, selectedIdioma, setValue }: Academic
     control,
     name: "turma_id"
   });
+  const aulasTurma = useWatch({ control, name: 'aulas_turma' });
+  const aulasParticulares = useWatch({ control, name: 'aulas_particulares' });
 
   // Função para normalizar strings removendo acentos e convertendo para minúsculas
   const normalizeString = (str: string) => {
@@ -89,41 +92,85 @@ const AcademicFields = ({ control, classes, selectedIdioma, setValue }: Academic
           />
         )}
       />
-      <FormField
-        control={control}
-        name="turma_id"
-        render={({ field }) => (
-          <div>
-            <StudentSelectField
-              value={field.value || 'none'}
-              label="Turma"
-              placeholder="Selecione a turma"
-              options={[
-                { value: "none", label: "Sem turma" },
-                ...filteredClasses.map((cls) => ({
-                  value: cls.id,
-                  label: `${cls.nome} - ${cls.nivel}`
-                }))
-              ]}
-              onChange={field.onChange}
-              formMessage={<FormMessage />}
-              disabled={turmaDisabled}
+      {/* Seção de Seleção de Turmas */}
+      <div className="space-y-4">
+        <div className="border-t pt-4">
+          <h3 className="text-sm font-medium text-gray-900 mb-3">Seleção de Turmas</h3>
+          
+          {/* Turma Regular - só aparece se aulas_turma estiver marcado */}
+          {aulasTurma && (
+            <FormField
+              control={control}
+              name="turma_id"
+              render={({ field }) => (
+                <div className="space-y-2">
+                  <StudentSelectField
+                    value={field.value || 'none'}
+                    label="Turma Regular"
+                    placeholder="Selecione a turma regular"
+                    options={[
+                      { value: "none", label: "Sem turma regular" },
+                      ...filteredClasses
+                        .filter(cls => !cls.tipo_turma || cls.tipo_turma === 'Turma' || cls.tipo_turma === 'Regular')
+                        .map((cls) => ({
+                          value: cls.id,
+                          label: `${cls.nome} - ${cls.nivel}`
+                        }))
+                    ]}
+                    onChange={field.onChange}
+                    formMessage={<FormMessage />}
+                  />
+                  {selectedIdioma && filteredClasses.filter(cls => !cls.tipo_turma || cls.tipo_turma === 'Turma' || cls.tipo_turma === 'Regular').length === 0 && (
+                    <div className="text-xs text-amber-600 mt-1">
+                      Nenhuma turma regular disponível para o idioma selecionado.
+                    </div>
+                  )}
+                </div>
+              )}
             />
-            {/* Mensagem explicativa se usuário selecionou idioma mas não há turmas */}
-            {selectedIdioma && filteredClasses.length === 0 && (
-              <div className="text-xs text-amber-600 mt-1">
-                Nenhuma turma disponível para o idioma selecionado. O aluno pode ficar sem turma.
-              </div>
-            )}
-            {/* Mensagem informativa sobre a opcionalidade */}
-            {!selectedIdioma && (
-              <div className="text-xs text-gray-500 mt-1">
-                Selecione um idioma para filtrar as turmas ou deixe o aluno sem turma.
-              </div>
-            )}
-          </div>
-        )}
-      />
+          )}
+          
+          {/* Turma Particular - só aparece se aulas_particulares estiver marcado */}
+          {aulasParticulares && (
+            <FormField
+              control={control}
+              name="turma_particular_id"
+              render={({ field }) => (
+                <div className="space-y-2">
+                  <StudentSelectField
+                    value={field.value || 'none'}
+                    label="Turma Particular"
+                    placeholder="Selecione a turma particular"
+                    options={[
+                      { value: "none", label: "Sem turma particular" },
+                      ...filteredClasses
+                        .filter(cls => cls.tipo_turma === 'Turma particular')
+                        .map((cls) => ({
+                          value: cls.id,
+                          label: `${cls.nome} - ${cls.nivel}`
+                        }))
+                    ]}
+                    onChange={field.onChange}
+                    formMessage={<FormMessage />}
+                  />
+                  {selectedIdioma && filteredClasses.filter(cls => cls.tipo_turma === 'Turma particular').length === 0 && (
+                    <div className="text-xs text-amber-600 mt-1">
+                      Nenhuma turma particular disponível para o idioma selecionado.
+                    </div>
+                  )}
+                </div>
+              )}
+            />
+          )}
+          
+          {/* Mensagem quando nenhum tipo de aula está selecionado */}
+          {!aulasTurma && !aulasParticulares && (
+            <div className="text-sm text-gray-500 p-3 bg-gray-50 rounded-lg">
+              Selecione pelo menos um tipo de aula abaixo para escolher as turmas.
+            </div>
+          )}
+        </div>
+      </div>
       <FormField
         control={control}
         name="nivel"

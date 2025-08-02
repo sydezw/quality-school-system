@@ -24,7 +24,7 @@ interface Plan {
   permite_parcelamento: boolean | null;
   observacoes: string | null;
   ativo: boolean | null;
-  idioma: 'Inglês' | 'Japonês' | 'Inglês/Japonês';
+  idioma: 'Inglês' | 'Japonês' | 'Inglês/Japonês' | 'particular';
   tipo_valor?: 'plano' | 'plano_material' | 'plano_matricula' | 'plano_completo';
   created_at: string;
   updated_at: string;
@@ -43,7 +43,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
     descricao: '',
     numero_aulas: '',
     frequencia_aulas: 'semanal',
-    idioma: 'Inglês' as 'Inglês' | 'Japonês' | 'Inglês/Japonês',
+    idioma: 'Inglês' as 'Inglês' | 'Japonês' | 'Inglês/Japonês' | 'particular',
     carga_horaria_total: '',
     valor_total: '',
     valor_por_aula: '',
@@ -326,6 +326,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
               <SelectItem value="Inglês">Inglês</SelectItem>
               <SelectItem value="Japonês">Japonês</SelectItem>
               <SelectItem value="Inglês/Japonês">Inglês/Japonês</SelectItem>
+              <SelectItem value="particular">Particular</SelectItem>
             </SelectContent>
           </Select>
         </div>

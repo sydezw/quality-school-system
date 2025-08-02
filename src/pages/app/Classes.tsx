@@ -11,8 +11,11 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, BookCopy, Calendar, Clock, Globe, Book, Users, GraduationCap, AlertTriangle, CheckCircle, X } from 'lucide-react';
+import { Plus, Edit, Trash2, BookCopy, Calendar, Clock, Globe, Book, Users, GraduationCap, AlertTriangle, CheckCircle, X, CalendarDays, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useForm } from 'react-hook-form';
+import { getIdiomaColor } from '@/utils/idiomaColors';
+import { calculateEndDate, calculateEndDateWithHolidays, parseDaysOfWeek, formatDateForDisplay, isHoliday } from '@/utils/dateCalculations';
+import HolidayModal from '@/components/classes/HolidayModal';
 
 interface Class {
   id: string;
@@ -24,6 +27,10 @@ interface Class {
   professor_id: string | null;
   materiais_ids?: string[];
   professores?: { nome: string };
+  tipo_turma?: string | null;
+  data_inicio?: string | null;
+  data_fim?: string | null;
+  total_aulas?: number | null;
 }
 
 interface Teacher {
@@ -61,20 +68,93 @@ const Classes = () => {
   const [selectedStudentsToAdd, setSelectedStudentsToAdd] = useState<string[]>([]);
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
+  const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
+  const [detectedHolidays, setDetectedHolidays] = useState<Date[]>([]);
+  const [calculatedEndDate, setCalculatedEndDate] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [tipoTurmaFilter, setTipoTurmaFilter] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  // Estados para planos particulares
+  const [plans, setPlans] = useState<any[]>([]);
+  const [selectedPlan, setSelectedPlan] = useState<string>('');
+  const [classDataInicio, setClassDataInicio] = useState<string>('');
+  const [classDataFim, setClassDataFim] = useState<string>('');
   const { toast } = useToast();
 
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm({
+  const { register, handleSubmit, reset, setValue, watch, getValues, formState: { errors } } = useForm({
     defaultValues: {
       nome: '',
       idioma: '',
       nivel: '',
       dias_da_semana: '',
       horario: '',
-      professor_id: 'none'
+      professor_id: 'none',
+      tipo_turma: 'Turma',
+      data_inicio: '',
+      data_fim: '',
+      total_aulas: 20
     }
   });
 
   const selectedIdioma = watch('idioma');
+  const watchedDataInicio = watch('data_inicio');
+  const watchedDataFim = watch('data_fim');
+  const watchedTotalAulas = watch('total_aulas');
+  const watchedDiasSemana = watch('dias_da_semana');
+
+  // Atualizar total de aulas quando plano for selecionado
+  useEffect(() => {
+    if (selectedPlan && selectedPlan !== 'none') {
+      const plan = plans.find(p => p.id === selectedPlan);
+      if (plan && plan.numero_aulas) {
+        setValue('total_aulas', plan.numero_aulas);
+      }
+    }
+  }, [selectedPlan, plans, setValue]);
+
+  // Calcular data de fim automaticamente
+  useEffect(() => {
+    // Para a seção de alunos da turma, usar os dias da turma selecionada
+    const daysToUse = selectedClassForStudents && selectedClassForStudents.dias_da_semana 
+      ? selectedClassForStudents.dias_da_semana.split(' e ') 
+      : selectedDays;
+    
+    if (watchedDataInicio && watchedTotalAulas && daysToUse.length > 0) {
+      console.log('Calculando data de fim:', {
+        dataInicio: watchedDataInicio,
+        totalAulas: watchedTotalAulas,
+        diasSemana: daysToUse
+      });
+      
+      const result = calculateEndDateWithHolidays(
+        watchedDataInicio,
+        watchedTotalAulas,
+        daysToUse
+      );
+      
+      console.log('Resultado do cálculo:', result);
+      
+      setCalculatedEndDate(result.endDate);
+      setDetectedHolidays(result.holidaysFound);
+      
+      // Atualizar o campo data_fim apenas se não foi editado manualmente
+      if (!watchedDataFim || watchedDataFim === calculatedEndDate) {
+        setValue('data_fim', result.endDate);
+      }
+      
+      // Mostrar modal se feriados foram detectados
+      if (result.holidaysFound.length > 0) {
+        setIsHolidayModalOpen(true);
+      }
+    } else {
+      setCalculatedEndDate('');
+      setDetectedHolidays([]);
+      if (!watchedDataFim) {
+        setValue('data_fim', '');
+      }
+    }
+  }, [watchedDataInicio, watchedTotalAulas, selectedDays, selectedClassForStudents, watchedDataFim, calculatedEndDate, setValue]);
 
   // Função para gerenciar seleção de dias
   const handleDayToggle = (day: string) => {
@@ -88,6 +168,114 @@ const Classes = () => {
       setValue('dias_da_semana', daysString);
       
       return newDays;
+    });
+  };
+
+  // Função para verificar se um feriado é a última aula do cronograma
+  const isLastClassHoliday = (holidayDate: Date, startDate: string, totalClasses: number, classDays: string[]): boolean => {
+    const daysOfWeek = {
+      'Domingo': 0,
+      'Segunda': 1,
+      'Terça': 2,
+      'Quarta': 3,
+      'Quinta': 4,
+      'Sexta': 5,
+      'Sábado': 6
+    };
+
+    const classDaysNumbers = classDays.map(day => daysOfWeek[day as keyof typeof daysOfWeek]).filter(day => day !== undefined);
+    let classCount = 0;
+    let currentDate = new Date(startDate);
+    let lastClassDate: Date | null = null;
+
+    // Avançar para o primeiro dia de aula se necessário
+    while (!classDaysNumbers.includes(currentDate.getDay())) {
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    // Simular cronograma para encontrar a última aula
+    while (classCount < totalClasses) {
+      if (classDaysNumbers.includes(currentDate.getDay())) {
+        if (!isHoliday(currentDate)) {
+          classCount++;
+          lastClassDate = new Date(currentDate);
+        }
+      }
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    // Verificar se o feriado seria a última aula
+    return lastClassDate ? holidayDate.getTime() === lastClassDate.getTime() : false;
+  };
+
+  // Função para reagendar feriado
+  const handleHolidayReschedule = (originalDate: Date, newDate: Date) => {
+    const watchedDataInicio = watch('data_inicio');
+    const watchedTotalAulas = watch('total_aulas');
+    
+    // Verificar se este feriado afeta a data final antes de removê-lo
+    let shouldUpdateEndDate = false;
+    if (watchedDataInicio && watchedTotalAulas && selectedDays.length > 0) {
+      // Verificar se é a última aula ou se a nova data é posterior ao cronograma atual
+      const { endDate: currentEndDate } = calculateEndDateWithHolidays(
+        watchedDataInicio,
+        watchedTotalAulas,
+        selectedDays
+      );
+      
+      const currentEndDateObj = new Date(currentEndDate);
+      
+      // Se a nova data é posterior à data atual de fim, ou se é a última aula sendo reagendada
+      if (newDate > currentEndDateObj || 
+          isLastClassHoliday(originalDate, watchedDataInicio, watchedTotalAulas, selectedDays)) {
+        shouldUpdateEndDate = true;
+      }
+    }
+    
+    // Remover o feriado da lista
+    setDetectedHolidays(prev => prev.filter(h => h.getTime() !== originalDate.getTime()));
+    
+    // Atualizar data de fim se necessário
+    if (shouldUpdateEndDate && watchedDataInicio && watchedTotalAulas && selectedDays.length > 0) {
+      // Recalcular sem o feriado reagendado
+      const remainingHolidays = detectedHolidays.filter(h => h.getTime() !== originalDate.getTime());
+      
+      if (remainingHolidays.length === 0) {
+        // Se não há mais feriados, a data de fim é a nova data reagendada ou a data calculada simples
+        const simpleEndDate = calculateEndDate(watchedDataInicio, watchedTotalAulas, selectedDays);
+        const simpleEndDateObj = new Date(simpleEndDate);
+        
+        // Usar a data mais tardia entre a calculada simples e a reagendada
+        const finalEndDate = newDate > simpleEndDateObj ? newDate : simpleEndDateObj;
+        setCalculatedEndDate(formatDateForDisplay(finalEndDate.toISOString().split('T')[0]));
+      } else {
+        // Recalcular com os feriados restantes e considerar o reagendamento
+        const { endDate: recalculatedEndDate } = calculateEndDateWithHolidays(
+          watchedDataInicio,
+          watchedTotalAulas,
+          selectedDays
+        );
+        const recalculatedEndDateObj = new Date(recalculatedEndDate);
+        
+        // Usar a data mais tardia
+        const finalEndDate = newDate > recalculatedEndDateObj ? newDate : recalculatedEndDateObj;
+        setCalculatedEndDate(formatDateForDisplay(finalEndDate.toISOString().split('T')[0]));
+      }
+    }
+    
+    toast({
+      title: "Feriado reagendado",
+      description: `Aula de ${formatDateForDisplay(originalDate.toISOString().split('T')[0])} reagendada para ${formatDateForDisplay(newDate.toISOString().split('T')[0])}`
+    });
+  };
+
+  // Função para ignorar todos os feriados
+  const handleIgnoreHolidays = () => {
+    setDetectedHolidays([]);
+    setIsHolidayModalOpen(false);
+    toast({
+      title: "Feriados aceitos",
+      description: "Feriados foram compensados automaticamente. Data de fim ajustada."
     });
   };
 
@@ -123,7 +311,14 @@ const Classes = () => {
       if (nextLevel === 10) {
         // Caso especial para Book 10 que está como "English Book 9,9"
         materialName = "English Book 9,9";
+      } else if (nextLevel === 2) {
+        // Caso especial para Book 2 que está como "English book 2 " (com espaço)
+        materialName = "English book 2 ";
+      } else if (nextLevel <= 5) {
+        // Books 1-5 estão com 'b' minúsculo
+        materialName = `English book ${nextLevel}`;
       } else {
+        // Books 6+ estão com 'B' maiúsculo
         materialName = `English Book ${nextLevel}`;
       }
 
@@ -176,6 +371,7 @@ const Classes = () => {
     fetchClasses();
     fetchTeachers();
     fetchMaterials();
+    fetchPlans();
   }, []);
 
   const fetchClasses = async () => {
@@ -242,6 +438,60 @@ const Classes = () => {
     }
   };
 
+  const fetchPlans = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('planos')
+        .select('*')
+        .eq('idioma', 'particular')
+        .eq('ativo', true)
+        .order('nome');
+
+      if (error) throw error;
+      setPlans(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar planos particulares:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar os planos particulares.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Função para filtrar turmas
+  const filteredClasses = classes.filter(classItem => {
+    const matchesSearch = classItem.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         classItem.idioma.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         classItem.nivel.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         (classItem.professores?.nome || '').toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesFilter = tipoTurmaFilter === 'all' || classItem.tipo_turma === tipoTurmaFilter;
+    
+    return matchesSearch && matchesFilter;
+  });
+
+  // Função para paginação
+  const totalPages = Math.ceil(filteredClasses.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedClasses = filteredClasses.slice(startIndex, endIndex);
+
+  // Função para ir para a página anterior
+  const goToPreviousPage = () => {
+    setCurrentPage(prev => Math.max(prev - 1, 1));
+  };
+
+  // Função para ir para a próxima página
+  const goToNextPage = () => {
+    setCurrentPage(prev => Math.min(prev + 1, totalPages));
+  };
+
+  // Reset da página quando os filtros mudam
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, tipoTurmaFilter]);
+
   const onSubmit = async (data: any) => {
     try {
       // Validar campos obrigatórios
@@ -262,7 +512,11 @@ const Classes = () => {
         dias_da_semana: data.dias_da_semana,
         horario: data.horario,
         professor_id: data.professor_id === 'none' ? null : data.professor_id,
-        materiais_ids: selectedMaterials
+        materiais_ids: selectedMaterials,
+        tipo_turma: data.tipo_turma,
+        data_inicio: data.data_inicio || null,
+        data_fim: data.data_fim || null,
+        total_aulas: data.total_aulas || null
       };
 
       if (editingClass) {
@@ -286,7 +540,11 @@ const Classes = () => {
             dias_da_semana: submitData.dias_da_semana,
             horario: submitData.horario,
             professor_id: submitData.professor_id,
-            materiais_ids: submitData.materiais_ids
+            materiais_ids: submitData.materiais_ids,
+            tipo_turma: submitData.tipo_turma,
+            data_inicio: submitData.data_inicio,
+            data_fim: submitData.data_fim,
+            total_aulas: submitData.total_aulas
           });
 
         if (error) throw error;
@@ -300,6 +558,9 @@ const Classes = () => {
       setEditingClass(null);
       reset();
       setSelectedMaterials([]);
+      setSelectedDays([]);
+      setCalculatedEndDate('');
+      setDetectedHolidays([]);
       fetchClasses();
     } catch (error) {
       console.error('Erro ao salvar turma:', error);
@@ -320,10 +581,22 @@ const Classes = () => {
   const fetchClassStudents = async (classId: string) => {
     try {
       setLoadingStudents(true);
+      
+      // Buscar informações da turma para determinar o tipo
+      const { data: classData, error: classError } = await supabase
+        .from('turmas')
+        .select('tipo_turma')
+        .eq('id', classId)
+        .single();
+        
+      if (classError) throw classError;
+      
+      const isParticularClass = classData?.tipo_turma === 'Turma particular';
+      
       const { data, error } = await supabase
         .from('alunos')
         .select('id, nome, email, telefone, status')
-        .eq('turma_id', classId)
+        .or(isParticularClass ? `turma_particular_id.eq.${classId}` : `turma_id.eq.${classId}`)
         .order('nome');
 
       if (error) throw error;
@@ -344,7 +617,7 @@ const Classes = () => {
     try {
       const { data, error } = await supabase
         .from('alunos')
-        .select('id, nome, email, status, turma_id, aulas_particulares, aulas_turma')
+        .select('id, nome, email, status, turma_id, turma_particular_id, aulas_particulares, aulas_turma')
         .eq('status', 'Ativo')
         .order('nome');
 
@@ -375,23 +648,27 @@ const Classes = () => {
     if (!selectedClassForStudents || selectedStudentsToAdd.length === 0) return;
 
     try {
-      // Verificar quantos alunos já estão na turma
+      // Verificar quantos alunos já estão na turma (regular ou particular)
+      const isParticularClass = selectedClassForStudents.tipo_turma === 'Turma particular';
       const { data: currentStudents, error: countError } = await supabase
         .from('alunos')
-        .select('id, turma_id')
-        .eq('turma_id', selectedClassForStudents.id)
+        .select('id, turma_id, turma_particular_id')
+        .or(isParticularClass ? `turma_particular_id.eq.${selectedClassForStudents.id}` : `turma_id.eq.${selectedClassForStudents.id}`)
         .eq('status', 'Ativo');
 
       if (countError) throw countError;
 
       const currentCount = currentStudents?.length || 0;
-      const maxStudents = 10;
+      
+      // Definir limite baseado no tipo de turma
+      const maxStudents = selectedClassForStudents.tipo_turma === 'Turma particular' ? 2 : 10;
+      const tipoTurmaTexto = selectedClassForStudents.tipo_turma === 'Turma particular' ? 'particular' : 'regular';
       const availableSlots = maxStudents - currentCount;
 
       if (availableSlots <= 0) {
         toast({
           title: "Limite Atingido",
-          description: "Esta turma já possui o máximo de 10 alunos.",
+          description: `Esta turma ${tipoTurmaTexto} já possui o máximo de ${maxStudents} alunos.`,
           variant: "destructive",
         });
         return;
@@ -413,7 +690,7 @@ const Classes = () => {
       if (studentsToAdd.length > availableSlots) {
         toast({
           title: "Limite Excedido",
-          description: `Esta turma só pode receber mais ${availableSlots} aluno(s). Máximo de 10 alunos por turma.`,
+          description: `Esta turma ${tipoTurmaTexto} só pode receber mais ${availableSlots} aluno(s). Máximo de ${maxStudents} alunos por turma ${tipoTurmaTexto}.`,
           variant: "destructive",
         });
         return;
@@ -427,7 +704,7 @@ const Classes = () => {
         // Buscar dados atuais do aluno
         const { data: studentData, error: studentError } = await supabase
           .from('alunos')
-          .select('turma_id, aulas_particulares, aulas_turma, nome')
+          .select('turma_id, turma_particular_id, aulas_particulares, aulas_turma, nome')
           .eq('id', studentId)
           .single();
           
@@ -436,36 +713,47 @@ const Classes = () => {
           continue;
         }
         
-        // Se o aluno não tem turma principal, definir esta como principal
-        if (!studentData.turma_id) {
+        // Determinar se é turma particular ou regular
+        const isParticularClass = selectedClassForStudents.tipo_turma === 'Turma particular';
+        
+        if (isParticularClass) {
+          // Adicionar à turma particular
           const { error: updateError } = await supabase
             .from('alunos')
             .update({ 
-              turma_id: selectedClassForStudents.id,
-              aulas_turma: true 
+              turma_particular_id: selectedClassForStudents.id,
+              aulas_particulares: true 
             })
             .eq('id', studentId);
             
           if (updateError) {
-            console.error(`Erro ao matricular aluno ${studentId}:`, updateError);
+            console.error(`Erro ao matricular aluno ${studentId} em turma particular:`, updateError);
             continue;
           }
           
           successCount++;
-        } else if (studentData.turma_id !== selectedClassForStudents.id) {
-          // Aluno já tem uma turma principal diferente
-          // Por enquanto, apenas marcar que faz aulas de turma
-          const { error: updateError } = await supabase
-            .from('alunos')
-            .update({ aulas_turma: true })
-            .eq('id', studentId);
+        } else {
+          // Adicionar à turma regular
+          if (!studentData.turma_id) {
+            // Aluno não tem turma regular, definir esta como principal
+            const { error: updateError } = await supabase
+              .from('alunos')
+              .update({ 
+                turma_id: selectedClassForStudents.id,
+                aulas_turma: true 
+              })
+              .eq('id', studentId);
+              
+            if (updateError) {
+              console.error(`Erro ao matricular aluno ${studentId}:`, updateError);
+              continue;
+            }
             
-          if (updateError) {
-            console.error(`Erro ao atualizar aluno ${studentId}:`, updateError);
-            continue;
+            successCount++;
+          } else if (studentData.turma_id !== selectedClassForStudents.id) {
+            // Aluno já tem uma turma principal diferente
+            warningMessages.push(`${studentData.nome} já possui uma turma regular. Para múltiplas turmas regulares, execute o script SQL de múltiplas matrículas.`);
           }
-          
-          warningMessages.push(`${studentData.nome} já possui turma principal. Múltiplas turmas regulares requerem implementação completa da tabela de relacionamento.`);
         }
       }
 
@@ -509,16 +797,24 @@ const Classes = () => {
 
   const removeStudentFromClass = async (studentId: string) => {
     try {
+      if (!selectedClassForStudents) return;
+      
+      const isParticularClass = selectedClassForStudents.tipo_turma === 'Turma particular';
+      
+      const updateData = isParticularClass 
+        ? { turma_particular_id: null, aulas_particulares: false }
+        : { turma_id: null, aulas_turma: false };
+      
       const { error } = await supabase
         .from('alunos')
-        .update({ turma_id: null })
+        .update(updateData)
         .eq('id', studentId);
 
       if (error) throw error;
 
       toast({
         title: "Sucesso",
-        description: "Aluno removido da turma com sucesso!",
+        description: `Aluno removido da turma ${isParticularClass ? 'particular' : 'regular'} com sucesso!`,
       });
 
       if (selectedClassForStudents) {
@@ -531,6 +827,57 @@ const Classes = () => {
         description: "Não foi possível remover o aluno da turma.",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleSaveClassConfiguration = async () => {
+    if (!selectedClassForStudents) return;
+
+    try {
+      setLoading(true);
+      
+      const formData = getValues();
+      
+      // Preparar dados para atualização
+      const updateData: any = {
+        total_aulas: formData.total_aulas,
+        data_inicio: formData.data_inicio,
+        data_fim: formData.data_fim,
+      };
+
+      // Se for turma particular e tiver plano selecionado, salvar o plano
+      if (selectedClassForStudents.tipo_turma === 'Turma particular' && selectedPlan && selectedPlan !== 'none') {
+        updateData.plano_id = selectedPlan;
+      }
+
+      const { error } = await supabase
+        .from('turmas')
+        .update(updateData)
+        .eq('id', selectedClassForStudents.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso!",
+        description: "Configurações da turma salvas com sucesso.",
+      });
+
+      // Atualizar a lista de turmas
+      await fetchClasses();
+      
+      // Atualizar os dados da turma selecionada
+      const updatedClass = { ...selectedClassForStudents, ...updateData };
+      setSelectedClassForStudents(updatedClass);
+      
+    } catch (error) {
+      console.error('Erro ao salvar configurações da turma:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar configurações da turma.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -691,7 +1038,11 @@ const Classes = () => {
       nivel: classItem.nivel || '',
       dias_da_semana: classItem.dias_da_semana,
       horario: classItem.horario,
-      professor_id: classItem.professor_id || 'none'
+      professor_id: classItem.professor_id || 'none',
+      tipo_turma: classItem.tipo_turma || 'Turma',
+      data_inicio: classItem.data_inicio || '',
+      total_aulas: classItem.total_aulas || 20,
+      data_fim: classItem.data_fim || ''
     });
     
     // Carregar dias selecionados a partir da string
@@ -700,6 +1051,13 @@ const Classes = () => {
     
     // Carregar materiais selecionados
     setSelectedMaterials(classItem.materiais_ids || []);
+    
+    // Calcular data de fim se houver dados suficientes
+    if (classItem.data_inicio && classItem.total_aulas && daysArray.length > 0) {
+      const endDate = calculateEndDate(classItem.data_inicio, classItem.total_aulas, daysArray);
+      setCalculatedEndDate(endDate);
+    }
+    
     setIsDialogOpen(true);
   };
 
@@ -711,10 +1069,16 @@ const Classes = () => {
       nivel: '',
       dias_da_semana: '',
       horario: '',
-      professor_id: 'none'
+      professor_id: 'none',
+      tipo_turma: 'Turma',
+      data_inicio: '',
+      total_aulas: 20,
+      data_fim: ''
     });
     setSelectedMaterials([]);
     setSelectedDays([]);
+    setCalculatedEndDate('');
+    setDetectedHolidays([]);
     setIsDialogOpen(true);
   };
 
@@ -726,13 +1090,7 @@ const Classes = () => {
     );
   };
 
-  const getIdiomaColor = (idioma: string) => {
-    switch (idioma) {
-      case 'Inglês': return 'bg-blue-100 text-blue-800';
-      case 'Japonês': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
+
 
   const filteredTeachers = teachers.filter(teacher => 
     !selectedIdioma || teacher.idiomas.includes(selectedIdioma)
@@ -914,6 +1272,39 @@ const Classes = () => {
                       <p className="text-sm text-red-600">{errors.nivel.message}</p>
                     </div>
                   )}
+                </div>
+              </div>
+              
+              {/* Seção: Configurações da Turma */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Configurações da Turma</h3>
+                
+                <div>
+                  <Label htmlFor="tipo_turma" className="text-sm font-medium text-gray-700">
+                    Tipo de Turma *
+                  </Label>
+                  <Select 
+                    onValueChange={(value) => setValue('tipo_turma', value)} 
+                    value={watch('tipo_turma')}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Selecione o tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Turma">
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4" />
+                          Turma Regular
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="Turma particular">
+                        <div className="flex items-center gap-2">
+                          <GraduationCap className="h-4 w-4" />
+                          Turma Particular
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               
@@ -1227,16 +1618,43 @@ const Classes = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BookCopy className="h-5 w-5" />
-            Lista de Turmas ({classes.length})
+            Lista de Turmas ({filteredClasses.length} de {classes.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {/* Barra de pesquisa e filtros */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Pesquisar por nome, idioma, nível ou professor..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <div className="w-full sm:w-48">
+              <Select value={tipoTurmaFilter} onValueChange={setTipoTurmaFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtrar por tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os tipos</SelectItem>
+                  <SelectItem value="Turma">Turma Regular</SelectItem>
+                  <SelectItem value="Turma particular">Turma Particular</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>Idioma</TableHead>
                 <TableHead>Nível</TableHead>
+                <TableHead>Tipo de Turma</TableHead>
                 <TableHead>Materiais</TableHead>
                 <TableHead>Horário</TableHead>
                 <TableHead>Professor</TableHead>
@@ -1244,7 +1662,7 @@ const Classes = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {classes.map((classItem) => (
+              {paginatedClasses.map((classItem) => (
                 <TableRow key={classItem.id}>
                   <TableCell className="font-medium text-base">{classItem.nome}</TableCell>
                   <TableCell>
@@ -1255,6 +1673,18 @@ const Classes = () => {
                   <TableCell>
                     <Badge variant="outline" className="text-sm bg-red-50 text-red-700 border-red-200">
                       {classItem.nivel || 'Não definido'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge 
+                      variant="outline" 
+                      className={`text-sm ${
+                        classItem.tipo_turma === 'Turma particular' 
+                          ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                          : 'bg-blue-50 text-blue-700 border-blue-200'
+                      }`}
+                    >
+                      {classItem.tipo_turma === 'Turma particular' ? 'Particular' : 'Regular'}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -1315,6 +1745,40 @@ const Classes = () => {
               ))}
             </TableBody>
           </Table>
+          
+          {/* Controles de paginação */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-6">
+              <div className="text-sm text-gray-600">
+                Mostrando {startIndex + 1} a {Math.min(endIndex, filteredClasses.length)} de {filteredClasses.length} turmas
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToPreviousPage}
+                  disabled={currentPage === 1}
+                  className="flex items-center gap-1"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Anterior
+                </Button>
+                <span className="text-sm text-gray-600">
+                  Página {currentPage} de {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToNextPage}
+                  disabled={currentPage === totalPages}
+                  className="flex items-center gap-1"
+                >
+                  Próxima
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -1398,7 +1862,7 @@ const Classes = () => {
 
        {/* Modal de Visualização de Alunos da Turma */}
        <Dialog open={isStudentsDialogOpen} onOpenChange={setIsStudentsDialogOpen}>
-         <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto">
+         <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto animate-in fade-in-0 zoom-in-95 duration-200 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=closed]:duration-150">
            <DialogHeader>
              <DialogTitle className="flex items-center gap-2 text-blue-600">
                <Users className="h-5 w-5" />
@@ -1426,6 +1890,160 @@ const Classes = () => {
                  </Button>
                </div>
              </div>
+
+             {/* Seção de Configurações da Turma - apenas para turmas particulares */}
+             {/* Configurações da Turma - Campos de Data e Aulas */}
+             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-4">
+               <h3 className="text-lg font-medium text-blue-900 border-b border-blue-200 pb-2">
+                 Configurações da Turma
+               </h3>
+               
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                 {/* Total de Aulas */}
+                  <div>
+                    <Label htmlFor="total_aulas" className="text-sm font-medium text-gray-700">
+                      Total de Aulas *
+                      {selectedPlan && selectedPlan !== 'none' && (
+                        <span className="text-xs text-green-600 ml-1">(Do plano selecionado)</span>
+                      )}
+                    </Label>
+                    <Input
+                      id="total_aulas"
+                      type="number"
+                      min="1"
+                      max="100"
+                      {...register('total_aulas', {
+                        required: 'Total de aulas é obrigatório',
+                        min: { value: 1, message: 'Mínimo 1 aula' },
+                        max: { value: 100, message: 'Máximo 100 aulas' }
+                      })}
+                      className="mt-1"
+                      placeholder="Ex: 20"
+                      readOnly={selectedPlan && selectedPlan !== 'none'}
+                    />
+                    {selectedPlan && selectedPlan !== 'none' && (
+                      <div className="mt-1 flex items-center gap-1">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <p className="text-xs text-green-600">
+                          Valor obtido do plano selecionado
+                        </p>
+                      </div>
+                    )}
+                    {errors.total_aulas && (
+                      <div className="mt-1 flex items-center gap-1">
+                        <AlertTriangle className="h-4 w-4 text-red-500" />
+                        <p className="text-sm text-red-600">{errors.total_aulas.message}</p>
+                      </div>
+                    )}
+                  </div>
+
+                 {/* Data de Início */}
+                 <div>
+                   <Label htmlFor="data_inicio" className="text-sm font-medium text-gray-700">
+                     Data de Início *
+                   </Label>
+                   <Input
+                     id="data_inicio"
+                     type="date"
+                     {...register('data_inicio', {
+                       required: 'Data de início é obrigatória'
+                     })}
+                     className="mt-1"
+                   />
+                   {errors.data_inicio && (
+                     <div className="mt-1 flex items-center gap-1">
+                       <AlertTriangle className="h-4 w-4 text-red-500" />
+                       <p className="text-sm text-red-600">{errors.data_inicio.message}</p>
+                     </div>
+                   )}
+                 </div>
+
+                 {/* Data de Fim */}
+                 <div>
+                   <Label htmlFor="data_fim" className="text-sm font-medium text-gray-700">
+                     Data de Fim
+                     <span className="text-xs text-gray-500 ml-1">(Automática)</span>
+                   </Label>
+                   <Input
+                     id="data_fim"
+                     type="date"
+                     {...register('data_fim')}
+                     className="mt-1"
+                     placeholder="Será calculada automaticamente"
+                   />
+                   {calculatedEndDate && (
+                     <div className="mt-1 flex items-center gap-1">
+                       <CheckCircle className="h-4 w-4 text-green-500" />
+                       <p className="text-xs text-green-600">
+                         Calculada: {formatDateForDisplay(calculatedEndDate)}
+                       </p>
+                     </div>
+                   )}
+                   {detectedHolidays.length > 0 && (
+                     <div className="mt-1 flex items-center gap-1">
+                       <AlertTriangle className="h-4 w-4 text-amber-500" />
+                       <p className="text-xs text-amber-600">
+                         {detectedHolidays.length} feriado(s) detectado(s)
+                       </p>
+                     </div>
+                   )}
+                 </div>
+               </div>
+             </div>
+
+             {selectedClassForStudents?.tipo_turma === 'Turma particular' && (
+               <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 space-y-4">
+                 <h3 className="text-lg font-medium text-purple-900 border-b border-purple-200 pb-2">
+                   Configurações da Turma Particular
+                 </h3>
+                 
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   {/* Seleção de Plano */}
+                   <div>
+                     <Label htmlFor="plano_particular" className="text-sm font-medium text-gray-700">
+                       Plano Particular
+                     </Label>
+                     <Select value={selectedPlan} onValueChange={setSelectedPlan}>
+                       <SelectTrigger className="mt-1">
+                         <SelectValue placeholder="Selecione um plano" />
+                       </SelectTrigger>
+                       <SelectContent>
+                          <SelectItem value="none">
+                            <div className="flex items-center gap-2">
+                              <X className="h-4 w-4" />
+                              Nenhum plano
+                            </div>
+                          </SelectItem>
+                         {plans.map((plan) => (
+                           <SelectItem key={plan.id} value={plan.id}>
+                             <div className="flex items-center gap-2">
+                               <BookCopy className="h-4 w-4" />
+                               {plan.nome}
+                             </div>
+                           </SelectItem>
+                         ))}
+                       </SelectContent>
+                     </Select>
+                   </div>
+
+                   {/* Informações do Plano Selecionado */}
+                   {selectedPlan && selectedPlan !== 'none' && (() => {
+                     const plan = plans.find(p => p.id === selectedPlan);
+                     return plan ? (
+                       <div className="bg-white rounded-lg p-3 border">
+                         <h4 className="text-sm font-medium text-gray-900 mb-2">Informações do Plano</h4>
+                         <div className="space-y-1 text-xs">
+                           <p><strong>Aulas:</strong> {plan.numero_aulas}</p>
+                           <p><strong>Carga Horária:</strong> {plan.carga_horaria_total || 'N/A'} horas</p>
+                           <p><strong>Valor:</strong> R$ {plan.valor_total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || 'N/A'}</p>
+                           <p><strong>Frequência:</strong> {plan.frequencia_aulas || 'N/A'}</p>
+                         </div>
+                       </div>
+                     ) : null;
+                   })()}
+                 </div>
+               </div>
+             )}
 
              {loadingStudents ? (
                <div className="flex items-center justify-center py-8">
@@ -1488,6 +2106,27 @@ const Classes = () => {
                  </div>
                </div>
              )}
+             
+             {/* Botão de Salvar Configurações */}
+             <div className="flex justify-end pt-4 border-t border-gray-200">
+               <Button
+                 onClick={handleSaveClassConfiguration}
+                 className="bg-green-600 hover:bg-green-700 text-white"
+                 disabled={loading}
+               >
+                 {loading ? (
+                   <div className="flex items-center gap-2">
+                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                     Salvando...
+                   </div>
+                 ) : (
+                   <div className="flex items-center gap-2">
+                     <CheckCircle className="h-4 w-4" />
+                     Salvar Configurações
+                   </div>
+                 )}
+               </Button>
+             </div>
            </div>
          </DialogContent>
        </Dialog>
@@ -1516,13 +2155,13 @@ const Classes = () => {
              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                <div className="flex items-center justify-between">
                  <p className="text-sm text-blue-800">
-                   <strong>Limite de alunos:</strong> Máximo 10 alunos por turma
+                   <strong>Limite de alunos:</strong> Máximo {selectedClassForStudents?.tipo_turma === 'Turma particular' ? '2' : '10'} alunos por turma {selectedClassForStudents?.tipo_turma === 'Turma particular' ? 'particular' : 'regular'}
                  </p>
                  <p className="text-sm text-blue-600 font-medium">
-                   {classStudents.length}/10 alunos na turma
+                   {classStudents.length}/{selectedClassForStudents?.tipo_turma === 'Turma particular' ? '2' : '10'} alunos na turma
                  </p>
                </div>
-               {classStudents.length >= 10 && (
+               {classStudents.length >= (selectedClassForStudents?.tipo_turma === 'Turma particular' ? 2 : 10) && (
                  <p className="text-sm text-red-600 mt-2 font-medium">
                    ⚠️ Esta turma já atingiu o limite máximo de alunos.
                  </p>
@@ -1594,22 +2233,23 @@ const Classes = () => {
                            <TableCell className="font-medium">{student.nome}</TableCell>
                            <TableCell>{student.email || '-'}</TableCell>
                            <TableCell>
-                             {student.turma_id ? (
-                               <div className="flex flex-col gap-1">
-                                 <Badge variant="outline" className="text-xs">
-                                   Tem turma principal
+                             <div className="flex flex-col gap-1">
+                               {student.turma_id && (
+                                 <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700">
+                                   Turma Regular
                                  </Badge>
-                                 {student.aulas_particulares && (
-                                   <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700">
-                                     + Aulas particulares
-                                   </Badge>
-                                 )}
-                               </div>
-                             ) : (
-                               <Badge variant="secondary" className="text-xs">
-                                 {student.aulas_particulares ? 'Só particulares' : 'Sem turma'}
-                               </Badge>
-                             )}
+                               )}
+                               {student.turma_particular_id && (
+                                 <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700">
+                                   Turma Particular
+                                 </Badge>
+                               )}
+                               {!student.turma_id && !student.turma_particular_id && (
+                                 <Badge variant="secondary" className="text-xs">
+                                   Sem turma
+                                 </Badge>
+                               )}
+                             </div>
                            </TableCell>
                            <TableCell>
                              <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-200">
@@ -1655,6 +2295,16 @@ const Classes = () => {
            </div>
          </DialogContent>
        </Dialog>
+
+       {/* Modal de Feriados */}
+       <HolidayModal
+         isOpen={isHolidayModalOpen}
+         onClose={() => setIsHolidayModalOpen(false)}
+         holidays={detectedHolidays}
+         onReschedule={handleHolidayReschedule}
+         onIgnore={handleIgnoreHolidays}
+         classDays={selectedDays}
+       />
     </div>
   );
 };

@@ -33,6 +33,7 @@ interface Student {
   idioma: string;
   nivel: string;
   turma_id: string;
+  turma_particular_id?: string;
   responsavel_id: string;
   status: string;
   observacoes: string;
@@ -58,6 +59,7 @@ interface Class {
   nome: string;
   idioma: string;
   nivel: string;
+  tipo_turma?: string;
 }
 
 interface StudentFormProps {
@@ -94,6 +96,7 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel, onCloseWithP
       idioma: '',
       nivel: 'none',
       turma_id: '',
+      turma_particular_id: '',
       responsavel_id: '',
       status: 'Ativo',
       observacoes: '',

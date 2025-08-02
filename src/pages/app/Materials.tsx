@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, BookOpen, Package } from 'lucide-react';
 import { useForm } from 'react-hook-form';
+import { getIdiomaColor } from '@/utils/idiomaColors';
 
 
 interface Material {
@@ -171,13 +172,7 @@ const Materials = () => {
     }
   };
 
-  const getIdiomaColor = (idioma: string) => {
-    switch (idioma) {
-      case 'Inglês': return 'bg-blue-100 text-blue-800';
-      case 'Japonês': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
+
 
   if (loading) {
     return (

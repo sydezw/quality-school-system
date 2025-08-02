@@ -478,30 +478,7 @@ const ContractGenerator2 = () => {
                     if (node.nodeType === Node.ELEMENT_NODE) {
                       const element = node as Element;
                       if (element.classList.contains('placeholder-text')) {
-                        // Verificar se é um campo de data
-                        const isDateField = element.textContent?.includes('data') || 
-                                          element.textContent?.includes('nascimento') || 
-                                          element.textContent?.includes('Data');
-                        
-                        if (isDateField && e.key.match(/[0-9]/)) {
-                          e.preventDefault();
-                          element.textContent = 'dd/mm/yyyy';
-                          element.classList.remove('placeholder-text');
-                          element.style.color = '#333';
-                          element.style.fontStyle = 'normal';
-                          
-                          // Posicionar cursor no início
-                          setTimeout(() => {
-                            const newRange = document.createRange();
-                            const textNode = element.firstChild;
-                            if (textNode) {
-                              newRange.setStart(textNode, 0);
-                              newRange.collapse(true);
-                              selection.removeAllRanges();
-                              selection.addRange(newRange);
-                            }
-                          }, 0);
-                        } else if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
+                        if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
                           element.classList.remove('placeholder-text');
                           element.style.color = '#333';
                           element.style.fontStyle = 'normal';
@@ -514,30 +491,7 @@ const ContractGenerator2 = () => {
                     } else if (node.nodeType === Node.TEXT_NODE && node.parentElement) {
                       const parentElement = node.parentElement;
                       if (parentElement.classList.contains('placeholder-text')) {
-                        // Verificar se é um campo de data
-                        const isDateField = parentElement.textContent?.includes('data') || 
-                                          parentElement.textContent?.includes('nascimento') || 
-                                          parentElement.textContent?.includes('Data');
-                        
-                        if (isDateField && e.key.match(/[0-9]/)) {
-                          e.preventDefault();
-                          parentElement.textContent = 'dd/mm/yyyy';
-                          parentElement.classList.remove('placeholder-text');
-                          parentElement.style.color = '#333';
-                          parentElement.style.fontStyle = 'normal';
-                          
-                          // Posicionar cursor no início
-                          setTimeout(() => {
-                            const newRange = document.createRange();
-                            const textNode = parentElement.firstChild;
-                            if (textNode) {
-                              newRange.setStart(textNode, 0);
-                              newRange.collapse(true);
-                              selection.removeAllRanges();
-                              selection.addRange(newRange);
-                            }
-                          }, 0);
-                        } else if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
+                        if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
                           parentElement.classList.remove('placeholder-text');
                           parentElement.style.color = '#333';
                           parentElement.style.fontStyle = 'normal';

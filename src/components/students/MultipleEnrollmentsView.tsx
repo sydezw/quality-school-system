@@ -168,7 +168,7 @@ export const MultipleEnrollmentsView: React.FC<MultipleEnrollmentsViewProps> = (
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-3xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto mx-auto my-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-blue-600">
             <Users className="h-5 w-5" />
