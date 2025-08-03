@@ -1,0 +1,13 @@
+<svg width="200" height="80" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .signature-text {
+        font-family: 'Brush Script MT', cursive;
+        font-size: 24px;
+        fill: #000;
+      }
+    </style>
+  </defs>
+  <text x="10" y="40" class="signature-text">Testemunha 1</text>
+  <line x1="10" y1="50" x2="190" y2="50" stroke="#000" stroke-width="1"/>
+</svg>

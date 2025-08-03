@@ -9,7 +9,8 @@ interface Class {
   id: string;
   nome: string;
   idioma: string;
-  nivel?: string; // Opcional, pois não estamos buscando esse campo atualmente
+  nivel?: string;
+  tipo_turma?: string;
 }
 
 export const useStudents = () => {
@@ -37,6 +38,7 @@ export const useStudents = () => {
           nivel,
           status,
           turma_id,
+          turma_particular_id,
           responsavel_id,
           created_at,
           updated_at,
@@ -50,7 +52,10 @@ export const useStudents = () => {
           data_cancelamento,
           data_conclusao,
           data_exclusao,
-          turmas(nome, idioma),
+          aulas_particulares,
+          aulas_turma,
+          turma_regular:turmas!turma_id(nome, idioma),
+          turma_particular:turmas!turma_particular_id(nome, idioma),
           responsaveis(nome, telefone)
         `);
       
@@ -74,6 +79,7 @@ export const useStudents = () => {
         nivel: item.nivel || 'none', // Campo nivel do aluno, usando 'none' como padrão
         status: item.status,
         turma_id: item.turma_id,
+        turma_particular_id: item.turma_particular_id,
         responsavel_id: item.responsavel_id,
         created_at: item.created_at,
         updated_at: item.updated_at,
@@ -87,9 +93,14 @@ export const useStudents = () => {
         data_cancelamento: item.data_cancelamento,
         data_conclusao: item.data_conclusao,
         data_exclusao: item.data_exclusao,
-        turmas: item.turmas ? {
-          nome: item.turmas.nome,
-          idioma: item.turmas.idioma || ''
+        aulas_particulares: item.aulas_particulares || false,
+        aulas_turma: item.aulas_turma !== null ? item.aulas_turma : true,
+        turmas: item.turma_regular ? {
+          nome: item.turma_regular.nome,
+          idioma: item.turma_regular.idioma || ''
+        } : item.turma_particular ? {
+          nome: item.turma_particular.nome,
+          idioma: item.turma_particular.idioma || ''
         } : undefined,
         responsaveis: item.responsaveis ? {
           nome: item.responsaveis.nome,
@@ -114,7 +125,7 @@ export const useStudents = () => {
     try {
       const { data, error } = await supabase
         .from('turmas')
-        .select('id, nome, idioma, nivel')
+        .select('id, nome, idioma, nivel, tipo_turma')
         .order('nome');
 
       if (error) throw error;
@@ -128,6 +139,47 @@ export const useStudents = () => {
       });
     }
   }, [toast]);
+
+  const processMultipleEnrollments = async (studentId: string, data: any, editingStudent: Student | null) => {
+    try {
+      // Usar as novas colunas turma_id e turma_particular_id
+      
+      // Preparar dados para atualização
+      const updateData: any = {
+        aulas_turma: data.aulas_turma || false,
+        aulas_particulares: data.aulas_particulares || false
+      };
+      
+      // Definir turma regular
+      if (data.aulas_turma && data.turma_id && data.turma_id !== 'none' && data.turma_id !== '') {
+        updateData.turma_id = data.turma_id;
+      } else {
+        updateData.turma_id = null;
+      }
+      
+      // Definir turma particular
+      if (data.aulas_particulares && data.turma_particular_id && data.turma_particular_id !== 'none' && data.turma_particular_id !== '') {
+        updateData.turma_particular_id = data.turma_particular_id;
+      } else {
+        updateData.turma_particular_id = null;
+      }
+      
+      const { error } = await supabase
+        .from('alunos')
+        .update(updateData)
+        .eq('id', studentId);
+        
+      if (error) {
+        console.error('Erro ao processar matrículas:', error);
+        throw error;
+      }
+      
+      console.log('Múltiplas matrículas processadas com novas colunas:', updateData);
+    } catch (error) {
+      console.error('Erro ao processar múltiplas matrículas:', error);
+      throw error;
+    }
+  };
 
   const saveStudent = async (data: any, editingStudent: Student | null) => {
     try {
@@ -145,7 +197,9 @@ export const useStudents = () => {
         cidade: data.cidade || null,
         estado: data.estado || null,
         nivel: data.nivel && data.nivel !== 'none' ? data.nivel : null,
-        status: data.status || 'Ativo'
+        status: data.status || 'Ativo',
+        aulas_particulares: data.aulas_particulares || false,
+        aulas_turma: data.aulas_turma !== undefined ? data.aulas_turma : true
       };
   
       // Só incluir idioma se tiver valor válido
@@ -153,28 +207,39 @@ export const useStudents = () => {
         submitData.idioma = data.idioma;
       }
   
-      // Só incluir turma_id se tiver valor UUID válido
-      if (data.turma_id && data.turma_id !== 'none' && data.turma_id !== '' && data.turma_id.length > 10) {
+      // Manter turma_id apenas para compatibilidade (turma principal)
+      if (data.turma_id && data.turma_id !== 'none' && data.turma_id !== '') {
         submitData.turma_id = data.turma_id;
+      } else if (data.turma_id === 'none' || data.turma_id === '') {
+        submitData.turma_id = null;
       }
   
       // Só incluir responsavel_id se tiver valor UUID válido
-      if (data.responsavel_id && data.responsavel_id !== 'none' && data.responsavel_id !== '' && data.responsavel_id.length > 10) {
+      if (data.responsavel_id && data.responsavel_id !== 'none' && data.responsavel_id !== '') {
         submitData.responsavel_id = data.responsavel_id;
+      } else if (data.responsavel_id === 'none' || data.responsavel_id === '') {
+        // Explicitamente definir como null para remover o responsável
+        submitData.responsavel_id = null;
       }
   
-      console.log('Dados que serão enviados:', submitData);
+      console.log('Dados recebidos do formulário:', data);
+      console.log('Dados que serão enviados para o banco:', submitData);
+      console.log('Editando aluno:', editingStudent?.id, editingStudent?.nome);
   
+      let studentId: string;
+      
       if (editingStudent) {
         const { error } = await supabase
           .from('alunos')
           .update(submitData)
           .eq('id', editingStudent.id);
-  
+
         if (error) {
           console.error('Erro ao atualizar:', error);
           throw error;
         }
+        
+        studentId = editingStudent.id;
         
         toast({
           title: "Sucesso",
@@ -185,12 +250,13 @@ export const useStudents = () => {
           .from('alunos')
           .insert([submitData])
           .select();
-  
+
         if (error) {
           console.error('Erro ao inserir:', error);
           throw error;
         }
         
+        studentId = insertedData[0].id;
         console.log('Aluno criado:', insertedData);
         
         toast({
@@ -198,6 +264,9 @@ export const useStudents = () => {
           description: "Aluno criado com sucesso!",
         });
       }
+      
+      // Processar múltiplas matrículas
+      await processMultipleEnrollments(studentId, data, editingStudent);
   
       await fetchStudents();
       return true;

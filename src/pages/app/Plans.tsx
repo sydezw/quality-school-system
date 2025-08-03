@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import PlanForm from '@/components/plans/PlanForm';
 import PlanStudentsModal from '@/components/plans/PlanStudentsModal';
+import { getIdiomaColor } from '@/utils/idiomaColors';
 
 
 interface Plan {
@@ -27,7 +28,7 @@ interface Plan {
   permite_parcelamento: boolean | null;
   observacoes: string | null;
   ativo: boolean | null;
-  idioma: 'Inglês' | 'Japonês' | 'Inglês/Japonês';
+  idioma: 'Inglês' | 'Japonês' | 'Inglês/Japonês' | 'particular';
   tipo_valor?: 'plano' | 'plano_material' | 'plano_matricula' | 'plano_completo';
   created_at: string;
   updated_at: string;
@@ -113,7 +114,7 @@ const Plans = () => {
         permite_cancelamento: plan.permite_cancelamento ?? true,
         permite_parcelamento: plan.permite_parcelamento ?? true,
         ativo: plan.ativo ?? true,
-        idioma: plan.idioma as 'Inglês' | 'Japonês' | 'Inglês/Japonês',
+        idioma: plan.idioma as 'Inglês' | 'Japonês' | 'Inglês/Japonês' | 'particular',
         tipo_valor: plan.tipo_valor as 'plano' | 'plano_material' | 'plano_matricula' | 'plano_completo' | undefined
       }));
       
@@ -291,6 +292,8 @@ const Plans = () => {
 
 
 
+
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -322,6 +325,7 @@ const Plans = () => {
             <SelectItem value="Inglês">Inglês</SelectItem>
             <SelectItem value="Japonês">Japonês</SelectItem>
             <SelectItem value="Inglês/Japonês">Inglês/Japonês</SelectItem>
+            <SelectItem value="particular">Particular</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -364,7 +368,7 @@ const Plans = () => {
                 <div className="flex justify-between items-start">
                   <CardTitle className="text-lg line-clamp-2">{plan.nome}</CardTitle>
                   <div className="flex items-center gap-1">
-                    <Badge variant="outline" className="text-xs mr-1">
+                    <Badge variant="outline" className={`text-xs mr-1 ${getIdiomaColor(plan.idioma)}`}>
                       {plan.idioma}
                     </Badge>
                     {plan.ativo ? (

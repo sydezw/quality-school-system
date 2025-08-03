@@ -38,9 +38,10 @@ interface NewStudentFormProps {
   classes: Class[];
   onSubmit: (data: StudentFormValues) => void;
   onCancel: () => void;
+  onCloseWithPrivateClasses?: () => void;
 }
 
-const NewStudentForm = ({ classes, onSubmit, onCancel }: NewStudentFormProps): JSX.Element => {
+const NewStudentForm = ({ classes, onSubmit, onCancel, onCloseWithPrivateClasses }: NewStudentFormProps): JSX.Element => {
   const { toast } = useToast();
   const { responsibles, saveResponsible } = useResponsibles();
   const [selectedIdioma, setSelectedIdioma] = useState<string>('');
@@ -73,10 +74,20 @@ const NewStudentForm = ({ classes, onSubmit, onCancel }: NewStudentFormProps): J
 
   const { handleSubmit, setValue, watch } = form;
   const watchedIdioma = watch('idioma');
+  const watchedAulasParticulares = watch('aulas_particulares');
 
   useEffect(() => {
     setSelectedIdioma(watchedIdioma || '');
   }, [watchedIdioma]);
+
+  // Função personalizada de cancelamento
+  const handleCancel = () => {
+    if (watchedAulasParticulares && onCloseWithPrivateClasses) {
+      onCloseWithPrivateClasses();
+    } else {
+      onCancel();
+    }
+  };
 
   const handleFormSubmit = async (data: StudentFormValues) => {
     try {
@@ -309,7 +320,7 @@ const NewStudentForm = ({ classes, onSubmit, onCancel }: NewStudentFormProps): J
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={onCancel}
+                      onClick={handleCancel}
                       disabled={isSubmitting}
                       className="px-4 py-2 text-sm font-medium transition-all duration-200 hover:bg-gray-50 z-20"
                     >
