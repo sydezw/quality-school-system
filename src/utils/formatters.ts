@@ -67,6 +67,18 @@ export const formatDate = (dateString: string): string => {
   if (!dateString) return '';
   
   try {
+    // Para datas no formato YYYY-MM-DD (do banco), criar a data sem problemas de timezone
+    if (dateString.includes('-') && dateString.length === 10) {
+      const [year, month, day] = dateString.split('-').map(Number);
+      const date = new Date(year, month - 1, day); // month - 1 porque Date usa 0-11 para meses
+      return new Intl.DateTimeFormat('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      }).format(date);
+    }
+    
+    // Para outros formatos de data
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('pt-BR', {
       day: '2-digit',

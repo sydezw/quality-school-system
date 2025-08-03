@@ -1009,7 +1009,7 @@ const FinancialReportsTable = () => {
                 {despesas.map((despesa) => (
                   <motion.div 
                     key={despesa.id} 
-                    className="flex items-center justify-between p-4 rounded-lg transition-colors duration-200" style={{backgroundColor: '#F9FAFB'}} onMouseEnter={(e) => e.target.style.backgroundColor = '#F3F4F6'} onMouseLeave={(e) => e.target.style.backgroundColor = '#F9FAFB'}
+                    className="flex items-center justify-between p-4 rounded-lg transition-colors duration-200" style={{backgroundColor: '#F9FAFB'}} onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.backgroundColor = '#F3F4F6'} onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.backgroundColor = '#F9FAFB'}
                     whileHover={{ scale: 1.02 }}
                     transition={{ type: "spring", stiffness: 300 }}
                   >
@@ -1061,7 +1061,7 @@ const FinancialReportsTable = () => {
                 {proximosVencimentosRegistros.map((vencimento) => (
                   <motion.div 
                     key={vencimento.id} 
-                    className="flex items-center justify-between p-4 rounded-lg transition-colors duration-200" style={{backgroundColor: '#F9FAFB'}} onMouseEnter={(e) => e.target.style.backgroundColor = '#F3F4F6'} onMouseLeave={(e) => e.target.style.backgroundColor = '#F9FAFB'}
+                    className="flex items-center justify-between p-4 rounded-lg transition-colors duration-200" style={{backgroundColor: '#F9FAFB'}} onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.backgroundColor = '#F3F4F6'} onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.backgroundColor = '#F9FAFB'}
                     whileHover={{ scale: 1.02 }}
                     transition={{ type: "spring", stiffness: 300 }}
                   >

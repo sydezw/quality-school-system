@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Database } from '@/integrations/supabase/types';
-import { Edit, Trash2, DollarSign } from 'lucide-react';
+import { Edit, Trash2, DollarSign, Eye, User } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import AdvancedStudentDeleteDialog from './AdvancedStudentDeleteDialog';
+import StudentDetailsModal from './StudentDetailsModal';
 import { formatCPF } from '@/utils/formatters';
 
 // Definir o tipo Student baseado na tabela alunos do banco
@@ -32,6 +33,8 @@ interface StudentTableProps {
 const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, isDeleting }: StudentTableProps) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
   const handleDeleteClick = (student: Student) => {
     setStudentToDelete(student);
@@ -49,6 +52,16 @@ const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, isDel
   const handleDeleteCancel = () => {
     setDeleteDialogOpen(false);
     setStudentToDelete(null);
+  };
+
+  const handleStudentClick = (student: Student) => {
+    setSelectedStudent(student);
+    setDetailsModalOpen(true);
+  };
+
+  const handleDetailsModalClose = () => {
+    setDetailsModalOpen(false);
+    setSelectedStudent(null);
   };
   
   const getStatusColor = (student: Student) => {
@@ -87,7 +100,21 @@ const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, isDel
         <TableBody>
           {students.map((student) => (
             <TableRow key={student.id}>
-              <TableCell className="font-medium">{student.nome}</TableCell>
+              <TableCell className="font-medium">
+                <div 
+                  className="flex items-center gap-2 cursor-pointer group hover:bg-gradient-to-r hover:from-[#D90429]/5 hover:to-pink-500/5 p-2 rounded-lg transition-all duration-200"
+                  onClick={() => handleStudentClick(student)}
+                  title="Clique para ver detalhes do aluno"
+                >
+                  <div className="p-1.5 bg-gradient-to-r from-[#D90429] to-pink-500 rounded-full group-hover:scale-110 transition-transform duration-200">
+                    <User className="h-3 w-3 text-white" />
+                  </div>
+                  <span className="group-hover:text-[#D90429] transition-colors duration-200 font-medium">
+                    {student.nome}
+                  </span>
+                  <Eye className="h-4 w-4 text-gray-400 group-hover:text-[#D90429] opacity-0 group-hover:opacity-100 transition-all duration-200" />
+                </div>
+              </TableCell>
               <TableCell>{student.cpf ? formatCPF(student.cpf) : 'Não informado'}</TableCell>
               <TableCell>{student.idioma}</TableCell>
               <TableCell>{student.turmas?.nome || 'Sem turma'}</TableCell>
@@ -146,6 +173,12 @@ const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, isDel
         onClose={handleDeleteCancel}
         onConfirm={handleDeleteConfirm}
         isLoading={isDeleting}
+      />
+      
+      <StudentDetailsModal
+        isOpen={detailsModalOpen}
+        onClose={handleDetailsModalClose}
+        student={selectedStudent}
       />
     </div>
   );

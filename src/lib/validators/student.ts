@@ -18,8 +18,7 @@ export const studentFormSchema = z.object({
   nivel: z.string().optional(),
   turma_id: z.string().optional(),
   responsavel_id: z.string().optional().nullable(),
-  status: z.enum(["Ativo", "Inativo", "Suspenso", "Trancado"]).optional(),
-  observacoes: z.string().optional()
+  status: z.enum(["Ativo", "Inativo", "Suspenso", "Trancado"]).optional()
 });
 
 export type StudentFormValues = z.infer<typeof studentFormSchema>;

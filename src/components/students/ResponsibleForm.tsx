@@ -74,7 +74,7 @@ const ResponsibleForm = ({ editingResponsible, onSubmit, onCancel }: Responsible
         }
         
         // Preencher o número do endereço
-        setValue('numero_endereco', addressData.numero || '');
+        setValue('numero_endereco', addressData.numero_endereco || '');
         
         toast({
           title: "Endereço importado!",

@@ -1183,7 +1183,7 @@ export type Database = {
           carga_horaria_total: number | null
           created_at: string
           descricao: string
-          frequencia_aulas: Json
+          frequencia_aulas: string
           horario_por_aula: number | null
           id: string
           idioma: Database["public"]["Enums"]["idioma"]
@@ -1192,6 +1192,7 @@ export type Database = {
           observacoes: string | null
           permite_cancelamento: boolean | null
           permite_parcelamento: boolean | null
+          tipo_valor: string | null
           updated_at: string
           valor_por_aula: number | null
           valor_total: number | null
@@ -1201,7 +1202,7 @@ export type Database = {
           carga_horaria_total?: number | null
           created_at?: string
           descricao: string
-          frequencia_aulas: Json
+          frequencia_aulas: string
           horario_por_aula?: number | null
           id?: string
           idioma?: Database["public"]["Enums"]["idioma"]
@@ -1210,6 +1211,7 @@ export type Database = {
           observacoes?: string | null
           permite_cancelamento?: boolean | null
           permite_parcelamento?: boolean | null
+          tipo_valor?: string | null
           updated_at?: string
           valor_por_aula?: number | null
           valor_total?: number | null
@@ -1219,7 +1221,7 @@ export type Database = {
           carga_horaria_total?: number | null
           created_at?: string
           descricao?: string
-          frequencia_aulas?: Json
+          frequencia_aulas?: string
           horario_por_aula?: number | null
           id?: string
           idioma?: Database["public"]["Enums"]["idioma"]
@@ -1228,6 +1230,7 @@ export type Database = {
           observacoes?: string | null
           permite_cancelamento?: boolean | null
           permite_parcelamento?: boolean | null
+          tipo_valor?: string | null
           updated_at?: string
           valor_por_aula?: number | null
           valor_total?: number | null
@@ -1529,7 +1532,7 @@ export type Database = {
           id: string
           idioma: Database["public"]["Enums"]["idioma"]
           materiais_ids: Json | null
-          nivel: Database["public"]["Enums"]["nivel"]
+          nivel: Database["public"]["Enums"]["nivel"] | null
           nome: string
           professor_id: string | null
           sala_id: string | null
@@ -1543,7 +1546,7 @@ export type Database = {
           id?: string
           idioma: Database["public"]["Enums"]["idioma"]
           materiais_ids?: Json | null
-          nivel: Database["public"]["Enums"]["nivel"]
+          nivel?: Database["public"]["Enums"]["nivel"] | null
           nome: string
           professor_id?: string | null
           sala_id?: string | null
@@ -1557,7 +1560,7 @@ export type Database = {
           id?: string
           idioma?: Database["public"]["Enums"]["idioma"]
           materiais_ids?: Json | null
-          nivel?: Database["public"]["Enums"]["nivel"]
+          nivel?: Database["public"]["Enums"]["nivel"] | null
           nome?: string
           professor_id?: string | null
           sala_id?: string | null

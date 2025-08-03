@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { formatDate } from '@/utils/formatters';
 
 // Interfaces
 export interface Contract {
@@ -28,7 +29,7 @@ export interface ContractFormData {
   valor_mensalidade?: number; // Tornado opcional
   observacao?: string;
   plano_id?: string;
-  idioma_contrato?: string; // Adicionar campo idioma_contrato
+  idioma_contrato?: 'Inglês' | 'Japonês' | 'Inglês/Japonês'; // Tipo correto do enum
 }
 
 export interface ContractStats {
@@ -276,9 +277,14 @@ export const useContracts = () => {
       const { error } = await supabase
         .from('contratos')
         .insert({
-          ...contractData,
-          status_contrato: 'Ativo',
-          valor_mensalidade: contractData.valor_mensalidade || 0 // Valor padrão se não fornecido
+          aluno_id: contractData.aluno_id,
+          data_inicio: contractData.data_inicio,
+          data_fim: contractData.data_fim,
+          valor_mensalidade: contractData.valor_mensalidade || 0,
+          observacao: contractData.observacao,
+          plano_id: contractData.plano_id,
+          idioma_contrato: contractData.idioma_contrato,
+          status_contrato: 'Ativo'
         });
 
       if (error) throw error;
@@ -307,7 +313,13 @@ export const useContracts = () => {
       const { error } = await supabase
         .from('contratos')
         .update({
-          ...contractData,
+          aluno_id: contractData.aluno_id,
+          data_inicio: contractData.data_inicio,
+          data_fim: contractData.data_fim,
+          valor_mensalidade: contractData.valor_mensalidade,
+          observacao: contractData.observacao,
+          plano_id: contractData.plano_id,
+          idioma_contrato: contractData.idioma_contrato,
           updated_at: new Date().toISOString()
         })
         .eq('id', contractId);
@@ -412,9 +424,11 @@ export const useContracts = () => {
       newEndDate.setFullYear(newEndDate.getFullYear() + 1);
 
       // Criar observação com informações de renovação
-      const dataInicioFormatada = new Date(contract.data_inicio).toLocaleDateString('pt-BR');
-      const dataRenovacaoFormatada = newEndDate.toLocaleDateString('pt-BR');
-      const dataHoje = new Date().toLocaleDateString('pt-BR');
+      const dataInicioFormatada = contract.data_inicio
+        ? formatDate(contract.data_inicio)
+        : 'Data não informada';
+      const dataRenovacaoFormatada = formatDate(newEndDate.toISOString().split('T')[0]);
+      const dataHoje = formatDate(new Date().toISOString().split('T')[0]);
       
       const novaObservacao = contract.observacao 
         ? `${contract.observacao}\n\n[RENOVAÇÃO ${dataHoje}] Contrato renovado até ${dataRenovacaoFormatada}`

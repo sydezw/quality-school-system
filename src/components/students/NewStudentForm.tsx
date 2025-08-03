@@ -31,7 +31,7 @@ interface Class {
   id: string;
   nome: string;
   idioma: string;
-  nivel: string;
+  nivel?: string;
 }
 
 interface NewStudentFormProps {
@@ -58,7 +58,7 @@ const NewStudentForm = ({ classes, onSubmit, onCancel }: NewStudentFormProps): J
       telefone: '',
       email: '',
       endereco: '',
-      numero: '',
+      numero_endereco: '',
       bairro: '',
       cidade: '',
       estado: '',
@@ -67,8 +67,7 @@ const NewStudentForm = ({ classes, onSubmit, onCancel }: NewStudentFormProps): J
       nivel: '',
       turma_id: '',
       responsavel_id: '',
-      status: undefined,
-      observacoes: ''
+      status: undefined
     }
   });
 

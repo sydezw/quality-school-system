@@ -19,23 +19,26 @@ import { useToast } from "@/hooks/use-toast";
 interface Student {
   id: string;
   nome: string;
-  cpf: string;
-  data_nascimento: string;
-  telefone: string;
-  email: string;
-  endereco: string;
-  numero: string;
-  // complemento: string; // REMOVIDO
-  bairro: string;
-  cidade: string;
-  estado: string;
-  cep: string;
-  idioma: string;
-  nivel: string;
-  turma_id: string;
-  responsavel_id: string;
+  cpf: string | null;
+  data_nascimento: string | null;
+  telefone: string | null;
+  email: string | null;
+  endereco: string | null;
+  numero_endereco: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  estado: string | null;
+  cep: string | null;
+  idioma: string | null;
+  nivel: string | null;
+  turma_id: string | null;
+  responsavel_id: string | null;
   status: string;
-  observacoes: string;
+  created_at: string;
+  updated_at: string;
+  data_cancelamento: string | null;
+  data_conclusao: string | null;
+  data_exclusao: string | null;
 }
 import { 
   User, 
@@ -55,7 +58,7 @@ interface Class {
   id: string;
   nome: string;
   idioma: string;
-  nivel: string;
+  nivel?: string;
 }
 
 interface StudentFormProps {
@@ -92,8 +95,7 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
       nivel: 'none',
       turma_id: '',
       responsavel_id: '',
-      status: 'Ativo',
-      observacoes: ''
+      status: 'Ativo'
     }
   });
 
@@ -122,7 +124,7 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
         telefone: editingStudent.telefone || '',
         email: editingStudent.email || '',
         endereco: editingStudent.endereco || '',
-        numero_endereco: editingStudent.numero || '',
+        numero_endereco: editingStudent.numero_endereco || '',
         bairro: editingStudent.bairro || '',
         cidade: editingStudent.cidade || '',
         estado: editingStudent.estado || '',
@@ -131,8 +133,7 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
         nivel: editingStudent.nivel || 'none',
         turma_id: editingStudent.turma_id || '',
         responsavel_id: editingStudent.responsavel_id || '',
-        status: (editingStudent.status as "Ativo" | "Inativo" | "Suspenso") || 'Ativo',
-        observacoes: editingStudent.observacoes || ''
+        status: (editingStudent.status as "Ativo" | "Inativo" | "Suspenso") || 'Ativo'
       });
       
       setSelectedIdioma(editingStudent.idioma || '');
@@ -152,7 +153,7 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel }: StudentFor
       setValue('telefone', editingStudent.telefone || '');
       setValue('email', editingStudent.email || '');
       setValue('endereco', editingStudent.endereco || '');
-      setValue('numero_endereco', editingStudent.numero || ''); // Mapear numero para numero_endereco
+      setValue('numero_endereco', editingStudent.numero_endereco || ''); // Mapear numero_endereco
       setValue('idioma', editingStudent.idioma || '');
       setValue('nivel', editingStudent.nivel || 'none'); // Adicionando campo nivel
       setValue('turma_id', editingStudent.turma_id || '');

@@ -21,18 +21,33 @@ import NewStudentForm from './NewStudentForm';
 interface Student {
   id: string;
   nome: string;
-  email: string;
-  telefone: string;
-  data_nascimento: string;
-  cpf: string;
-  turma_id: string;
+  email: string | null;
+  telefone: string | null;
+  data_nascimento: string | null;
+  cpf: string | null;
+  endereco: string | null;
+  numero_endereco: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  estado: string | null;
+  cep: string | null;
+  idioma: string | null;
+  nivel: string | null;
+  turma_id: string | null;
+  responsavel_id: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  data_cancelamento: string | null;
+  data_conclusao: string | null;
+  data_exclusao: string | null;
 }
 
 interface Class {
   id: string;
   nome: string;
   idioma: string;
-  nivel: string;
+  nivel?: string; // Tornando opcional para alinhar com useStudents.tsx
 }
 
 interface StudentDialogProps {

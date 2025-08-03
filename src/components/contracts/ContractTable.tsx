@@ -4,6 +4,7 @@ import { Calendar, User, DollarSign, AlertTriangle } from 'lucide-react';
 import { Contract } from '@/hooks/useContracts';
 import { ContractStatusBadge } from './ContractStatusBadge';
 import { ContractActions } from './ContractActions';
+import { formatDate } from '@/utils/formatters';
 
 interface ContractTableProps {
   contracts: Contract[];
@@ -108,10 +109,10 @@ export const ContractTable = ({
                   </span>
                 </TableCell>
                 <TableCell className="text-base">
-                  {new Date(contract.data_inicio).toLocaleDateString('pt-BR')}
+                  {formatDate(contract.data_inicio)}
                 </TableCell>
                 <TableCell className="text-base">
-                  {new Date(contract.data_fim).toLocaleDateString('pt-BR')}
+                  {formatDate(contract.data_fim)}
                 </TableCell>
                 <TableCell>
                   <ContractStatusBadge contract={contract} />

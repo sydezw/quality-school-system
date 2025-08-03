@@ -268,6 +268,34 @@ export const useParcelas = () => {
     }
   };
 
+  // Função para excluir múltiplas parcelas
+  const excluirMultiplasParcelas = async (ids: number[]) => {
+    try {
+      const { error } = await supabase
+        .from('parcelas_alunos')
+        .delete()
+        .in('id', ids);
+      
+      if (error) throw error;
+      
+      toast({
+        title: 'Sucesso',
+        description: `${ids.length} parcela(s) excluída(s) com sucesso!`
+      });
+      
+      // Recarregar lista
+      await fetchParcelas();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao excluir parcelas';
+      toast({
+        title: 'Erro',
+        description: errorMessage,
+        variant: 'destructive'
+      });
+      throw err;
+    }
+  };
+
   // Carregar parcelas na inicialização
   useEffect(() => {
     fetchParcelas();
@@ -280,6 +308,7 @@ export const useParcelas = () => {
     fetchParcelas,
     marcarComoPago,
     excluirParcela,
+    excluirMultiplasParcelas,
     calcularStatusAutomatico
   };
 };

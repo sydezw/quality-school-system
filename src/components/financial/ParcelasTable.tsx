@@ -26,8 +26,8 @@ import {
   RotateCcw,
   FilterX
 } from 'lucide-react';
-import { useParcelas } from '@/hooks/useParcelas';
-import { useToast } from '@/hooks/use-toast';
+import { useParcelas, ParcelaComDetalhes } from '@/hooks/useParcelas';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import FinancialPlanForm from './FinancialPlanForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -43,6 +43,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import FinancialPlanDialog from './FinancialPlanDialog';
 import { Student } from '@/types/shared';
 import { formatarFormaPagamento } from '@/utils/formatters';
+import { useMultipleSelection } from '@/hooks/useMultipleSelection';
+import { MultipleSelectionBar } from '@/components/shared/MultipleSelectionBar';
+import { SelectionCheckbox } from '@/components/shared/SelectionCheckbox';
+import { ConfirmDeleteModal } from '@/components/shared/ConfirmDeleteModal';
 
 interface Parcela {
   id: number;
@@ -88,19 +92,17 @@ const ParcelasTable: React.FC = () => {
   // Estado para controlar se os filtros avançados estão expandidos
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
   
-  const { toast } = useToast();
+  // Estado para o modal de confirmação de exclusão
+  const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Função para aplicar filtro automático inicial (apenas na primeira vez)
   useEffect(() => {
     if (isInitialLoad) {
-      toast({
-        title: "🎯 Filtro automático aplicado",
-        description: "Mostrando apenas parcelas pendentes e vencidas até hoje.",
-        duration: 4000,
-      });
+      toast.success("🎯 Filtro automático aplicado - Mostrando apenas parcelas pendentes e vencidas até hoje.");
       setIsInitialLoad(false);
     }
-  }, [isInitialLoad, toast]);
+  }, [isInitialLoad]);
 
   // Funções para gerenciar filtros múltiplos
   const handleStatusFilterChange = (status: string, checked: boolean) => {
@@ -125,6 +127,7 @@ const ParcelasTable: React.FC = () => {
     fetchParcelas,
     marcarComoPago,
     excluirParcela,
+    excluirMultiplasParcelas,
     calcularStatusAutomatico
   } = useParcelas();
 
@@ -141,11 +144,7 @@ const ParcelasTable: React.FC = () => {
       if (studentsError) throw studentsError;
 
       if (!students || students.length === 0) {
-        toast({
-          title: "Nenhum aluno encontrado",
-          description: "Não há alunos ativos para criar plano de pagamento.",
-          variant: "destructive",
-        });
+        toast.error("Nenhum aluno encontrado - Não há alunos ativos para criar plano de pagamento.");
         return;
       }
 
@@ -160,11 +159,7 @@ const ParcelasTable: React.FC = () => {
       const studentsWithoutPlans = students.filter(student => !studentsWithPlans.has(student.id));
 
       if (studentsWithoutPlans.length === 0) {
-        toast({
-          title: "Todos os alunos já possuem planos",
-          description: "Todos os alunos ativos já possuem planos de pagamento criados.",
-          variant: "destructive",
-        });
+        toast.error("Todos os alunos já possuem planos - Todos os alunos ativos já possuem planos de pagamento criados.");
         return;
       }
 
@@ -172,17 +167,10 @@ const ParcelasTable: React.FC = () => {
       setSelectedStudentForPlan(null);
       setIsFinancialPlanDialogOpen(true);
       
-      toast({
-        title: "Modal de criação aberto",
-        description: `${studentsWithoutPlans.length} aluno(s) disponível(is) para criar plano.`,
-      });
+      toast.success(`Modal de criação aberto - ${studentsWithoutPlans.length} aluno(s) disponível(is) para criar plano.`);
     } catch (error) {
       console.error('Erro ao verificar alunos:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao verificar alunos disponíveis.",
-        variant: "destructive",
-      });
+      toast.error("Erro ao verificar alunos disponíveis.");
     }
   };
 
@@ -190,6 +178,52 @@ const ParcelasTable: React.FC = () => {
     fetchParcelas(); // Atualizar a lista de parcelas
     setIsFinancialPlanDialogOpen(false);
     setSelectedStudentForPlan(null);
+  };
+
+  // Função para lidar com exclusão (individual ou múltipla)
+  const handleDelete = async (parcela: ParcelaComDetalhes) => {
+    if (isSelectionMode) {
+      // Se estamos no modo de seleção, adicionar/remover da seleção
+      toggleSelection(parcela);
+    } else {
+      // Se não estamos no modo de seleção, entrar no modo e selecionar esta parcela
+      enterSelectionMode();
+      toggleSelection(parcela);
+    }
+  };
+
+  // Função para confirmar exclusão múltipla
+  const handleConfirmMultipleDelete = () => {
+    const selectedParcelas = getSelectedItems();
+    if (selectedParcelas.length === 0) return;
+    
+    setIsConfirmDeleteModalOpen(true);
+  };
+
+  // Função para executar a exclusão após confirmação
+  const executeDelete = async () => {
+    const selectedParcelas = getSelectedItems();
+    if (selectedParcelas.length === 0) return;
+
+    try {
+      setIsDeleting(true);
+      
+      if (selectedParcelas.length === 1) {
+        await excluirParcela(selectedParcelas[0].id);
+      } else {
+        await excluirMultiplasParcelas(selectedParcelas.map(p => p.id));
+      }
+      
+      exitSelectionMode();
+      setIsConfirmDeleteModalOpen(false);
+      
+      toast.success(`Exclusão realizada - ${selectedParcelas.length} parcela(s) excluída(s) com sucesso.`);
+    } catch (error) {
+      console.error('Erro ao excluir parcelas:', error);
+      toast.error("Erro na exclusão - Ocorreu um erro ao excluir as parcelas.");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // Função para calcular o número da parcela por tipo de item
@@ -267,11 +301,7 @@ const ParcelasTable: React.FC = () => {
     setIdiomaFilter('todos');
     setCurrentPage(1);
     
-    toast({
-      title: "🔄 Filtros resetados",
-      description: "Filtros voltaram ao padrão inicial (pendentes/vencidas até hoje).",
-      duration: 3000,
-    });
+    toast.success("🔄 Filtros resetados - Filtros voltaram ao padrão inicial (pendentes/vencidas até hoje).");
   };
 
   // Função para limpar todos os filtros
@@ -284,11 +314,7 @@ const ParcelasTable: React.FC = () => {
     setIdiomaFilter('todos');
     setCurrentPage(1);
     
-    toast({
-      title: "🧹 Todos os filtros removidos",
-      description: "Mostrando todas as parcelas sem filtros.",
-      duration: 3000,
-    });
+    toast.success("🧹 Todos os filtros removidos - Mostrando todas as parcelas sem filtros.");
   };
 
   // Verificar se filtros estão no estado inicial
@@ -321,6 +347,21 @@ const ParcelasTable: React.FC = () => {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+
+  // Hook para seleção múltipla
+  const {
+    selectedItems,
+    isSelectionMode,
+    toggleSelection,
+    selectAll,
+    clearSelection,
+    enterSelectionMode,
+    exitSelectionMode,
+    getSelectedItems
+  } = useMultipleSelection<ParcelaComDetalhes>({
+    items: parcelas,
+    getItemId: (parcela) => parcela.id
+  });
 
   // DEBUG: Logs para diagnosticar
   console.log('=== DEBUG PAGINAÇÃO PARCELAS ===');
@@ -837,6 +878,20 @@ const ParcelasTable: React.FC = () => {
                   <Table className="w-full min-w-[1200px]">
                     <TableHeader>
                       <TableRow className="bg-gray-50 hover:bg-gray-50">
+                        {isSelectionMode && (
+                          <TableHead className="font-bold w-12" style={{color: '#6B7280'}}>
+                            <SelectionCheckbox
+                              isSelected={selectedItems.size === parcelas.length && parcelas.length > 0}
+                              onChange={() => {
+                                if (selectedItems.size === parcelas.length) {
+                                  clearSelection();
+                                } else {
+                                  selectAll();
+                                }
+                              }}
+                            />
+                          </TableHead>
+                        )}
                         <TableHead className="font-bold w-20" style={{color: '#6B7280'}}>ID</TableHead>
               <TableHead className="font-bold min-w-[180px]" style={{color: '#6B7280'}}>Aluno</TableHead>
               <TableHead className="font-bold min-w-[150px]" style={{color: '#6B7280'}}>Plano</TableHead>
@@ -861,8 +916,16 @@ const ParcelasTable: React.FC = () => {
                               key={parcela.id}
                               className={`border-b hover:bg-gray-50/50 transition-colors ${
                                 index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
-                              }`}
+                              } ${selectedItems.has(parcela.id) ? 'bg-blue-50' : ''}`}
                             >
+                              {isSelectionMode && (
+                                <TableCell>
+                                  <SelectionCheckbox
+                                    isSelected={selectedItems.has(parcela.id)}
+                                    onChange={() => toggleSelection(parcela)}
+                                  />
+                                </TableCell>
+                              )}
                               <TableCell className="font-mono text-base text-gray-600">
                                 #{parcela.id}
                               </TableCell>
@@ -956,11 +1019,7 @@ const ParcelasTable: React.FC = () => {
                                     <Button
                                       size="sm"
                                       variant="outline"
-                                      onClick={() => {
-                                        if (window.confirm('Tem certeza que deseja excluir esta parcela? Esta ação não pode ser desfeita.')) {
-                                          excluirParcela(parcela.id);
-                                        }
-                                      }}
+                                      onClick={() => handleDelete(parcela)}
                                       className="hover:bg-red-50" style={{borderColor: '#FECACA', color: '#D90429'}} onMouseEnter={(e) => (e.target as HTMLElement).style.borderColor = '#FCA5A5'} onMouseLeave={(e) => (e.target as HTMLElement).style.borderColor = '#FECACA'}
                                     >
                                       <Trash2 className="h-4 w-4" />
@@ -979,6 +1038,22 @@ const ParcelasTable: React.FC = () => {
             </CardContent>
           </Card>
         </motion.div>
+
+        {/* Barra de Seleção Múltipla */}
+        {isSelectionMode && (
+          <MultipleSelectionBar
+            isVisible={isSelectionMode}
+            selectedCount={selectedItems.size}
+            totalItems={parcelas.length}
+            onSelectAll={selectAll}
+            onClearSelection={clearSelection}
+            onDelete={handleConfirmMultipleDelete}
+            onCancel={exitSelectionMode}
+            itemName="parcelas"
+            deleteButtonText="Excluir Selecionadas"
+            isAllSelected={selectedItems.size === parcelas.length && parcelas.length > 0}
+          />
+        )}
 
         {/* Contador de Registros */}
         {parcelasFiltradas.length > 0 && (
@@ -1195,6 +1270,16 @@ const ParcelasTable: React.FC = () => {
           />
         </DialogContent>
       </Dialog>
+
+      {/* Modal de confirmação de exclusão */}
+      <ConfirmDeleteModal
+        isOpen={isConfirmDeleteModalOpen}
+        onClose={() => setIsConfirmDeleteModalOpen(false)}
+        onConfirm={executeDelete}
+        itemCount={getSelectedItems().length}
+        itemName="parcela"
+        isLoading={isDeleting}
+      />
     </>
   );
 };

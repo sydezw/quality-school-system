@@ -21,7 +21,7 @@ const AddressFields = ({ control, setValue }: AddressFieldsProps) => {
   // Usar useWatch para capturar os valores atuais do formulário
   const cep = useWatch({ control, name: 'cep' });
   const endereco = useWatch({ control, name: 'endereco' });
-  const numero = useWatch({ control, name: 'numero' });
+  const numero = useWatch({ control, name: 'numero_endereco' });
   const bairro = useWatch({ control, name: 'bairro' });
   const cidade = useWatch({ control, name: 'cidade' });
   const estado = useWatch({ control, name: 'estado' });
@@ -79,7 +79,7 @@ const AddressFields = ({ control, setValue }: AddressFieldsProps) => {
     const addressData = {
       cep: cep || '',
       endereco: endereco || '',
-      numero: numero || '',
+      numero_endereco: numero || '',
       bairro: bairro || '',
       cidade: cidade || '',
       estado: estado || ''
@@ -236,11 +236,10 @@ const AddressFields = ({ control, setValue }: AddressFieldsProps) => {
           />
         </div>
 
-        {/* Número */}
         <div className="bg-white p-6 rounded-xl border-2 border-gray-100 hover:border-emerald-200 transition-all duration-300 shadow-sm hover:shadow-md">
           <FormField
             control={control}
-            name="numero"
+            name="numero_endereco"
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-sm font-bold text-gray-700 flex items-center gap-3 mb-4">

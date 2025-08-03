@@ -9,7 +9,7 @@ interface Class {
   id: string;
   nome: string;
   idioma: string;
-  nivel: string;
+  nivel?: string;
 }
 
 interface AcademicFieldsProps {
@@ -100,7 +100,7 @@ const AcademicFields = ({ control, classes, selectedIdioma, setValue }: Academic
                 { value: "none", label: "Sem turma" },
                 ...filteredClasses.map((cls) => ({
                   value: cls.id,
-                  label: `${cls.nome} - ${cls.nivel}`
+                  label: `${cls.nome} - ${cls.nivel || 'Sem nível'}`
                 }))
               ]}
               onChange={field.onChange}
@@ -135,7 +135,7 @@ const AcademicFields = ({ control, classes, selectedIdioma, setValue }: Academic
               <StudentSelectField
                 value={field.value || 'none'}
                 label="Nível"
-                placeholder={turmaSelecionada ? `Nível da turma: ${turmaSelecionada.nivel}` : "Selecione o nível"}
+                placeholder={turmaSelecionada ? `Nível da turma: ${turmaSelecionada.nivel || 'Sem nível'}` : "Selecione o nível"}
                 options={[
                   { value: "none", label: "Sem nível definido" },
                   { value: "Book 1", label: "Book 1" },

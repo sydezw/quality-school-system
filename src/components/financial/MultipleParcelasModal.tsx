@@ -36,17 +36,26 @@ interface MultipleParcelasModalProps {
   onClose: () => void;
   aluno: Aluno | null;
   onSuccess: () => void;
+  initialTab?: 'single' | 'multiple'; // Nova prop para definir a tab inicial
 }
 
 export const MultipleParcelasModal: React.FC<MultipleParcelasModalProps> = ({
   isOpen,
   onClose,
   aluno,
-  onSuccess
+  onSuccess,
+  initialTab = 'single' // Valor padrão é 'single'
 }) => {
-  const [activeTab, setActiveTab] = useState<'single' | 'multiple'>('single');
+  const [activeTab, setActiveTab] = useState<'single' | 'multiple'>(initialTab);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+
+  // Atualizar a tab ativa quando initialTab mudar
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   // Estados para parcela única
   const [singleParcela, setSingleParcela] = useState<NovaParcelaForm>({
@@ -188,7 +197,7 @@ export const MultipleParcelasModal: React.FC<MultipleParcelasModalProps> = ({
         valor: valorPorParcela,
         data_vencimento: data,
         status_pagamento: 'pendente' as const,
-        idioma_registro: 'Inglês',
+        idioma_registro: 'Inglês' as const,
         descricao_item: multipleParcelas.descricao_item || null,
         observacoes: multipleParcelas.observacoes || null,
         forma_pagamento: multipleParcelas.forma_pagamento
@@ -227,7 +236,7 @@ export const MultipleParcelasModal: React.FC<MultipleParcelasModalProps> = ({
       valor: 0,
       data_vencimento: '',
       status_pagamento: 'pendente',
-      idioma_registro: 'Inglês',
+      idioma_registro: 'Inglês' as const,
       descricao_item: '',
       observacoes: '',
       forma_pagamento: 'boleto'
@@ -369,7 +378,10 @@ export const MultipleParcelasModal: React.FC<MultipleParcelasModalProps> = ({
                 <Button 
                   onClick={criarParcelaUnica}
                   disabled={loading}
-                  className="transition-all duration-200" style={{background: 'linear-gradient(to right, #D90429, #1F2937)'}} onMouseEnter={(e) => e.target.style.background = 'linear-gradient(to right, #B91C1C, #111827)'} onMouseLeave={(e) => e.target.style.background = 'linear-gradient(to right, #D90429, #1F2937)'}
+                  className="transition-all duration-200" 
+                  style={{background: 'linear-gradient(to right, #D90429, #1F2937)'}} 
+                  onMouseEnter={(e) => (e.target as HTMLElement).style.background = 'linear-gradient(to right, #B91C1C, #111827)'} 
+                  onMouseLeave={(e) => (e.target as HTMLElement).style.background = 'linear-gradient(to right, #D90429, #1F2937)'}
                 >
                   {loading ? 'Criando...' : 'Criar Parcela'}
                 </Button>
@@ -522,7 +534,10 @@ export const MultipleParcelasModal: React.FC<MultipleParcelasModalProps> = ({
                 <Button 
                   onClick={criarMultiplasParcelas}
                   disabled={loading}
-                  className="transition-all duration-200" style={{background: 'linear-gradient(to right, #D90429, #1F2937)'}} onMouseEnter={(e) => e.target.style.background = 'linear-gradient(to right, #B91C1C, #111827)'} onMouseLeave={(e) => e.target.style.background = 'linear-gradient(to right, #D90429, #1F2937)'}
+                  className="transition-all duration-200" 
+                  style={{background: 'linear-gradient(to right, #D90429, #1F2937)'}} 
+                  onMouseEnter={(e) => (e.target as HTMLElement).style.background = 'linear-gradient(to right, #B91C1C, #111827)'} 
+                  onMouseLeave={(e) => (e.target as HTMLElement).style.background = 'linear-gradient(to right, #D90429, #1F2937)'}
                 >
                   {loading ? 'Criando...' : `Criar ${multipleParcelas.quantidade} Parcelas`}
                 </Button>

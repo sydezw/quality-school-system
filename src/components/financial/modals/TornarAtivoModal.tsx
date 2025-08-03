@@ -161,7 +161,22 @@ export const TornarAtivoModal: React.FC<TornarAtivoModalProps> = ({
       descontoCalculado = 0; // Não há desconto, está pagando extra
     }
     
-    const valorTotalGeral = valorAPagar + valorMatricula + valorMaterial;
+    const valorTotalGeral = (() => {
+      const tipoValor = planoSelecionado?.tipo_valor;
+      let total = valorAPagar; // Valor do plano já com desconto aplicado
+      
+      // Adicionar material apenas se não estiver incluído no plano
+      if (tipoValor !== 'plano_material' && tipoValor !== 'plano_completo') {
+        total += valorMaterial;
+      }
+      
+      // Adicionar matrícula apenas se não estiver incluída no plano
+      if (tipoValor !== 'plano_matricula' && tipoValor !== 'plano_completo') {
+        total += valorMatricula;
+      }
+      
+      return total;
+    })();
   
     return {
       valorPlano: valorTotalPlano,
@@ -1016,17 +1031,35 @@ export const TornarAtivoModal: React.FC<TornarAtivoModalProps> = ({
                         const planoSelecionado = planosGenericos.find(p => p.id === watchedValues.plano_id);
                         const valorMatricula = parseFloat(watchedValues.valor_matricula) || 0;
                         const valorMaterial = parseFloat(watchedValues.valor_material) || 0;
-                        const totalBruto = calculatedValues.valorPlano + valorMatricula + valorMaterial;
-                        const resultado = totalBruto - calculatedValues.descontoCalculado;
+                        const tipoValor = planoSelecionado?.tipo_valor;
+                        
+                        // Calcular valor total correto baseado no tipo_valor do plano
+                        let resultado = calculatedValues.valorAPagar; // Valor do plano já com desconto aplicado
+                        
+                        // Adicionar material apenas se não estiver incluído no plano
+                        if (tipoValor !== 'plano_material' && tipoValor !== 'plano_completo') {
+                          resultado += valorMaterial;
+                        }
+                        
+                        // Adicionar matrícula apenas se não estiver incluída no plano
+                        if (tipoValor !== 'plano_matricula' && tipoValor !== 'plano_completo') {
+                          resultado += valorMatricula;
+                        }
                         
                         return (
                           <div className="space-y-2">
-                            <p>{planoSelecionado?.nome?.toLowerCase()} : R$ {formatarDecimalBR(calculatedValues.valorPlano)}</p>
-                            {valorMatricula > 0 && (
+                            <p>{planoSelecionado?.nome?.toLowerCase()} : R$ {formatarDecimalBR(calculatedValues.valorAPagar)}</p>
+                            {valorMatricula > 0 && (tipoValor !== 'plano_matricula' && tipoValor !== 'plano_completo') && (
                               <p>Taxa de Matrícula : R$ {formatarDecimalBR(valorMatricula)}</p>
                             )}
-                            {valorMaterial > 0 && (
+                            {valorMatricula > 0 && (tipoValor === 'plano_matricula' || tipoValor === 'plano_completo') && (
+                              <p className="text-green-600">Taxa de Matrícula : Incluída no plano</p>
+                            )}
+                            {valorMaterial > 0 && (tipoValor !== 'plano_material' && tipoValor !== 'plano_completo') && (
                               <p>Materiais : R$ {formatarDecimalBR(valorMaterial)}</p>
+                            )}
+                            {valorMaterial > 0 && (tipoValor === 'plano_material' || tipoValor === 'plano_completo') && (
+                              <p className="text-green-600">Materiais : Incluídos no plano</p>
                             )}
                             {calculatedValues.descontoCalculado > 0 && (
                               <p className="text-green-600">Desconto : R$ -{formatarDecimalBR(calculatedValues.descontoCalculado)}</p>

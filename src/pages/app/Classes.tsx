@@ -18,7 +18,7 @@ interface Class {
   id: string;
   nome: string;
   idioma: string;
-  nivel: string;
+  nivel?: string;
   dias_da_semana: string;
   horario: string;
   professor_id: string | null;

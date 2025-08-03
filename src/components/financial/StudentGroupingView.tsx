@@ -27,12 +27,13 @@ import {
   RefreshCw,
   Users,
   X,
-  ChevronRight
+  ChevronRight,
+  MessageSquare
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -45,11 +46,16 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { criarNovaParcela } from '@/utils/parcelaNumbering';
+import { formatarFormaPagamento } from '@/utils/formatters';
 import { useParcelas } from '@/hooks/useParcelas';
 import { ExcluirRegistroModal } from './modals/ExcluirRegistroModal';
 import { TornarAtivoModal } from './modals/TornarAtivoModal';
 import { MultipleParcelasModal } from './MultipleParcelasModal';
 import FinancialPlanDialog from './FinancialPlanDialog';
+import { useMultipleSelection } from '@/hooks/useMultipleSelection';
+import { MultipleSelectionBar } from '@/components/shared/MultipleSelectionBar';
+import { SelectionCheckbox } from '@/components/shared/SelectionCheckbox';
+import { ConfirmDeleteModal } from '@/components/shared/ConfirmDeleteModal';
 
 interface Aluno {
   id: string;
@@ -73,6 +79,7 @@ interface Aluno {
     id: string;
     nome: string;
     valor_total: number;
+    tipo_valor?: string;
   } | null;
   parcelas: Parcela[];
   registro_financeiro_id: string;
@@ -112,7 +119,6 @@ interface StudentGroupingViewProps {
 }
 
 const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) => {
-  const { toast } = useToast();
   const { marcarComoPago } = useParcelas();
   const [alunos, setAlunos] = useState<Aluno[]>([]);
   const [loading, setLoading] = useState(true);
@@ -144,12 +150,93 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
   const [alunoParaTornarAtivo, setAlunoParaTornarAtivo] = useState<Aluno | null>(null);
   const [isMultipleParcelasModalOpen, setIsMultipleParcelasModalOpen] = useState(false);
   const [selectedAlunoForMultipleParcelas, setSelectedAlunoForMultipleParcelas] = useState<Aluno | null>(null);
+  const [initialTab, setInitialTab] = useState<'single' | 'multiple'>('single');
   const [isFinancialPlanDialogOpen, setIsFinancialPlanDialogOpen] = useState(false);
   const [selectedStudentForPlan, setSelectedStudentForPlan] = useState<any>(null);
   const [isPlanoModalOpen, setIsPlanoModalOpen] = useState(false);
   const [alunoPlanoDetalhes, setAlunoPlanoDetalhes] = useState<Aluno | null>(null);
   const [parcelaPreview, setParcelaPreview] = useState<any>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  
+  // Estados para o modal de confirmação de exclusão múltipla
+  const [isConfirmMultipleDeleteModalOpen, setIsConfirmMultipleDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Hook para seleção múltipla
+  const {
+    selectedItems,
+    isSelectionMode,
+    toggleSelection,
+    selectAll,
+    clearSelection,
+    enterSelectionMode,
+    exitSelectionMode,
+    getSelectedItems
+  } = useMultipleSelection<Parcela>({
+    items: alunos.flatMap(aluno => aluno.parcelas),
+    getItemId: (parcela) => parcela.id
+  });
+
+  // Função para selecionar todas as parcelas de um aluno específico
+  const selectAllForStudent = useCallback((parcelasDoAluno: Parcela[]) => {
+    // Seleciona cada parcela do aluno sem limpar a seleção atual
+    parcelasDoAluno.forEach(parcela => {
+      if (!selectedItems.has(parcela.id)) {
+        toggleSelection(parcela);
+      }
+    });
+  }, [toggleSelection, selectedItems]);
+
+  // Função para verificar se todas as parcelas de um aluno estão selecionadas
+  const areAllStudentParcelasSelected = useCallback((parcelasDoAluno: Parcela[]) => {
+    return parcelasDoAluno.length > 0 && parcelasDoAluno.every(parcela => selectedItems.has(parcela.id));
+  }, [selectedItems]);
+
+  // Função para desselecionar todas as parcelas de um aluno específico
+  const clearSelectionForStudent = useCallback((parcelasDoAluno: Parcela[]) => {
+    parcelasDoAluno.forEach(parcela => {
+      if (selectedItems.has(parcela.id)) {
+        toggleSelection(parcela);
+      }
+    });
+  }, [toggleSelection, selectedItems]);
+
+  // Função para calcular valor total correto baseado no tipo de valor do plano
+  const calcularValorTotalCorreto = (registro: any) => {
+    const valorPlano = registro.valor_plano || 0;
+    const valorMaterial = registro.valor_material || 0;
+    const valorMatricula = registro.valor_matricula || 0;
+    const tipoValor = registro.planos?.tipo_valor;
+
+    let total = valorPlano;
+
+    // Adicionar material apenas se não estiver incluído no plano
+    if (tipoValor !== 'plano_material' && tipoValor !== 'plano_completo') {
+      total += valorMaterial;
+    }
+
+    // Adicionar matrícula apenas se não estiver incluída no plano
+    if (tipoValor !== 'plano_matricula' && tipoValor !== 'plano_completo') {
+      total += valorMatricula;
+    }
+
+    // Não subtrair desconto pois o valor_plano já vem com desconto aplicado
+    return total;
+  };
+
+  // Função para verificar se um item está incluído no plano
+  const isItemIncludedInPlan = (tipoItem: string, tipoValorPlano?: string) => {
+    if (!tipoValorPlano) return false;
+    
+    switch (tipoItem) {
+      case 'material':
+        return tipoValorPlano === 'plano_material' || tipoValorPlano === 'plano_completo';
+      case 'matrícula':
+        return tipoValorPlano === 'plano_matricula' || tipoValorPlano === 'plano_completo';
+      default:
+        return false;
+    }
+  };
 
   // Função para aplicar cores baseadas no tipo de item
   const getItemTypeColor = (tipo: string) => {
@@ -191,7 +278,7 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
   };
 
   // Função para carregar dados
-  const carregarDados = useCallback(async () => {
+  const carregarDados = async () => {
     setLoading(true);
     try {
       const migradoValue = tipoRegistro === 'migrados' ? 'sim' : 'nao';
@@ -221,7 +308,8 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
           planos (
             id,
             nome,
-            valor_total
+            valor_total,
+            tipo_valor
           ),
           parcelas_alunos (
             id,
@@ -247,32 +335,37 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
         throw error;
       }
 
-      const alunosFormatados = alunosData?.map(registro => ({
-        id: registro.alunos?.id || '',
-        nome: registro.alunos?.nome || '',
-        migrado: registro.migrado,
-        plano_id: registro.plano_id,
-        valor_total: (registro.valor_plano || 0) + (registro.valor_material || 0) + (registro.valor_matricula || 0) - (registro.desconto_total || 0),
-        valor_plano: registro.valor_plano,
-        valor_matricula: registro.valor_matricula,
-        valor_material: registro.valor_material,
-        desconto_total: registro.desconto_total,
-        status_geral: registro.status_geral,
-        data_primeiro_vencimento: registro.data_primeiro_vencimento,
-        forma_pagamento_plano: registro.forma_pagamento_plano,
-        forma_pagamento_material: registro.forma_pagamento_material,
-        forma_pagamento_matricula: registro.forma_pagamento_matricula,
-        numero_parcelas_plano: registro.numero_parcelas_plano,
-        numero_parcelas_material: registro.numero_parcelas_material,
-        numero_parcelas_matricula: registro.numero_parcelas_matricula,
-        plano: registro.planos ? {
-          id: registro.planos.id,
-          nome: registro.planos.nome,
-          valor_total: registro.planos.valor_total
-        } : null,
-        parcelas: ordenarParcelasPorTipoENumero(registro.parcelas_alunos || []),
-        registro_financeiro_id: registro.id
-      })) || [];
+      const alunosFormatados = alunosData?.map(registro => {
+        const valorTotalCalculado = calcularValorTotalCorreto(registro);
+        
+        return {
+          id: registro.alunos?.id || '',
+          nome: registro.alunos?.nome || '',
+          migrado: registro.migrado,
+          plano_id: registro.plano_id,
+          valor_total: valorTotalCalculado,
+          valor_plano: registro.valor_plano,
+          valor_matricula: registro.valor_matricula,
+          valor_material: registro.valor_material,
+          desconto_total: registro.desconto_total,
+          status_geral: registro.status_geral,
+          data_primeiro_vencimento: registro.data_primeiro_vencimento,
+          forma_pagamento_plano: registro.forma_pagamento_plano,
+          forma_pagamento_material: registro.forma_pagamento_material,
+          forma_pagamento_matricula: registro.forma_pagamento_matricula,
+          numero_parcelas_plano: registro.numero_parcelas_plano,
+          numero_parcelas_material: registro.numero_parcelas_material,
+          numero_parcelas_matricula: registro.numero_parcelas_matricula,
+          plano: registro.planos ? {
+            id: registro.planos.id,
+            nome: registro.planos.nome,
+            valor_total: registro.planos.valor_total,
+            tipo_valor: registro.planos.tipo_valor
+          } : null,
+          parcelas: ordenarParcelasPorTipoENumero(registro.parcelas_alunos || []),
+          registro_financeiro_id: registro.id
+        };
+      }) || [];
 
       setAlunos(alunosFormatados);
       
@@ -283,19 +376,15 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
       
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar dados dos alunos",
-        variant: "destructive"
-      });
+      toast.error("Erro ao carregar dados dos alunos");
     } finally {
       setLoading(false);
     }
-  }, [tipoRegistro, toast]);
+  };
 
   useEffect(() => {
     carregarDados();
-  }, [carregarDados]);
+  }, [tipoRegistro]);
 
   // Função para formatar data
   const formatDate = (dateString: string) => {
@@ -483,9 +572,17 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
     setIsTornarAtivoModalOpen(true);
   };
 
-  // Função para abrir modal de múltiplas parcelas
+  // Função para abrir modal de parcela avulsa (tab única)
+  const abrirModalParcelaAvulsa = (aluno: Aluno) => {
+    setSelectedAlunoForMultipleParcelas(aluno);
+    setInitialTab('single');
+    setIsMultipleParcelasModalOpen(true);
+  };
+
+  // Função para abrir modal de múltiplas parcelas (tab múltiplas)
   const abrirModalMultiplasParcelas = (aluno: Aluno) => {
     setSelectedAlunoForMultipleParcelas(aluno);
+    setInitialTab('multiple');
     setIsMultipleParcelasModalOpen(true);
   };
 
@@ -502,16 +599,13 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
           data_vencimento: novaParcela.data_vencimento,
           status_pagamento: novaParcela.status_pagamento,
           descricao_item: novaParcela.descricao_item,
-          idioma_registro: novaParcela.idioma_registro,
+          idioma_registro: novaParcela.idioma_registro as "Inglês" | "Japonês",
           forma_pagamento: novaParcela.forma_pagamento
         }
       );
 
       if (parcelaCriada) {
-        toast({
-          title: "Sucesso",
-          description: "Parcela criada com sucesso!",
-        });
+        toast.success("Parcela criada com sucesso!");
         setNovaParcela(null);
         setIsCreateModalOpen(false);
         await carregarDados();
@@ -520,11 +614,7 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
       }
     } catch (error) {
       console.error('Erro ao criar parcela:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao criar parcela",
-        variant: "destructive"
-      });
+      toast.error("Erro ao criar parcela");
     }
   };
 
@@ -536,7 +626,7 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
       const { error } = await supabase
         .from('parcelas_alunos')
         .update({
-          tipo_item: editandoParcela.tipo_item,
+          tipo_item: editandoParcela.tipo_item as "material" | "cancelamento" | "plano" | "matrícula" | "outros",
           numero_parcela: editandoParcela.numero_parcela,
           valor: editandoParcela.valor,
           data_vencimento: editandoParcela.data_vencimento,
@@ -549,21 +639,14 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
 
       if (error) throw error;
 
-      toast({
-        title: "Sucesso",
-        description: "Parcela atualizada com sucesso!"
-      });
+      toast.success("Parcela atualizada com sucesso!");
 
       setIsEditModalOpen(false);
       setEditandoParcela(null);
       carregarDados();
     } catch (error) {
       console.error('Erro ao atualizar parcela:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao atualizar parcela",
-        variant: "destructive"
-      });
+      toast.error("Erro ao atualizar parcela");
     }
   }, [editandoParcela, toast, carregarDados]);
 
@@ -577,10 +660,7 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
 
       if (error) throw error;
 
-      toast({
-        title: "Sucesso",
-        description: "Parcela excluída com sucesso!"
-      });
+      toast.success("Parcela excluída com sucesso!");
 
       setIsConfirmDeleteModalOpen(false);
       setParcelaParaExcluir(null);
@@ -588,13 +668,73 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
       carregarDados();
     } catch (error) {
       console.error('Erro ao excluir parcela:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao excluir parcela",
-        variant: "destructive"
-      });
+      toast.error("Erro ao excluir parcela");
     }
   }, [toast, carregarDados]);
+
+  // Função para excluir múltiplas parcelas
+  const excluirMultiplasParcelas = useCallback(async (parcelaIds: number[]) => {
+    try {
+      const { error } = await supabase
+        .from('parcelas_alunos')
+        .delete()
+        .in('id', parcelaIds);
+
+      if (error) throw error;
+
+      toast.success(`${parcelaIds.length} parcela(s) excluída(s) com sucesso!`);
+
+      carregarDados();
+    } catch (error) {
+      console.error('Erro ao excluir parcelas:', error);
+      toast.error("Erro ao excluir parcelas");
+    }
+  }, [toast, carregarDados]);
+
+  // Função para lidar com exclusão (individual ou múltipla)
+  const handleDelete = async (parcela: Parcela) => {
+    if (!isSelectionMode) {
+      // Modo individual - entrar no modo de seleção
+      enterSelectionMode();
+      toggleSelection(parcela);
+    } else {
+      // Modo de seleção - adicionar/remover da seleção
+      toggleSelection(parcela);
+    }
+  };
+
+  // Função para confirmar exclusão múltipla
+  const handleConfirmMultipleDelete = async () => {
+    const selectedParcelas = getSelectedItems();
+    if (selectedParcelas.length === 0) return;
+
+    setIsConfirmMultipleDeleteModalOpen(true);
+  };
+
+  // Função para executar a exclusão
+  const executeDelete = async () => {
+    const selectedParcelas = getSelectedItems();
+    if (selectedParcelas.length === 0) return;
+
+    setIsDeleting(true);
+    
+    try {
+      if (selectedParcelas.length === 1) {
+        await excluirParcela(selectedParcelas[0].id);
+      } else {
+        await excluirMultiplasParcelas(selectedParcelas.map(p => p.id));
+      }
+      
+      exitSelectionMode();
+      toast.success(`${selectedParcelas.length} parcela(s) excluída(s) com sucesso!`);
+    } catch (error) {
+      console.error('Erro ao excluir parcelas:', error);
+      toast.error('Erro ao excluir parcelas. Tente novamente.');
+    } finally {
+      setIsDeleting(false);
+      setIsConfirmMultipleDeleteModalOpen(false);
+    }
+  };
 
   // Função para cancelar exclusão
   const cancelarExclusao = useCallback(() => {
@@ -1172,6 +1312,21 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
                                    <Table>
                                      <TableHeader>
                                        <TableRow className="bg-[#D90429] hover:bg-[#1F2937]">
+                                         {isSelectionMode && (
+                                           <TableHead className="font-semibold text-white w-12">
+                                             <SelectionCheckbox
+                               isSelected={areAllStudentParcelasSelected(aluno.parcelas)}
+                               onChange={() => {
+                                 if (areAllStudentParcelasSelected(aluno.parcelas)) {
+                                   clearSelectionForStudent(aluno.parcelas);
+                                 } else {
+                                   selectAllForStudent(aluno.parcelas);
+                                 }
+                               }}
+                               size="sm"
+                             />
+                                           </TableHead>
+                                         )}
                                          <TableHead className="font-semibold text-white">
                                            <div className="flex items-center space-x-2">
                                              <FileText className="h-4 w-4" />
@@ -1207,6 +1362,18 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
                                              <span>Forma de Pagamento</span>
                                            </div>
                                          </TableHead>
+                                         <TableHead className="font-semibold text-white min-w-[150px]">
+                                           <div className="flex items-center space-x-2">
+                                             <FileText className="h-4 w-4" />
+                                             <span>Descrição do Item</span>
+                                           </div>
+                                         </TableHead>
+                                         <TableHead className="font-semibold text-white min-w-[200px]">
+                                           <div className="flex items-center space-x-2">
+                                             <MessageSquare className="h-4 w-4" />
+                                             <span>Observações</span>
+                                           </div>
+                                         </TableHead>
                                          {tipoRegistro === 'ativos' && (
                                            <TableHead className="font-semibold text-white">
                                              <div className="flex items-center space-x-2">
@@ -1223,30 +1390,41 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
                                            initial={{ opacity: 0, x: -20 }}
                                            animate={{ opacity: 1, x: 0 }}
                                            transition={{ duration: 0.3, delay: parcelaIndex * 0.05 }}
-                                           className="hover:bg-[#F9FAFB] hover:bg-opacity-50 transition-colors"
+                                           className={`hover:bg-[#F9FAFB] hover:bg-opacity-50 transition-colors ${
+                                             selectedItems.has(parcela.id) ? 'bg-blue-50' : ''
+                                           }`}
                                          >
+                                           {isSelectionMode && (
+                                             <TableCell className="py-3">
+                                               <SelectionCheckbox
+                                                 isSelected={selectedItems.has(parcela.id)}
+                                                 onChange={() => toggleSelection(parcela)}
+                                                 size="sm"
+                                               />
+                                             </TableCell>
+                                           )}
                                            <TableCell className="py-3">
                                              <div className="flex items-center space-x-2">
                                                <div className={getItemTypeColor(parcela.tipo_item)}>
                                                  {getTipoIcon(parcela.tipo_item)}
                                                </div>
-                                               <span className={`font-medium capitalize ${getItemTypeColor(parcela.tipo_item)}`}>
+                                               <span className={`font-medium capitalize text-base ${getItemTypeColor(parcela.tipo_item)}`}>
                                                  {parcela.tipo_item}
                                                </span>
                                              </div>
                                            </TableCell>
                                            <TableCell className="py-3">
-                                             <Badge className="bg-[#6B7280] bg-opacity-10 text-[#6B7280] border-[#6B7280] border-opacity-30">
+                                             <Badge className="bg-[#6B7280] bg-opacity-10 text-[#6B7280] border-[#6B7280] border-opacity-30 text-base">
                                                {parcela.numero_parcela}
                                              </Badge>
                                            </TableCell>
                                            <TableCell className="py-3">
-                                             <span className="font-semibold text-[#1F2937]">
+                                             <span className="font-semibold text-[#1F2937] text-base">
                                                {formatCurrency(parcela.valor)}
                                              </span>
                                            </TableCell>
                                            <TableCell className="py-3">
-                                             <span className="text-[#6B7280]">
+                                             <span className="text-[#6B7280] text-base">
                                                {formatDate(parcela.data_vencimento)}
                                              </span>
                                            </TableCell>
@@ -1256,18 +1434,41 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
                                                {parcela.status_pagamento === 'pendente' && <Clock className="h-3 w-3 mr-1" />}
                                                {parcela.status_pagamento === 'vencido' && <AlertTriangle className="h-3 w-3 mr-1" />}
                                                {parcela.status_pagamento === 'cancelado' && <XCircle className="h-3 w-3 mr-1" />}
-                                               <span className="capitalize font-medium">{parcela.status_pagamento}</span>
+                                               <span className="capitalize font-medium text-base">{parcela.status_pagamento}</span>
                                              </Badge>
                                            </TableCell>
                                            <TableCell className="py-3">
                                              <div className="flex items-center space-x-2">
                                                {getFormaPagamentoParcela(parcela, aluno) === 'pix' && <Smartphone className="h-4 w-4 text-green-600" />}
-                                               {getFormaPagamentoParcela(parcela, aluno) === 'cartao' && <CreditCard className="h-4 w-4 text-blue-600" />}
+                                               {getFormaPagamentoParcela(parcela, aluno) === 'cartao_credito' && <CreditCard className="h-4 w-4 text-blue-600" />}
+                                               {getFormaPagamentoParcela(parcela, aluno) === 'cartao_debito' && <CreditCard className="h-4 w-4 text-blue-600" />}
                                                {getFormaPagamentoParcela(parcela, aluno) === 'boleto' && <FileText className="h-4 w-4 text-orange-600" />}
                                                {getFormaPagamentoParcela(parcela, aluno) === 'dinheiro' && <DollarSign className="h-4 w-4 text-green-600" />}
-                                               <span className="text-[#6B7280] capitalize">
-                                                 {getFormaPagamentoParcela(parcela, aluno)}
+                                               <span className="text-[#6B7280] text-base">
+                                                 {formatarFormaPagamento(getFormaPagamentoParcela(parcela, aluno))}
                                                </span>
+                                             </div>
+                                           </TableCell>
+                                           <TableCell className="py-3 max-w-xs">
+                                             <div className="text-base text-gray-600">
+                                               {parcela.descricao_item ? (
+                                                 <div className="truncate" title={parcela.descricao_item}>
+                                                   {parcela.descricao_item}
+                                                 </div>
+                                               ) : (
+                                                 <span className="text-gray-400 italic">-</span>
+                                               )}
+                                             </div>
+                                           </TableCell>
+                                           <TableCell className="py-3 max-w-xs">
+                                             <div className="text-base text-gray-600">
+                                               {parcela.observacoes ? (
+                                                 <div className="truncate" title={parcela.observacoes}>
+                                                   {parcela.observacoes}
+                                                 </div>
+                                               ) : (
+                                                 <span className="text-gray-400 italic">-</span>
+                                               )}
                                              </div>
                                            </TableCell>
                                            {tipoRegistro === 'ativos' && (
@@ -1281,7 +1482,7 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
                                                          whileTap={{ scale: 0.9 }}
                                                          onClick={(e) => {
                                                            e.stopPropagation();
-                                                           marcarComoPago(parcela.id, carregarDados, toast);
+                                                           marcarComoPago(parcela.id);
                                                          }}
                                                          className="p-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
                                                        >
@@ -1315,7 +1516,7 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
                                                      <motion.button
                                                        whileHover={{ scale: 1.1 }}
                                                        whileTap={{ scale: 0.9 }}
-                                                       onClick={(e) => handleButtonClick(() => abrirConfirmacaoExclusao(parcela), e)}
+                                                       onClick={(e) => handleButtonClick(() => handleDelete(parcela), e)}
                                                        className="p-2 rounded-lg bg-[#D90429] bg-opacity-10 text-[#D90429] hover:bg-[#D90429] hover:bg-opacity-20 transition-colors"
                                                      >
                                                        <Trash2 className="h-4 w-4" />
@@ -1337,18 +1538,15 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
                                    {tipoRegistro === 'ativos' && (
                                      <div className="p-6 bg-[#F9FAFB] border-t border-[#6B7280] border-opacity-20">
                                        <div className="flex flex-wrap gap-3">
-                                         {['plano', 'material', 'matrícula', 'cancelamento', 'outros'].map((tipo) => (
-                                           <motion.button
-                                             key={tipo}
-                                             whileHover={{ scale: 1.05 }}
-                                             whileTap={{ scale: 0.95 }}
-                                             onClick={() => abrirModalCriarParcela(aluno.id, aluno.nome, aluno.registro_financeiro_id, tipo as any)}
-                                             className="bg-[#D90429] hover:bg-[#1F2937] text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 shadow-md"
-                                           >
-                                             {getTipoIcon(tipo)}
-                                             <span className="capitalize">+ {tipo}</span>
-                                           </motion.button>
-                                         ))}
+                                         <motion.button
+                                           whileHover={{ scale: 1.05 }}
+                                           whileTap={{ scale: 0.95 }}
+                                           onClick={() => abrirModalParcelaAvulsa(aluno)}
+                                           className="bg-[#D90429] hover:bg-[#1F2937] text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 shadow-md"
+                                         >
+                                           <Plus className="h-4 w-4" />
+                                           <span>Parcela Avulsa</span>
+                                         </motion.button>
                                          
                                          <motion.button
                                            whileHover={{ scale: 1.05 }}
@@ -1357,7 +1555,7 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
                                            className="bg-[#D90429] hover:bg-[#1F2937] text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 shadow-md"
                                          >
                                            <Plus className="h-4 w-4" />
-                                           <span>Múltiplas Parcelas</span>
+                                           <span>Parcelas Múltiplas</span>
                                          </motion.button>
                                        </div>
                                      </div>
@@ -1673,25 +1871,45 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
                        <h4 className="font-semibold text-[#D90429] mb-2">Plano</h4>
                        <p className="text-[#6B7280] text-sm">Valor: {formatCurrency(alunoPlanoDetalhes.valor_plano)}</p>
                        <p className="text-[#6B7280] text-sm">Parcelas: {alunoPlanoDetalhes.numero_parcelas_plano || 1}</p>
-                       <p className="text-[#6B7280] text-sm">Forma: {alunoPlanoDetalhes.forma_pagamento_plano || 'boleto'}</p>
+                       <p className="text-[#6B7280] text-sm">Forma: {formatarFormaPagamento(alunoPlanoDetalhes.forma_pagamento_plano || 'boleto')}</p>
                      </div>
                    )}
                    
-                   {alunoPlanoDetalhes.valor_material && (
+                   {((alunoPlanoDetalhes.valor_material !== undefined && alunoPlanoDetalhes.valor_material !== null && alunoPlanoDetalhes.valor_material > 0) || isItemIncludedInPlan('material', alunoPlanoDetalhes.plano?.tipo_valor)) && (
                      <div className="p-4 border border-[#6B7280] border-opacity-20 rounded-lg">
                        <h4 className="font-semibold text-blue-600 mb-2">Material</h4>
-                       <p className="text-[#6B7280] text-sm">Valor: {formatCurrency(alunoPlanoDetalhes.valor_material)}</p>
-                       <p className="text-[#6B7280] text-sm">Parcelas: {alunoPlanoDetalhes.numero_parcelas_material || 1}</p>
-                       <p className="text-[#6B7280] text-sm">Forma: {alunoPlanoDetalhes.forma_pagamento_material || 'boleto'}</p>
+                       {isItemIncludedInPlan('material', alunoPlanoDetalhes.plano?.tipo_valor) ? (
+                         <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-2">
+                           <p className="text-blue-700 text-sm font-medium">
+                             ✓ Valor já incluído no plano
+                           </p>
+                         </div>
+                       ) : (
+                         <>
+                           <p className="text-[#6B7280] text-sm">Valor: {formatCurrency(alunoPlanoDetalhes.valor_material)}</p>
+                           <p className="text-[#6B7280] text-sm">Parcelas: {alunoPlanoDetalhes.numero_parcelas_material || 1}</p>
+                           <p className="text-[#6B7280] text-sm">Forma: {formatarFormaPagamento(alunoPlanoDetalhes.forma_pagamento_material || 'boleto')}</p>
+                         </>
+                       )}
                      </div>
                    )}
                    
-                   {alunoPlanoDetalhes.valor_matricula && (
+                   {((alunoPlanoDetalhes.valor_matricula !== undefined && alunoPlanoDetalhes.valor_matricula !== null && alunoPlanoDetalhes.valor_matricula > 0) || isItemIncludedInPlan('matrícula', alunoPlanoDetalhes.plano?.tipo_valor)) && (
                      <div className="p-4 border border-[#6B7280] border-opacity-20 rounded-lg">
                        <h4 className="font-semibold text-green-600 mb-2">Matrícula</h4>
-                       <p className="text-[#6B7280] text-sm">Valor: {formatCurrency(alunoPlanoDetalhes.valor_matricula)}</p>
-                       <p className="text-[#6B7280] text-sm">Parcelas: {alunoPlanoDetalhes.numero_parcelas_matricula || 1}</p>
-                       <p className="text-[#6B7280] text-sm">Forma: {alunoPlanoDetalhes.forma_pagamento_matricula || 'boleto'}</p>
+                       {isItemIncludedInPlan('matrícula', alunoPlanoDetalhes.plano?.tipo_valor) ? (
+                         <div className="bg-green-50 border border-green-200 rounded-md p-3 mb-2">
+                           <p className="text-green-700 text-sm font-medium">
+                             ✓ Valor já incluído no plano
+                           </p>
+                         </div>
+                       ) : (
+                         <>
+                           <p className="text-[#6B7280] text-sm">Valor: {formatCurrency(alunoPlanoDetalhes.valor_matricula)}</p>
+                           <p className="text-[#6B7280] text-sm">Parcelas: {alunoPlanoDetalhes.numero_parcelas_matricula || 1}</p>
+                           <p className="text-[#6B7280] text-sm">Forma: {formatarFormaPagamento(alunoPlanoDetalhes.forma_pagamento_matricula || 'boleto')}</p>
+                         </>
+                       )}
                      </div>
                    )}
                  </div>
@@ -1701,6 +1919,21 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
                    <Table>
                      <TableHeader>
                        <TableRow className="bg-[#D90429]">
+                         {isSelectionMode && (
+                           <TableHead className="text-white w-12">
+                             <SelectionCheckbox
+                               isSelected={areAllStudentParcelasSelected(alunoPlanoDetalhes.parcelas)}
+                               onChange={() => {
+                                 if (areAllStudentParcelasSelected(alunoPlanoDetalhes.parcelas)) {
+                                   clearSelectionForStudent(alunoPlanoDetalhes.parcelas);
+                                 } else {
+                                   selectAllForStudent(alunoPlanoDetalhes.parcelas);
+                                 }
+                               }}
+                               size="sm"
+                             />
+                           </TableHead>
+                         )}
                          <TableHead className="text-white">Tipo</TableHead>
                          <TableHead className="text-white">#</TableHead>
                          <TableHead className="text-white">Valor</TableHead>
@@ -1710,7 +1943,19 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
                      </TableHeader>
                      <TableBody>
                        {alunoPlanoDetalhes.parcelas.map((parcela) => (
-                         <TableRow key={parcela.id}>
+                         <TableRow 
+                           key={parcela.id}
+                           className={selectedItems.has(parcela.id) ? 'bg-blue-50' : ''}
+                         >
+                           {isSelectionMode && (
+                             <TableCell>
+                               <SelectionCheckbox
+                                 isSelected={selectedItems.has(parcela.id)}
+                                 onChange={() => toggleSelection(parcela)}
+                                 size="sm"
+                               />
+                             </TableCell>
+                           )}
                            <TableCell>
                              <div className="flex items-center space-x-2">
                                <div className={getItemTypeColor(parcela.tipo_item)}>
@@ -1743,7 +1988,7 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
          <ExcluirRegistroModal
            isOpen={excluirModalOpen}
            onClose={() => setExcluirModalOpen(false)}
-           alunoNome={selectedAluno}
+           aluno={{ id: '', nome: selectedAluno || '' }}
            registroId={selectedRegistroId}
            onSuccess={carregarDados}
          />
@@ -1760,13 +2005,38 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
            onClose={() => setIsMultipleParcelasModalOpen(false)}
            aluno={selectedAlunoForMultipleParcelas}
            onSuccess={carregarDados}
+           initialTab={initialTab}
          />
 
          <FinancialPlanDialog
            isOpen={isFinancialPlanDialogOpen}
-           onClose={() => setIsFinancialPlanDialogOpen(false)}
+           onOpenChange={setIsFinancialPlanDialogOpen}
            selectedStudent={selectedStudentForPlan}
            onSuccess={handlePlanSuccess}
+         />
+
+         {/* Barra de Seleção Múltipla */}
+         <MultipleSelectionBar
+           isVisible={isSelectionMode}
+           selectedCount={selectedItems.size}
+           totalItems={alunoPlanoDetalhes ? alunoPlanoDetalhes.parcelas.length : alunosFiltrados.flatMap(aluno => aluno.parcelas).length}
+           onSelectAll={alunoPlanoDetalhes ? () => selectAllForStudent(alunoPlanoDetalhes.parcelas) : selectAll}
+           onClearSelection={alunoPlanoDetalhes ? () => clearSelectionForStudent(alunoPlanoDetalhes.parcelas) : clearSelection}
+           onDelete={handleConfirmMultipleDelete}
+           onCancel={exitSelectionMode}
+           itemName="parcela"
+           deleteButtonText="Excluir Selecionadas"
+           isAllSelected={alunoPlanoDetalhes ? areAllStudentParcelasSelected(alunoPlanoDetalhes.parcelas) : selectedItems.size === alunosFiltrados.flatMap(aluno => aluno.parcelas).length}
+         />
+
+         {/* Modal de Confirmação de Exclusão */}
+         <ConfirmDeleteModal
+           isOpen={isConfirmMultipleDeleteModalOpen}
+           onClose={() => setIsConfirmMultipleDeleteModalOpen(false)}
+           onConfirm={executeDelete}
+           itemCount={selectedItems.size}
+           itemName="parcela"
+           isLoading={isDeleting}
          />
        </motion.div>
      </TooltipProvider>
