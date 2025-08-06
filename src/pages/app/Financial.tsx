@@ -93,7 +93,6 @@ const Financial = () => {
     .reduce((sum, b) => sum + b.valor, 0);
 
   const totalDespesas = despesas
-    .filter(d => d.status === 'Pago')
     .reduce((sum, d) => sum + d.valor, 0);
 
   const toggleAlunoExpanded = (alunoId: string) => {

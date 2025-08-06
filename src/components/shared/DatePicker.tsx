@@ -16,6 +16,7 @@ interface DatePickerProps {
   error?: string;
   className?: string;
   dateFormat?: string;
+  disableAutoFormat?: boolean;
 }
 
 const DatePicker: React.FC<DatePickerProps> = ({
@@ -25,7 +26,8 @@ const DatePicker: React.FC<DatePickerProps> = ({
   disabled = false,
   error,
   className = "",
-  dateFormat = "dd/MM/yyyy"
+  dateFormat = "dd/MM/yyyy",
+  disableAutoFormat = false
 }) => {
   const [open, setOpen] = useState(false);
   const [currentDate, setCurrentDate] = useState(value || new Date());
@@ -174,36 +176,56 @@ const DatePicker: React.FC<DatePickerProps> = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let inputVal = e.target.value;
     
-    // Remove tudo que não é número
-    const numbersOnly = inputVal.replace(/\D/g, '');
-    
-    // Aplica a formatação automática
-    let formattedValue = '';
-    if (numbersOnly.length > 0) {
-      if (numbersOnly.length <= 2) {
-        formattedValue = numbersOnly;
-      } else if (numbersOnly.length <= 4) {
-        formattedValue = `${numbersOnly.slice(0, 2)}/${numbersOnly.slice(2)}`;
-      } else {
-        formattedValue = `${numbersOnly.slice(0, 2)}/${numbersOnly.slice(2, 4)}/${numbersOnly.slice(4, 8)}`;
-      }
-    }
-    
-    setInputValue(formattedValue);
-
-    // Tenta fazer o parse da data quando tiver 10 caracteres (dd/MM/yyyy)
-    if (formattedValue.length === 10) {
-      try {
-        const parsed = parse(formattedValue, dateFormat, new Date());
-        if (isValid(parsed)) {
-          onChange(parsed);
-          setCurrentDate(parsed);
+    if (disableAutoFormat) {
+      // Sem formatação automática - apenas aceita o valor como está
+      setInputValue(inputVal);
+      
+      // Tenta fazer o parse da data se estiver no formato correto
+      if (inputVal.length === 10) {
+        try {
+          const parsed = parse(inputVal, dateFormat, new Date());
+          if (isValid(parsed)) {
+            onChange(parsed);
+            setCurrentDate(parsed);
+          }
+        } catch {
+          // Invalid date format
         }
-      } catch {
-        // Invalid date format
+      } else if (inputVal === "") {
+        onChange(null);
       }
-    } else if (formattedValue === "") {
-      onChange(null);
+    } else {
+      // Remove tudo que não é número
+      const numbersOnly = inputVal.replace(/\D/g, '');
+      
+      // Aplica a formatação automática
+      let formattedValue = '';
+      if (numbersOnly.length > 0) {
+        if (numbersOnly.length <= 2) {
+          formattedValue = numbersOnly;
+        } else if (numbersOnly.length <= 4) {
+          formattedValue = `${numbersOnly.slice(0, 2)}/${numbersOnly.slice(2)}`;
+        } else {
+          formattedValue = `${numbersOnly.slice(0, 2)}/${numbersOnly.slice(2, 4)}/${numbersOnly.slice(4, 8)}`;
+        }
+      }
+      
+      setInputValue(formattedValue);
+
+      // Tenta fazer o parse da data quando tiver 10 caracteres (dd/MM/yyyy)
+      if (formattedValue.length === 10) {
+        try {
+          const parsed = parse(formattedValue, dateFormat, new Date());
+          if (isValid(parsed)) {
+            onChange(parsed);
+            setCurrentDate(parsed);
+          }
+        } catch {
+          // Invalid date format
+        }
+      } else if (formattedValue === "") {
+        onChange(null);
+      }
     }
   };
 

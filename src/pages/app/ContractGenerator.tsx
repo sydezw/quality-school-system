@@ -26,13 +26,31 @@ interface Student {
   telefone: string | null;
   turma_regular?: {
     nome: string;
+    nivel: string | null;
+    horario: string | null;
+    dias_da_semana: string | null;
   } | null;
   turma_particular?: {
     nome: string;
+    nivel: string | null;
+    horario: string | null;
+    dias_da_semana: string | null;
   } | null;
   responsaveis?: {
     nome: string;
   } | null;
+  financeiro_alunos?: Array<{
+    plano_id: string;
+    valor_plano: number;
+    numero_parcelas_plano: number;
+    planos: {
+      nome: string;
+      valor_total: number;
+      numero_aulas: number;
+      frequencia_aulas: string;
+      descricao: string;
+    };
+  }>;
 }
 
 const ContractGenerator = () => {
@@ -142,8 +160,8 @@ const ContractGenerator = () => {
         .from('alunos')
         .select(`
           *,
-          turma_regular:turmas!turma_id(nome),
-          turma_particular:turmas!turma_particular_id(nome),
+          turma_regular:turmas!turma_id(nome, nivel, horario, dias_da_semana),
+          turma_particular:turmas!turma_particular_id(nome, nivel, horario, dias_da_semana),
           responsaveis(nome, cpf, telefone, email, endereco, numero_endereco),
           financeiro_alunos(
             plano_id,
@@ -200,22 +218,21 @@ const ContractGenerator = () => {
     const logoBase64 = "data:image/svg+xml;base64,PCFET0NUWVBFIHN2ZyBQVUJMSUMgIi0vL1czQy8vRFREIFNWRyAyMDAxMDkwNC8vRU4iCiAiaHR0cDovL3d3dy53My5vcmcvVFIvMjAwMS9SRUMtU1ZHLTIwMDEwOTA0L0RURC9zdmcxMC5kdGQiPgo8c3ZnIHZlcnNpb249IjEuMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIgogd2lkdGg9IjE5My4wMDAwMDBwdCIgaGVpZ2h0PSIxMzEuMDAwMDAwcHQiIHZpZXdCb3g9IjAgMCAxOTMuMDAwMDAwIDEzMS4wMDAwMDAiCiBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJ4TWlkWU1pZCBtZWV0Ij4KCjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDAuMDAwMDAwLDEzMS4wMDAwMDApIHNjYWxlKDAuMTAwMDAwLC0wLjEwMDAwMCkiCmZpbGw9IiMwMDAwMDAiIHN0cm9rZT0ibm9uZSI+CjxwYXRoIGQ9Ik00NzggMTEyNCBjLTQwIC0yMSAtNDQgLTUzIC0xNSAtMTI2IDI5IC03MyA0MiAtMTIyIDUyIC0xOTMgNCAtMjcKMTUgLTY5IDI1IC05MiAxNyAtMzkgMjIgLTQzIDU0IC00MyAyNSAwIDM2IC00IDM2IC0xNSAwIC04IC02IC0xNSAtMTQgLTE1Ci0yMCAwIC02MSAtODcgLTQ4IC0xMDMgMTcgLTIyIDIwIC01NiA2IC02OCAtMTIgLTEwIC05IC0xNSAxNiAtMzEgMjUgLTE1IDMxCi0yNCAyOCAtNDggLTIgLTE5IDUgLTM3IDE5IC01MiAxMSAtMTMgMjQgLTMyIDI3IC00NCA3IC0yMSAtMjQgLTEyMyAtNDkgLTE2MAotMTIgLTE5IC0xMiAtMjQgMCAtMzQgMTYgLTE0IDEzIC0xOSA0MSA2OCAyMiA2OCA0MCA4OSA2MyA2OSAxNCAtMTMgNDYgLTIzCjkxIC0zMCA4IC0xIDE1IDUgMTYgMTMgMyAzNiA1IDQwIDIzIDQwIDE1IDAgMjUgMjEgNTAgMTAzIDE4IDU2IDQyIDEzNCA1NQoxNzIgbDIzIDcwIDcgLTU1IGM0IC0zMCAxMiAtNzEgMTkgLTkwIGwxMSAtMzUgNyAzMCBjNCAxNyA3IDUwIDggNzUgMiA2NyAxNwo4MyAyOCAzMCA3IC0zNiAxNCAtNDYgNDYgLTYzIDM1IC0xOCA0MCAtMTggNTQgLTQgMjMgMjIgMTIgNDAgLTUxIDgyIC03OSA1Mgo5MCA5MyAtNDkgMTgyIDI1IDU0IDEyMiA4MSAxODggNTEgMjggLTEzIDUwIC03NSA0MSAtMTE0IC02IC0yMSAtMTIgLTI0IC01MAotMjQgLTQ1IDAgLTU2IDEwIC01NiA1MSAwIDEyIC01IDE2IC0xNSAxMyAtMjIgLTkgLTE4IC00OCA4IC03MiAxMyAtMTIgMjgKLTIyIDMzIC0yMiAyNSAwIDY2IC02MCA3MSAtMTA0IDEwIC04OCAtNjAgLTE0OCAtMTU1IC0xMzIgbC0zNCA1IDcgLTQ3IGMxMAotNjggMzAgLTEwMiA2MCAtMTAyIDIyIDAgMjUgLTQgMjUgLTM1IDAgLTM0IDIwIC00OSAzNSAtMjUgMyA1IDE3IDEwIDMwIDEwCjEzIDAgMjcgNSAzMCAxMCAxMCAxNiAzMyAxMiA1NSAtMTAgMTQgLTE0IDIwIC0zMyAyMCAtNjQgMCAtMjYgNiAtNDggMTUgLTU2CjI2IC0yMSAyOSAxNCA2IDc1IC0yNyA3MyAtMjggMTM5IC0xIDE2MiAxMyAxMiAyMCAzMCAyMCA1NSAwIDI2IDYgNDEgMjEgNTIKMTUgMTAgMjAgMjEgMTYgMzYgLTMgMTIgLTEgMzUgNSA1MSA5IDI1IDYgMzQgLTE0IDYyIC0xMyAxNyAtMjkgNDQgLTM2IDYwCi0xMSAyNiAtMTAgMjcgMTcgMjcgMTYgMCAzOCA4IDUwIDE4IDI0IDE5IDcxIDEzOCA3MSAxNzggMCAxMyA5IDU5IDIxIDEwMSAxMQo0MiAxOSA5MiAxNyAxMTIgLTMgMzIgLTcgMzcgLTQwIDQ4IC0zMiAxMCAtNDYgOSAtOTUgLTcgLTMyIC0xMSAtNzQgLTI4IC05MwotMzggLTg3IC00MyAtMjMwIC0xNzkgLTI3MCAtMjU3IC0yMiAtNDIgLTQwIC01OCAtNDAgLTM1IDAgNiAtNCAxMCAtOSAxMCAtNgowIC0xMSAtMTUgLTEzIC0zMiAtMyAtMzIgLTUgLTMzIC01MCAtMzYgbC00OCAtMyAwIC02MiBjLTEgLTc5IC0xMCAtMjM4IC0xNgotMjU1IC0yIC05IC0xOSAtMTIgLTUxIC0xMCBsLTQ4IDMgNCAxNTkgMyAxNTkgLTIzIC04IGMtMzkgLTEyIC03NCAtMTEgLTczIDMKMSA2IDIgMzIgMyA1NyBsMSA0NSAxMjQgMCAxMjUgMCAtMTIgMjMgYy0yMSAzOSAtOTYgMTI4IC0xNDUgMTcxIC01OSA1MyAtMTEzCjgxIC0yMDUgMTA2IC04NCAyMyAtNzUgMjMgLTEwOSA0eiIvPgo8L2c+Cjwvc3ZnPgo=";
 
     return `
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-  <div style="width: 80px; height: 80px;">
-    <img src="${logoBase64}" alt="Teen Speech Logo" style="width: 80px; height: 80px;" />
+<div style="text-align: center; margin-bottom: 20px;">
+  <div style="margin-bottom: 10px;">
+    <img src="${logoBase64}" alt="Teen Speech Logo" style="width: 80px; height: 80px; display: block; margin: 0 auto;" />
   </div>
-  <div style="text-align: center; flex-grow: 1;">
-    <h1 style="font-size: 18px; font-weight: bold; margin: 0;">TEEN SPEECH - ESCOLA DE IDIOMAS</h1>
-  </div>
+  <h1 style="font-size: 18px; font-weight: bold; margin: 0; text-align: center;">TEEN SPEECH - ESCOLA DE IDIOMAS</h1>
 </div>
 
-${getContractTitle()}
-
-CONTRATO DE PRESTAÇÃO DE SERVIÇOS EDUCACIONAIS
+<div style="text-align: center; margin-bottom: 20px;">
+  <h2 style="font-size: 16px; font-weight: bold; margin: 10px 0;">${getContractTitle()}</h2>
+  <h3 style="font-size: 14px; font-weight: bold; margin: 10px 0;">CONTRATO DE PRESTAÇÃO DE SERVIÇOS EDUCACIONAIS</h3>
+</div>
 
 O contrato de prestação de serviços educacionais que entre si celebram, de um lado, o(a) aluno(a) abaixo qualificado(a), doravante denominado(a) CONTRATANTE, e, de outro lado, a TEEN SPEECH, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 30.857.093/0001-36, com sede na Avenida Armando Bei, nº 465, Vila Nova Bonsucesso, Guarulhos/SP, doravante denominada CONTRATADA, têm entre si justo e contratado o seguinte:
 
-<div style="text-align: center; font-weight: bold;">01. Identificação do CONTRATANTE:</div>
+<div style="text-align: center; font-weight: bold; margin-top: 20px; margin-bottom: 15px;">01. Identificação do CONTRATANTE:</div>
 
 <div style="border: 1px solid #000; padding: 10px; margin-bottom: 15px;">
   <table style="width: 100%; border-collapse: collapse;">
@@ -304,6 +321,8 @@ O contrato de prestação de serviços educacionais que entre si celebram, de um
   </table>
 </div>
 
+<div style="page-break-before: always; margin-top: 50px;"></div>
+
 <div style="border: 1px solid #000; padding: 10px; margin-bottom: 15px;">
   <table style="width: 100%; border-collapse: collapse;">
     <tr>
@@ -321,13 +340,43 @@ O contrato de prestação de serviços educacionais que entre si celebram, de um
   </table>
 </div>
 
+<div style="border: 1px solid #000; padding: 10px; margin-bottom: 15px;">
+  <h4 style="text-align: center; margin: 10px 0; font-size: 14px; font-weight: bold;">INFORMAÇÕES DA TURMA DO ALUNO</h4>
+  <table style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="width: 30%; padding: 5px; font-weight: bold;">Nome da Turma:</td>
+      <td style="width: 70%; padding: 5px; border-bottom: 1px solid #000;">${selectedStudent.turma_regular?.nome || selectedStudent.turma_particular?.nome || '<span class="placeholder-text">nome da turma</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Idioma:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${selectedStudent.idioma || '<span class="placeholder-text">idioma</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Nível:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${selectedStudent.turma_regular?.nivel || selectedStudent.turma_particular?.nivel || '<span class="placeholder-text">nível</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Horário:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${selectedStudent.turma_regular?.horario || selectedStudent.turma_particular?.horario || '<span class="placeholder-text">horário</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Dias da Semana:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${selectedStudent.turma_regular?.dias_da_semana || selectedStudent.turma_particular?.dias_da_semana || '<span class="placeholder-text">dias da semana</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Tipo de Turma:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${selectedStudent.turma_regular ? 'Turma Regular' : selectedStudent.turma_particular ? 'Turma Particular' : '<span class="placeholder-text">tipo de turma</span>'}</td>
+    </tr>
+  </table>
+</div>
+
 <p style="text-align: justify; margin-bottom: 15px;">Por este Instrumento Particular de Contrato de Prestação de Serviços, de um lado TEEN SPEECH, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 30.857.093/0001-36, com sede na Avenida Armando Bei, nº 465, Vila Nova Bonsucesso, Guarulhos/SP, doravante denominada CONTRATADA, e, de outro lado, o(a) aluno(a) acima qualificado(a), doravante denominado(a) CONTRATANTE, têm entre si justo e contratado o seguinte:</p>
 
 <h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">1. CLÁUSULA PRIMEIRA - DA IDENTIFICAÇÃO DAS PARTES E DO OBJETO</h4>
 
 <p style="text-align: justify; margin-bottom: 10px;"><strong>1.1 CONTRATANTE:</strong> ${selectedStudent.nome}, portador(a) do CPF nº ${selectedStudent.cpf || '<span class="placeholder-text">CPF</span>'}, nascido(a) em ${selectedStudent.data_nascimento ? new Date(selectedStudent.data_nascimento).toLocaleDateString('pt-BR') : '<span class="placeholder-text">data de nascimento</span>'}, residente e domiciliado(a) na ${selectedStudent.endereco || '<span class="placeholder-text">endereço</span>'}, nº ${selectedStudent.numero_endereco || '<span class="placeholder-text">número</span>'}, telefone ${selectedStudent.telefone || '<span class="placeholder-text">telefone</span>'}, e-mail: ${selectedStudent.email || '<span class="placeholder-text">e-mail</span>'}.</p>
 
-<p style="text-align: justify; margin-bottom: 10px;"><strong>1.2 CONTRATADA:</strong> TEEN SPEECH - ESCOLA DE IDIOMAS, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 30.857.093/0001-36, com sede na cidade de Guarulhos - SP, na Avenida Armando Bei, nº 465, Vila Nova Bonsucesso, telefone (11) 4372-1271, e-mail: <span class="placeholder-text">e-mail da escola</span>.</p>
+<p style="text-align: justify; margin-bottom: 10px;"><strong>1.2 CONTRATADA:</strong> TEEN SPEECH - ESCOLA DE IDIOMAS, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 30.857.093/0001-36, com sede na cidade de Guarulhos - SP, na Avenida Armando Bei, nº 465, Vila Nova Bonsucesso, telefone (11) 4372-1271, e-mail: coordenacaotsbonsucesso@gmail.com.</p>
 
 <p style="text-align: justify; margin-bottom: 15px;"><strong>1.3 OBJETO:</strong> O presente contrato tem por objeto a prestação de serviços educacionais conforme ${selectedContract === 'contrato2' ? 'Contrato 2' : planData?.nome || 'Plano Padrão'}, na modalidade presencial/online, conforme as condições estabelecidas nas cláusulas seguintes.</p>
 
@@ -429,7 +478,7 @@ O contrato de prestação de serviços educacionais que entre si celebram, de um
 
 Estando as duas partes de acordo, declaram ciência através da assinatura deste, em duas vias de igual teor.
 
-Guarulhos, <span class="placeholder-text">dia</span> de <span class="placeholder-text">mês</span> de <span class="placeholder-text">ano</span>.
+Guarulhos, ${new Date().getDate()} de ${new Date().toLocaleDateString('pt-BR', { month: 'long' })} de ${new Date().getFullYear()}.
 
 Ciente e de acordo,
 
@@ -977,67 +1026,7 @@ TESTEMUNHAS:
                     // Os placeholders são removidos permanentemente quando editados
                   }}
                   onInput={(e) => {
-                    // Verificar se estamos editando um campo de data
-                    const selection = window.getSelection();
-                    if (selection && selection.rangeCount > 0) {
-                      const range = selection.getRangeAt(0);
-                      let node = range.startContainer;
-                      
-                      // Procurar se estamos em um elemento de data
-                      while (node && node !== e.currentTarget) {
-                        if (node.nodeType === Node.TEXT_NODE && node.parentElement) {
-                          const parentElement = node.parentElement;
-                          const content = parentElement.textContent || '';
-                          
-                          // Verificar se o conteúdo parece ser uma data
-                          const isDateContent = content.includes('dd/mm/yyyy') || 
-                                               content.match(/^\d{1,2}(\/\d{0,2})?(\/\d{0,4})?$/) ||
-                                               content.match(/^\d{4,8}$/);
-                          
-                          if (isDateContent) {
-                            // Extrair apenas números
-                            let numbers = content.replace(/\D/g, '');
-                            
-                            // Limitar a 8 dígitos (ddmmaaaa)
-                            if (numbers.length > 8) {
-                              numbers = numbers.substring(0, 8);
-                            }
-                            
-                            let formattedValue = '';
-                            
-                            if (numbers.length > 0) {
-                              // Aplicar formatação dd/mm/yyyy
-                              if (numbers.length <= 2) {
-                                formattedValue = numbers;
-                              } else if (numbers.length <= 4) {
-                                formattedValue = numbers.substring(0, 2) + '/' + numbers.substring(2);
-                              } else {
-                                formattedValue = numbers.substring(0, 2) + '/' + 
-                                               numbers.substring(2, 4) + '/' + 
-                                               numbers.substring(4);
-                              }
-                            }
-                            
-                            if (formattedValue !== content) {
-                              parentElement.textContent = formattedValue;
-                              
-                              // Reposicionar cursor no final
-                              const newRange = document.createRange();
-                              const textNode = parentElement.firstChild;
-                              if (textNode) {
-                                const cursorPos = formattedValue.length;
-                                newRange.setStart(textNode, cursorPos);
-                                newRange.collapse(true);
-                                selection.removeAllRanges();
-                                selection.addRange(newRange);
-                              }
-                              return;
-                            }
-                          }
-                        }
-                        node = node.parentNode;
-                      }
-                    }
+                    // Formatação automática de números para datas removida
                     
                     // Salvar posição do scroll antes da edição
                     const scrollTop = window.pageYOffset || document.documentElement.scrollTop;

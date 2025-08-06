@@ -308,34 +308,32 @@ export const NewContractDialog = ({ onContractCreated }: NewContractDialogProps)
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="data_inicio">Data de Início *</Label>
-              <Input
-                id="data_inicio"
-                type="date"
-                value={formData.data_inicio}
-                onChange={(e) => {
-                  const newValue = e.target.value;
+              <DatePicker
+                value={formData.data_inicio ? new Date(formData.data_inicio) : undefined}
+                onChange={(date) => {
+                  const newValue = date ? format(date, 'yyyy-MM-dd') : '';
                   setFormData(prev => ({ ...prev, data_inicio: newValue }));
                   if (newValue && formData.data_fim) {
                     setCalculatedStatus(calculateStatus(newValue, formData.data_fim));
                   }
                 }}
-                required
+                placeholder="Selecione a data de início"
+                disableAutoFormat={true}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="data_fim">Data de Fim *</Label>
-              <Input
-                id="data_fim"
-                type="date"
-                value={formData.data_fim}
-                onChange={(e) => {
-                  const newValue = e.target.value;
+              <DatePicker
+                value={formData.data_fim ? new Date(formData.data_fim) : undefined}
+                onChange={(date) => {
+                  const newValue = date ? format(date, 'yyyy-MM-dd') : '';
                   setFormData(prev => ({ ...prev, data_fim: newValue }));
                   if (formData.data_inicio && newValue) {
                     setCalculatedStatus(calculateStatus(formData.data_inicio, newValue));
                   }
                 }}
-                required
+                placeholder="Selecione a data de fim"
+                disableAutoFormat={true}
               />
             </div>
           </div>

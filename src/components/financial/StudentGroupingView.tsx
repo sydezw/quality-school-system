@@ -1480,10 +1480,16 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
                                                        <motion.button
                                                          whileHover={{ scale: 1.1 }}
                                                          whileTap={{ scale: 0.9 }}
-                                                         onClick={(e) => {
-                                                           e.stopPropagation();
-                                                           marcarComoPago(parcela.id);
-                                                         }}
+                                                         onClick={async (e) => {
+                                           e.stopPropagation();
+                                           await marcarComoPago(parcela.id);
+                                           // Atualizar dados financeiros no componente pai
+                                           if (onRefresh) {
+                                             await onRefresh();
+                                           }
+                                           // Recarregar dados locais
+                                           await carregarDados();
+                                         }}
                                                          className="p-2 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
                                                        >
                                                          <CheckCircle className="h-4 w-4" />

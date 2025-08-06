@@ -191,7 +191,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
       if (!formData.idioma) {
         toast({
           title: "Campo Obrigatório",
-          description: "O campo 'Idioma' é obrigatório.",
+          description: "O campo 'Tipo do Curso' é obrigatório.",
           variant: "destructive",
         });
         setLoading(false);
@@ -317,7 +317,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
         </div>
 
         <div>
-          <Label htmlFor="idioma">Idioma *</Label>
+          <Label htmlFor="idioma">Tipo do Curso *</Label>
           <Select value={formData.idioma} onValueChange={(value) => handleInputChange('idioma', value)} required>
             <SelectTrigger>
               <SelectValue placeholder="Selecione o idioma" />

@@ -321,7 +321,7 @@ const Plans = () => {
             <SelectValue placeholder="Filtrar por idioma" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="todos">Todos os idiomas</SelectItem>
+            <SelectItem value="todos">Todos os cursos</SelectItem>
             <SelectItem value="Inglês">Inglês</SelectItem>
             <SelectItem value="Japonês">Japonês</SelectItem>
             <SelectItem value="Inglês/Japonês">Inglês/Japonês</SelectItem>

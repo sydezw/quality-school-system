@@ -155,11 +155,11 @@ const CalendarTemplate: React.FC<CalendarTemplateProps> = ({
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <div className="flex items-center justify-center gap-3 mb-4">
-          <div className="p-3 bg-gradient-to-br from-red-500/10 to-gray-100 rounded-full">
+        <div className="flex items-center justify-center gap-3 mb-4 flex-wrap px-4">
+          <div className="p-3 bg-gradient-to-br from-red-500/10 to-gray-100 rounded-full flex-shrink-0">
             <Calendar className="h-8 w-8 text-red-600" />
           </div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-red-600 to-gray-800 bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-red-600 to-gray-800 bg-clip-text text-transparent text-center min-w-0">
             {title}
           </h1>
         </div>

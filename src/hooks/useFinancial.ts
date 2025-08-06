@@ -49,38 +49,37 @@ export const useFinancial = () => {
   const fetchBoletos = async () => {
     try {
       const { data, error } = await supabase
-        .from('financeiro_alunos')
+        .from('boletos')
         .select(`
           *,
-          alunos (nome),
-          planos (nome)
+          alunos (nome)
         `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       
-      const boletosConvertidos = data?.map(registro => ({
-        id: registro.id,
-        aluno_id: registro.aluno_id,
-        data_vencimento: registro.data_primeiro_vencimento,
-        valor: registro.valor_total,
-        status: registro.status_geral === 'Pago' ? 'Pago' : 'Pendente',
-        descricao: `Plano: ${registro.planos?.nome || 'N/A'}`,
-        link_pagamento: null,
-        data_pagamento: null,
-        metodo_pagamento: registro.forma_pagamento_plano,
-        observacoes: null,
-        numero_parcela: 1,
-        contrato_id: null,
-        alunos: registro.alunos
+      const boletosFormatados = data?.map(boleto => ({
+        id: boleto.id,
+        aluno_id: boleto.aluno_id,
+        data_vencimento: boleto.data_vencimento,
+        valor: Number(boleto.valor),
+        status: boleto.status,
+        descricao: boleto.descricao,
+        link_pagamento: boleto.link_pagamento,
+        data_pagamento: boleto.data_pagamento,
+        metodo_pagamento: boleto.metodo_pagamento,
+        observacoes: boleto.observacoes,
+        numero_parcela: boleto.numero_parcela,
+        contrato_id: boleto.contrato_id,
+        alunos: boleto.alunos
       })) || [];
       
-      setState(prev => ({ ...prev, boletos: boletosConvertidos }));
+      setState(prev => ({ ...prev, boletos: boletosFormatados }));
     } catch (error) {
-      console.error('Erro ao buscar registros financeiros:', error);
+      console.error('Erro ao buscar boletos:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível carregar os registros financeiros.",
+        description: "Não foi possível carregar os boletos.",
         variant: "destructive",
       });
     } finally {

@@ -69,7 +69,11 @@ interface Parcela {
   plano_nome?: string;
 }
 
-const ParcelasTable: React.FC = () => {
+interface ParcelasTableProps {
+  onRefresh?: () => Promise<void>;
+}
+
+const ParcelasTable: React.FC<ParcelasTableProps> = ({ onRefresh }) => {
   // Estado para controlar se é a primeira vez que o componente é montado
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   
@@ -1003,7 +1007,13 @@ const ParcelasTable: React.FC = () => {
                                     >
                                       <Button
                                         size="sm"
-                                        onClick={() => marcarComoPago(parcela.id)}
+                                        onClick={async () => {
+                                          await marcarComoPago(parcela.id);
+                                          // Atualizar dados financeiros no componente pai
+                                          if (onRefresh) {
+                                            await onRefresh();
+                                          }
+                                        }}
                                         className="bg-green-600 hover:bg-green-700 text-white"
                                       >
                                         <CheckCircle className="h-4 w-4" />

@@ -45,7 +45,7 @@ import Chart from 'react-apexcharts';
 // Interfaces
 interface ParcelaDetalhada {
   id: number;
-  registro_financeiro_id: string;
+  registro_financeiro_id: string | null;
   numero_parcela: number;
   valor: number;
   data_vencimento: string;
@@ -57,10 +57,12 @@ interface ParcelaDetalhada {
   aluno_nome?: string;
   plano_nome?: string;
   forma_pagamento?: string;
+  observacoes?: string | null;
   financeiro_alunos?: {
     alunos?: { nome: string };
     planos?: { nome: string };
   };
+  fonte?: 'parcelas_alunos' | 'parcelas_migracao_raw';
 }
 
 interface ProximoVencimentoRegistro {
@@ -110,8 +112,9 @@ const FinancialReportsTable = () => {
   const [detalhesAbertos, setDetalhesAbertos] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [anoFiltro, setAnoFiltro] = useState<string>('todos');
-  const [parcelas, setParcelas] = useState<ParcelaDetalhada[]>([]);
+  const [tipoParcelaFiltro, setTipoParcelaFiltro] = useState<'todas' | 'ativas' | 'migradas' | 'migradas_ativas'>('todas');
   const [despesas, setDespesas] = useState<Despesa[]>([]);
+  const [parcelas, setParcelas] = useState<ParcelaDetalhada[]>([]);
   const [proximosVencimentosRegistros, setProximosVencimentosRegistros] = useState<ProximoVencimentoRegistro[]>([]);
   
   // Estados para paginação da tabela de registros
@@ -146,34 +149,129 @@ const FinancialReportsTable = () => {
     return posicao + 1; // +1 porque queremos começar de 1, não de 0
   };
 
-  // Função para buscar dados das parcelas
-  const buscarDadosRegistros = async () => {
+  // Função para buscar dados de parcelas das duas tabelas
+  const buscarDadosRegistros = async (tipoParcela: 'todas' | 'ativas' | 'migradas_ativas' | 'migradas' = tipoParcelaFiltro) => {
     try {
-      const { data: parcelasData, error } = await supabase
-        .from('parcelas_alunos')
-        .select(`
-          *,
-          financeiro_alunos!inner (
-            aluno_id,
-            alunos (
-              nome,
-              status
-            ),
-            planos (
-              nome
+      let dadosCombinados: ParcelaDetalhada[] = [];
+      
+      // Buscar dados de parcelas ativas se necessário (apenas registros não migrados)
+      if (tipoParcela === 'todas' || tipoParcela === 'ativas') {
+        const { data: parcelasAlunosData, error: errorParcelas } = await supabase
+          .from('parcelas_alunos')
+          .select(`
+            id, registro_financeiro_id, numero_parcela, valor,
+            data_vencimento, data_pagamento, status_pagamento,
+            tipo_item, forma_pagamento, idioma_registro,
+            descricao_item, observacoes,
+            financeiro_alunos!inner (
+              aluno_id, ativo_ou_encerrado, migrado,
+              alunos (nome, status),
+              planos (nome)
             )
-          )
-        `)
-        .eq('financeiro_alunos.alunos.status', 'Ativo');
+          `)
+          .eq('financeiro_alunos.ativo_ou_encerrado', 'ativo')
+          .eq('financeiro_alunos.migrado', 'nao')
+          .eq('financeiro_alunos.alunos.status', 'Ativo');
 
-      if (error) {
-        console.error('Erro ao buscar dados das parcelas:', error);
-        return [];
+        if (errorParcelas) {
+          console.error('Erro ao buscar parcelas ativas:', errorParcelas);
+        } else if (parcelasAlunosData) {
+          // Normalizar dados das parcelas ativas
+          const parcelasNormalizadas = parcelasAlunosData.map(parcela => ({
+            ...parcela,
+            aluno_nome: parcela.financeiro_alunos?.alunos?.nome || 'N/A',
+            plano_nome: parcela.financeiro_alunos?.planos?.nome || 'N/A',
+            fonte: 'parcelas_alunos' as const
+          }));
+          dadosCombinados = [...dadosCombinados, ...parcelasNormalizadas];
+        }
       }
 
-      return parcelasData || [];
+      // Buscar dados de parcelas migradas ativas se necessário
+      if (tipoParcela === 'todas' || tipoParcela === 'migradas_ativas') {
+        const { data: parcelasMigradasAtivasData, error: errorMigradasAtivas } = await supabase
+          .from('parcelas_alunos')
+          .select(`
+            id, registro_financeiro_id, numero_parcela, valor,
+            data_vencimento, data_pagamento, status_pagamento,
+            tipo_item, forma_pagamento, idioma_registro,
+            descricao_item, observacoes,
+            financeiro_alunos!inner (
+              aluno_id, ativo_ou_encerrado, migrado,
+              alunos (nome, status),
+              planos (nome)
+            )
+          `)
+          .eq('financeiro_alunos.ativo_ou_encerrado', 'ativo')
+          .eq('financeiro_alunos.migrado', 'sim')
+          .eq('financeiro_alunos.alunos.status', 'Ativo');
+
+        if (errorMigradasAtivas) {
+          console.error('Erro ao buscar parcelas migradas ativas:', errorMigradasAtivas);
+        } else if (parcelasMigradasAtivasData) {
+          // Normalizar dados das parcelas migradas ativas
+          const parcelasNormalizadas = parcelasMigradasAtivasData.map(parcela => ({
+            ...parcela,
+            aluno_nome: parcela.financeiro_alunos?.alunos?.nome || 'N/A',
+            plano_nome: parcela.financeiro_alunos?.planos?.nome || 'N/A',
+            fonte: 'parcelas_alunos' as const
+          }));
+          dadosCombinados = [...dadosCombinados, ...parcelasNormalizadas];
+        }
+      }
+
+      // Buscar dados de parcelas migradas (histórico) se necessário
+      if (tipoParcela === 'todas' || tipoParcela === 'migradas') {
+        const { data: parcelasMigracaoData, error: errorMigracao } = await supabase
+          .from('parcelas_migracao_raw')
+          .select(`
+            id, aluno_nome, valor, data_vencimento,
+            data_pagamento, status_pagamento, tipo_item,
+            idioma, forma_pagamento, observacoes
+          `);
+
+        if (errorMigracao) {
+          console.error('Erro ao buscar parcelas migradas:', errorMigracao);
+        } else if (parcelasMigracaoData) {
+          // Normalizar dados das parcelas migradas
+          const parcelasNormalizadas = parcelasMigracaoData.map(parcela => ({
+            id: parcela.id,
+            registro_financeiro_id: null,
+            numero_parcela: 1, // Parcelas migradas não têm numeração específica
+            valor: parcela.valor,
+            data_vencimento: parcela.data_vencimento,
+            data_pagamento: parcela.data_pagamento,
+            status_pagamento: parcela.status_pagamento,
+            tipo_item: parcela.tipo_item as 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'outros',
+            descricao_item: null,
+            idioma_registro: parcela.idioma as 'Inglês' | 'Japonês',
+            aluno_nome: parcela.aluno_nome || 'N/A',
+            plano_nome: 'Plano Migrado',
+            forma_pagamento: parcela.forma_pagamento,
+            observacoes: parcela.observacoes,
+            fonte: 'parcelas_migracao_raw' as const
+          }));
+          dadosCombinados = [...dadosCombinados, ...parcelasNormalizadas];
+        }
+      }
+
+      // Ordenar por data de vencimento (mais recentes primeiro)
+      dadosCombinados.sort((a, b) => {
+        const dataA = new Date(a.data_vencimento);
+        const dataB = new Date(b.data_vencimento);
+        return dataB.getTime() - dataA.getTime();
+      });
+
+      setParcelas(dadosCombinados);
+      
+      // Calcular próximos vencimentos
+      calcularProximosVencimentos(dadosCombinados);
+      
+      return dadosCombinados;
     } catch (error) {
       console.error('Erro ao buscar dados das parcelas:', error);
+      setParcelas([]);
+      setProximosVencimentosRegistros([]);
       return [];
     }
   };
@@ -201,18 +299,20 @@ const FinancialReportsTable = () => {
   };
 
   // Função para calcular próximos vencimentos
-  const calcularProximosVencimentosRegistros = (parcelas: any[]): ProximoVencimentoRegistro[] => {
+  const calcularProximosVencimentos = (todasParcelas: ParcelaDetalhada[]) => {
     const hoje = new Date();
-    const em30Dias = new Date();
-    em30Dias.setDate(hoje.getDate() + 30);
+    const proximosDias = 30; // Próximos 30 dias
+    const dataLimite = new Date();
+    dataLimite.setDate(hoje.getDate() + proximosDias);
 
-    const proximosVencimentos = parcelas
+    const proximosVencimentos = todasParcelas
       .filter(parcela => {
         const dataVencimento = new Date(parcela.data_vencimento);
-        return parcela.status_pagamento !== 'pago' && 
-               parcela.status_pagamento !== 'cancelado' &&
-               dataVencimento >= hoje && 
-               dataVencimento <= em30Dias;
+        return (
+          parcela.status_pagamento !== 'pago' &&
+          dataVencimento >= hoje &&
+          dataVencimento <= dataLimite
+        );
       })
       .map(parcela => {
         const dataVencimento = new Date(parcela.data_vencimento);
@@ -220,32 +320,33 @@ const FinancialReportsTable = () => {
         
         return {
           id: parcela.id,
-          alunoNome: parcela.financeiro_alunos?.alunos?.nome || 'Nome não informado',
-          valor: parcela.valor || 0,
+          alunoNome: parcela.aluno_nome || 'N/A',
+          valor: parcela.valor,
           dataVencimento: parcela.data_vencimento,
           diasRestantes,
           tipoItem: parcela.tipo_item,
           numeroParcela: parcela.numero_parcela,
-          planoNome: parcela.financeiro_alunos?.planos?.nome,
+          planoNome: parcela.plano_nome || 'N/A',
           status: parcela.status_pagamento
         };
       })
       .sort((a, b) => a.diasRestantes - b.diasRestantes)
-      .slice(0, 10);
+      .slice(0, 10); // Limitar a 10 registros
 
-    return proximosVencimentos;
+    setProximosVencimentosRegistros(proximosVencimentos);
+  };
+
+  // Função para lidar com mudança do filtro de tipo de parcela
+  const handleTipoParcelaChange = async (novoTipo: 'todas' | 'ativas' | 'migradas' | 'migradas_ativas') => {
+    setTipoParcelaFiltro(novoTipo);
+    await carregarDados(novoTipo);
   };
 
   // Função para carregar todos os dados
-  const carregarDados = async () => {
+  const carregarDados = async (tipoParcela: 'todas' | 'ativas' | 'migradas' | 'migradas_ativas' = tipoParcelaFiltro) => {
     setLoading(true);
     try {
-      const parcelasData = await buscarDadosRegistros();
-      setParcelas(parcelasData);
-      
-      const proximosVencimentos = calcularProximosVencimentosRegistros(parcelasData);
-      setProximosVencimentosRegistros(proximosVencimentos);
-      
+      await buscarDadosRegistros(tipoParcela);
       await buscarDespesas();
       await buscarDadosGraficos();
     } catch (error) {
@@ -264,67 +365,63 @@ const FinancialReportsTable = () => {
   const exportarDados = async () => {
     setExportandoPDF(true);
     try {
-      // Usar as parcelas filtradas (que já incluem o filtro de ano e busca)
+      // Usar dados reais de parcelas filtradas
       const parcelasParaPDF = parcelasFiltradas;
       
-      // Calcular estatísticas baseadas nas parcelas filtradas
+      // Calcular estatísticas reais
       const totalParcelas = parcelasParaPDF.length;
-      const parcelasPagas = parcelasParaPDF.filter(p => p.status_pagamento === 'pago').length;
+      const parcelasPagas = parcelasParaPDF.filter(p => p.status_pagamento?.toLowerCase() === 'pago').length;
       const parcelasVencidas = parcelasParaPDF.filter(p => {
         const hoje = new Date();
-        const vencimento = new Date(p.data_vencimento);
-        return p.status_pagamento !== 'pago' && p.status_pagamento !== 'cancelado' && vencimento < hoje;
+        const dataVencimento = new Date(p.data_vencimento);
+        return p.status_pagamento?.toLowerCase() !== 'pago' && dataVencimento < hoje;
       }).length;
-      const parcelasPendentes = parcelasParaPDF.filter(p => {
-        const hoje = new Date();
-        const vencimento = new Date(p.data_vencimento);
-        return p.status_pagamento !== 'pago' && p.status_pagamento !== 'cancelado' && vencimento >= hoje;
-      }).length;
+      const parcelasPendentes = parcelasParaPDF.filter(p => 
+        p.status_pagamento?.toLowerCase() === 'pendente' || 
+        p.status_pagamento?.toLowerCase() === 'em aberto'
+      ).length;
       
       const valorTotalPago = parcelasParaPDF
-        .filter(p => p.status_pagamento === 'pago')
+        .filter(p => p.status_pagamento?.toLowerCase() === 'pago')
         .reduce((sum, p) => sum + (p.valor || 0), 0);
-      
       const valorTotalRestante = parcelasParaPDF
-        .filter(p => p.status_pagamento !== 'pago' && p.status_pagamento !== 'cancelado')
+        .filter(p => p.status_pagamento?.toLowerCase() !== 'pago')
         .reduce((sum, p) => sum + (p.valor || 0), 0);
-      
       const valorTotalVencido = parcelasParaPDF
         .filter(p => {
           const hoje = new Date();
-          const vencimento = new Date(p.data_vencimento);
-          return p.status_pagamento !== 'pago' && p.status_pagamento !== 'cancelado' && vencimento < hoje;
+          const dataVencimento = new Date(p.data_vencimento);
+          return p.status_pagamento?.toLowerCase() !== 'pago' && dataVencimento < hoje;
         })
         .reduce((sum, p) => sum + (p.valor || 0), 0);
       
       const totalDespesas = despesas.reduce((sum, d) => sum + (d.valor || 0), 0);
       
-      // Identificar alunos com maior risco (baseado nas parcelas filtradas)
-      const alunosRisco = parcelasParaPDF
+      // Análise de risco - alunos com parcelas vencidas
+      const alunosComParcelasVencidas = parcelasParaPDF
         .filter(p => {
           const hoje = new Date();
-          const vencimento = new Date(p.data_vencimento);
-          return p.status_pagamento !== 'pago' && p.status_pagamento !== 'cancelado' && vencimento < hoje;
+          const dataVencimento = new Date(p.data_vencimento);
+          return p.status_pagamento?.toLowerCase() !== 'pago' && dataVencimento < hoje;
         })
-        .reduce((acc, p) => {
-          const nome = p.financeiro_alunos?.alunos?.nome || 'Nome não informado';
-          if (!acc[nome]) {
-            acc[nome] = { count: 0, valor: 0 };
+        .reduce((acc, parcela) => {
+          const nomeAluno = parcela.aluno_nome || 'Nome não informado';
+          if (!acc[nomeAluno]) {
+            acc[nomeAluno] = { nome: nomeAluno, count: 0, valor: 0 };
           }
-          acc[nome].count++;
-          acc[nome].valor += p.valor || 0;
+          acc[nomeAluno].count++;
+          acc[nomeAluno].valor += parcela.valor || 0;
           return acc;
-        }, {} as Record<string, { count: number; valor: number }>);
+        }, {} as Record<string, { nome: string; count: number; valor: number }>);
       
-      const alunosRiscoArray = Object.entries(alunosRisco)
-        .map(([nome, data]) => ({ nome, ...data }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5);
+      const alunosRiscoArray = Object.values(alunosComParcelasVencidas)
+        .sort((a, b) => b.valor - a.valor)
+        .slice(0, 10);
 
       // Preparar dados estruturados para o PDF
       const dadosRelatorio = {
         cabecalho: {
-          titulo: `Relatório Financeiro - TS School${anoFiltro !== 'todos' ? ` (${anoFiltro})` : ''}`,
+          titulo: `### Estrutura Atual das Parcelas - TS School${anoFiltro !== 'todos' ? ` (${anoFiltro})` : ''}`,
           dataGeracao: new Date().toLocaleString('pt-BR'),
           filtroAno: anoFiltro !== 'todos' ? anoFiltro : 'Todos os anos',
           logo: "TS School" // Placeholder para logo
@@ -392,15 +489,16 @@ const FinancialReportsTable = () => {
             : 'Situação financeira estável. Manter acompanhamento regular dos vencimentos.'
         },
         parcelasDetalhadas: parcelasParaPDF.slice(0, 50).map(p => ({
-          aluno: p.financeiro_alunos?.alunos?.nome || 'Nome não informado',
-          plano: p.financeiro_alunos?.planos?.nome || 'Plano não informado',
+          aluno: p.aluno_nome || 'Nome não informado',
+          plano: p.plano_nome || 'Plano não informado',
           parcela: p.numero_parcela,
           valor: (p.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
           vencimento: new Date(p.data_vencimento).toLocaleDateString('pt-BR'),
           pagamento: p.data_pagamento ? new Date(p.data_pagamento).toLocaleDateString('pt-BR') : '-',
           status: p.status_pagamento,
           tipo: p.tipo_item,
-          idioma: p.idioma_registro
+          idioma: p.idioma_registro,
+          fonte: p.fonte
         }))
       };
 
@@ -537,33 +635,8 @@ const FinancialReportsTable = () => {
       console.log('Variação de saldo processada:', variacaoSaldoData);
       setVariacaoSaldo(variacaoSaldoData);
 
-      // Se não há dados, criar dados de exemplo para visualização
-      if (receitaMensalData.length === 0) {
-        console.log('Nenhum dado encontrado, criando dados de exemplo...');
-        const dadosExemplo: ReceitaMensal[] = [
-          { mes: 'Jan 2024', receita: 0, receitaAcumulada: 0 },
-          { mes: 'Fev 2024', receita: 0, receitaAcumulada: 0 },
-          { mes: 'Mar 2024', receita: 0, receitaAcumulada: 0 }
-        ];
-        setReceitaMensal(dadosExemplo);
-      }
-
-      if (receitaPorIdiomaArray.length === 0) {
-        const dadosExemploIdioma: ReceitaPorIdioma[] = [
-          { idioma: 'Inglês', receita: 0 },
-          { idioma: 'Japonês', receita: 0 }
-        ];
-        setReceitaPorIdioma(dadosExemploIdioma);
-      }
-
-      if (variacaoSaldoData.length === 0) {
-        const dadosExemploSaldo: VariacaoSaldo[] = [
-          { categoria: 'Receitas', valor: 0, tipo: 'entrada' },
-          { categoria: 'Despesas', valor: 0, tipo: 'saida' },
-          { categoria: 'Saldo Final', valor: 0, tipo: 'saldo' }
-        ];
-        setVariacaoSaldo(dadosExemploSaldo);
-      }
+      // Dados carregados diretamente do banco de dados
+      // Se não há dados, os arrays ficam vazios
 
     } catch (error) {
       console.error('Erro ao buscar dados dos gráficos:', error);
@@ -584,59 +657,21 @@ const FinancialReportsTable = () => {
     carregarDados();
   }, []);
 
-  // Calcular totais dinâmicos
-  const calcularTotaisDinamicos = (parcelas: ParcelaDetalhada[]) => {
-    const totalRecebido = parcelas
-      .filter(p => p.status_pagamento === 'pago')
-      .reduce((sum, p) => sum + (p.valor || 0), 0);
-    
-    const totalAReceber = parcelas
-      .filter(p => p.status_pagamento !== 'pago' && p.status_pagamento !== 'cancelado')
-      .reduce((sum, p) => sum + (p.valor || 0), 0);
-    
-    const parcelasPagas = parcelas.filter(p => p.status_pagamento === 'pago').length;
-    const parcelasPendentesVencidas = parcelas.filter(p => p.status_pagamento !== 'pago' && p.status_pagamento !== 'cancelado').length;
-    
-    const totalGeral = totalRecebido + totalAReceber;
-    const percentualQuitado = totalGeral > 0 ? (totalRecebido / totalGeral) * 100 : 0;
-
-    return {
-      totalRecebido,
-      totalAReceber,
-      parcelasPagas,
-      parcelasPendentesVencidas,
-      percentualQuitado
-    };
-  };
-
-  // Filtrar parcelas baseado no termo de busca e ano
+  // Filtrar parcelas com base nos critérios de busca e ano
   const parcelasFiltradas = parcelas.filter(parcela => {
-    // Filtro por termo de busca
-    if (searchTerm) {
-      const termo = searchTerm.toLowerCase();
-      const nomeAluno = parcela.financeiro_alunos?.alunos?.nome?.toLowerCase() || '';
-      const nomePlano = parcela.financeiro_alunos?.planos?.nome?.toLowerCase() || '';
-      const tipoItem = parcela.tipo_item?.toLowerCase() || '';
-      const descricaoItem = parcela.descricao_item?.toLowerCase() || '';
-      
-      const matchesSearch = nomeAluno.includes(termo) || 
-                           nomePlano.includes(termo) || 
-                           tipoItem.includes(termo) ||
-                           descricaoItem.includes(termo);
-      
-      if (!matchesSearch) return false;
-    }
+    const matchesSearch = !searchTerm || 
+      parcela.aluno_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      parcela.plano_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      parcela.tipo_item.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      parcela.status_pagamento.toLowerCase().includes(searchTerm.toLowerCase());
     
-    // Filtro por ano
-    if (anoFiltro !== 'todos') {
-      const anoVencimento = new Date(parcela.data_vencimento).getFullYear().toString();
-      if (anoVencimento !== anoFiltro) return false;
-    }
+    const matchesYear = anoFiltro === 'todos' || 
+      new Date(parcela.data_vencimento).getFullYear().toString() === anoFiltro;
     
-    return true;
+    return matchesSearch && matchesYear;
   });
 
-  // Cálculos de paginação para registros
+  // Cálculos de paginação
   const totalPagesRegistros = Math.ceil(parcelasFiltradas.length / registrosPorPagina);
   const startItemRegistros = (currentPageRegistros - 1) * registrosPorPagina + 1;
   const endItemRegistros = Math.min(currentPageRegistros * registrosPorPagina, parcelasFiltradas.length);
@@ -647,47 +682,42 @@ const FinancialReportsTable = () => {
 
 
 
-  // Páginas visíveis para paginação
+  // Função para calcular páginas visíveis na paginação
   const getVisiblePagesRegistros = () => {
-    if (totalPagesRegistros <= 1) return [];
+    const pages: (number | string)[] = [];
+    const maxVisiblePages = 5;
     
-    const delta = 2;
-    const range = [];
-    const rangeWithDots = [];
-
-    const start = Math.max(2, currentPageRegistros - delta);
-    const end = Math.min(totalPagesRegistros - 1, currentPageRegistros + delta);
-    
-    for (let i = start; i <= end; i++) {
-      range.push(i);
-    }
-
-    // Sempre incluir a primeira página
-    if (start > 2) {
-      rangeWithDots.push(1, '...');
-    } else {
-      rangeWithDots.push(1);
-    }
-
-    range.forEach(page => {
-      if (page !== 1 && page !== totalPagesRegistros) {
-        rangeWithDots.push(page);
+    if (totalPagesRegistros <= maxVisiblePages) {
+      for (let i = 1; i <= totalPagesRegistros; i++) {
+        pages.push(i);
       }
-    });
-
-    if (end < totalPagesRegistros - 1) {
-      rangeWithDots.push('...', totalPagesRegistros);
-    } else if (totalPagesRegistros > 1) {
-      rangeWithDots.push(totalPagesRegistros);
+    } else {
+      if (currentPageRegistros <= 3) {
+        for (let i = 1; i <= 4; i++) {
+          pages.push(i);
+        }
+        pages.push('...');
+        pages.push(totalPagesRegistros);
+      } else if (currentPageRegistros >= totalPagesRegistros - 2) {
+        pages.push(1);
+        pages.push('...');
+        for (let i = totalPagesRegistros - 3; i <= totalPagesRegistros; i++) {
+          pages.push(i);
+        }
+      } else {
+        pages.push(1);
+        pages.push('...');
+        for (let i = currentPageRegistros - 1; i <= currentPageRegistros + 1; i++) {
+          pages.push(i);
+        }
+        pages.push('...');
+        pages.push(totalPagesRegistros);
+      }
     }
-    return [...new Set(rangeWithDots)].sort((a, b) => {
-      if (typeof a === 'number' && typeof b === 'number') return a - b;
-      if (typeof a === 'number') return -1;
-      if (typeof b === 'number') return 1;
-      return 0;
-    });
+    
+    return pages;
   };
-
+  
   const visiblePagesRegistros = getVisiblePagesRegistros();
 
   // Reset página quando busca muda, ano muda ou itens por página muda
@@ -695,7 +725,56 @@ const FinancialReportsTable = () => {
     setCurrentPageRegistros(1);
   }, [searchTerm, anoFiltro, registrosPorPagina]);
 
-  // Calcular totais baseados nas parcelas filtradas
+  // Função para calcular totais dinâmicos
+  const calcularTotaisDinamicos = (parcelas: ParcelaDetalhada[]) => {
+    const totais = parcelas.reduce((acc, parcela) => {
+      const valor = parcela.valor || 0;
+      
+      switch (parcela.status_pagamento?.toLowerCase()) {
+        case 'pago':
+          acc.totalRecebido += valor;
+          acc.parcelasPagas += 1;
+          break;
+        case 'pendente':
+        case 'em aberto':
+          acc.totalPendente += valor;
+          acc.parcelasPendentesVencidas += 1;
+          break;
+        case 'vencido':
+          acc.totalVencido += valor;
+          acc.parcelasPendentesVencidas += 1;
+          break;
+        case 'cancelado':
+          acc.totalCancelado += valor;
+          break;
+        default:
+          acc.totalPendente += valor;
+          acc.parcelasPendentesVencidas += 1;
+      }
+      
+      acc.totalGeral += valor;
+      return acc;
+    }, {
+      totalRecebido: 0,
+      totalPendente: 0,
+      totalVencido: 0,
+      totalCancelado: 0,
+      totalGeral: 0,
+      parcelasPagas: 0,
+      parcelasPendentesVencidas: 0
+    });
+    
+    // Calcular propriedades derivadas
+    const totalAReceber = totais.totalPendente + totais.totalVencido;
+    const percentualQuitado = totais.totalGeral > 0 ? (totais.totalRecebido / totais.totalGeral) * 100 : 0;
+    
+    return {
+      ...totais,
+      totalAReceber,
+      percentualQuitado
+    };
+  };
+  
   const totaisDinamicos = calcularTotaisDinamicos(parcelasFiltradas);
 
   // Função para obter ícone do status
@@ -1203,10 +1282,26 @@ const FinancialReportsTable = () => {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="h-5 w-5" />
-                Parcelas Detalhadas
+                Parcelas Detalhadas dos Migrados
               </CardTitle>
               
               <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+                {/* Filtro de Tipo de Parcela */}
+                <div className="flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-gray-500" />
+                  <Select value={tipoParcelaFiltro} onValueChange={handleTipoParcelaChange}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="Tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todas">Todas</SelectItem>
+                      <SelectItem value="ativas">Ativas (Não Migradas)</SelectItem>
+                      <SelectItem value="migradas_ativas">Migradas Ativas</SelectItem>
+                      <SelectItem value="migradas">Migradas (Histórico)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Filtro de Ano */}
                 <div className="flex items-center gap-2">
                   <CalendarDays className="h-4 w-4 text-gray-500" />
@@ -1264,73 +1359,74 @@ const FinancialReportsTable = () => {
                     {detalhesAbertos && (
                       <>
                         <TableHead>Idioma</TableHead>
-                        <TableHead>Pagamento</TableHead>
+                        <TableHead>Forma de Pagamento</TableHead>
+                        <TableHead>Data de Pagamento</TableHead>
+                        <TableHead>Observações</TableHead>
+                        <TableHead>Fonte</TableHead>
                       </>
                     )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {parcelasExibidas.map((parcela) => (
-                    <TableRow key={parcela.id} className="hover:bg-gray-50 transition-colors duration-200">
-                      <TableCell>
-                        <div className="flex justify-center">
-                          {getStatusIcon(parcela.status_pagamento)}
-                        </div>
+                  {parcelasExibidas.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={detalhesAbertos ? 13 : 8} className="text-center py-8 text-gray-500">
+                        Nenhuma parcela encontrada
                       </TableCell>
-                      <TableCell className="font-medium">
-                        {parcela.financeiro_alunos?.alunos?.nome || 'Nome não informado'}
-                      </TableCell>
-                      <TableCell>
-                        {parcela.financeiro_alunos?.planos?.nome || 'Plano não informado'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {calcularNumeroPorTipo(parcela, parcelas)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-bold">
-                        R$ {parcela.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0,00'}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(parcela.data_vencimento).toLocaleDateString('pt-BR')}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(parcela.tipo_item)}>
-                          {parcela.tipo_item}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="max-w-xs">
-                        <div className="text-sm text-gray-600">
-                          {parcela.descricao_item ? (
-                            <div className="truncate" title={parcela.descricao_item}>
-                              {parcela.descricao_item}
-                            </div>
-                          ) : (
-                            <span className="text-gray-400 italic">-</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      {detalhesAbertos && (
-                        <>
-                          <TableCell>
-                            <Badge variant="secondary">
-                              {parcela.idioma_registro}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {parcela.data_pagamento ? 
-                              new Date(parcela.data_pagamento).toLocaleDateString('pt-BR') : 
-                              '-'
-                            }
-                          </TableCell>
-                        </>
-                      )}
                     </TableRow>
-                  ))}
+                  ) : (
+                    parcelasExibidas.map((parcela) => (
+                      <TableRow key={`${parcela.fonte}-${parcela.id}`}>
+                        <TableCell>
+                          <Badge 
+                            variant={parcela.status_pagamento === 'Pago' ? 'default' : 
+                                   parcela.status_pagamento === 'Pendente' ? 'secondary' : 'destructive'}
+                            className={parcela.status_pagamento === 'Pago' ? 'bg-green-100 text-green-800' : 
+                                     parcela.status_pagamento === 'Pendente' ? 'bg-yellow-100 text-yellow-800' : 
+                                     'bg-red-100 text-red-800'}
+                          >
+                            {parcela.status_pagamento === 'Pago' && <CheckCircle className="h-3 w-3 mr-1" />}
+                            {parcela.status_pagamento === 'Pendente' && <Clock className="h-3 w-3 mr-1" />}
+                            {parcela.status_pagamento === 'Vencido' && <XCircle className="h-3 w-3 mr-1" />}
+                            {parcela.status_pagamento === 'Cancelado' && <XCircle className="h-3 w-3 mr-1" />}
+                            {parcela.status_pagamento}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">{parcela.aluno_nome}</TableCell>
+                        <TableCell>{parcela.plano_nome || '-'}</TableCell>
+                        <TableCell>{parcela.numero_parcela}</TableCell>
+                        <TableCell className="font-semibold">
+                          R$ {parcela.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell>
+                          {new Date(parcela.data_vencimento).toLocaleDateString('pt-BR')}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{parcela.tipo_item}</Badge>
+                        </TableCell>
+                        <TableCell>{parcela.descricao_item || '-'}</TableCell>
+                        {detalhesAbertos && (
+                          <>
+                            <TableCell>{parcela.idioma_registro}</TableCell>
+                            <TableCell>{parcela.forma_pagamento || '-'}</TableCell>
+                            <TableCell>
+                              {parcela.data_pagamento ? new Date(parcela.data_pagamento).toLocaleDateString('pt-BR') : '-'}
+                            </TableCell>
+                            <TableCell>{parcela.observacoes || '-'}</TableCell>
+                            <TableCell>
+                              <Badge variant={parcela.fonte === 'parcelas_alunos' ? 'default' : 'secondary'}>
+                                {parcela.fonte === 'parcelas_alunos' ? 'Ativo' : 'Migrado'}
+                              </Badge>
+                            </TableCell>
+                          </>
+                        )}
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
                 <TableFooter>
                   <TableRow>
-                    <TableCell colSpan={12} className="bg-gray-50">
+                    <TableCell colSpan={detalhesAbertos ? 15 : 8} className="bg-gray-50">
                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4">
                         <div className="flex flex-col sm:flex-row gap-4 text-sm">
                           <div className="flex items-center gap-2">

@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -73,6 +73,7 @@ const Classes = () => {
   const [calculatedEndDate, setCalculatedEndDate] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [tipoTurmaFilter, setTipoTurmaFilter] = useState<string>('all');
+  // Estados para paginação de turmas com múltiplos dias
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   // Estados para planos particulares
@@ -93,7 +94,7 @@ const Classes = () => {
       tipo_turma: 'Turma',
       data_inicio: '',
       data_fim: '',
-      total_aulas: 20
+      total_aulas: 0
     }
   });
 
@@ -471,23 +472,70 @@ const Classes = () => {
     return matchesSearch && matchesFilter;
   });
 
-  // Função para paginação
-  const totalPages = Math.ceil(filteredClasses.length / itemsPerPage);
+  // Função para organizar turmas por dia da semana
+  const organizeClassesByDay = (classes: Class[]) => {
+    const daysOrder = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+    const classesByDay: { [key: string]: Class[] } = {};
+    
+    // Separar turmas de um dia das turmas de múltiplos dias
+    const singleDayClasses: Class[] = [];
+    const multiDayClasses: Class[] = [];
+    
+    // Inicializar todos os dias
+    daysOrder.forEach(day => {
+      classesByDay[day] = [];
+    });
+    
+    // Separar turmas por quantidade de dias
+    classes.forEach(classItem => {
+      const days = classItem.dias_da_semana.split(' e ');
+      if (days.length > 1) {
+        multiDayClasses.push(classItem);
+      } else {
+        singleDayClasses.push(classItem);
+      }
+    });
+    
+    // Organizar apenas turmas de um dia por dia da semana
+    singleDayClasses.forEach(classItem => {
+      const days = classItem.dias_da_semana.split(' e ');
+      days.forEach(day => {
+        const normalizedDay = day.trim();
+        if (classesByDay[normalizedDay]) {
+          classesByDay[normalizedDay].push(classItem);
+        }
+      });
+    });
+    
+    // Ordenar turmas dentro de cada dia por horário
+    Object.keys(classesByDay).forEach(day => {
+      classesByDay[day].sort((a, b) => {
+        const timeA = a.horario.split(':').map(Number);
+        const timeB = b.horario.split(':').map(Number);
+        return timeA[0] * 60 + timeA[1] - (timeB[0] * 60 + timeB[1]);
+      });
+    });
+    
+    return { classesByDay, daysOrder, multiDayClasses };
+  };
+
+  const { classesByDay, daysOrder, multiDayClasses } = organizeClassesByDay(filteredClasses);
+
+  // Paginação para turmas de múltiplos dias
+  const totalPages = multiDayClasses.length > 0 ? Math.ceil(multiDayClasses.length / itemsPerPage) : 0;
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedClasses = filteredClasses.slice(startIndex, endIndex);
+  const paginatedMultiDayClasses = multiDayClasses.slice(startIndex, endIndex);
 
-  // Função para ir para a página anterior
   const goToPreviousPage = () => {
     setCurrentPage(prev => Math.max(prev - 1, 1));
   };
 
-  // Função para ir para a próxima página
   const goToNextPage = () => {
     setCurrentPage(prev => Math.min(prev + 1, totalPages));
   };
 
-  // Reset da página quando os filtros mudam
+  // Reset da página quando filtros mudam
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, tipoTurmaFilter]);
@@ -892,8 +940,8 @@ const Classes = () => {
       // Preparar dados para atualização
       const updateData: any = {
         total_aulas: formData.total_aulas,
-        data_inicio: formData.data_inicio,
-        data_fim: formData.data_fim,
+        data_inicio: formData.data_inicio || null,
+        data_fim: formData.data_fim || null,
       };
 
       // Se for turma particular e tiver plano selecionado, salvar o plano
@@ -1092,7 +1140,7 @@ const Classes = () => {
       professor_id: classItem.professor_id || 'none',
       tipo_turma: classItem.tipo_turma || 'Turma',
       data_inicio: classItem.data_inicio || '',
-      total_aulas: classItem.total_aulas || 20,
+      total_aulas: classItem.total_aulas || 0,
       data_fim: classItem.data_fim || ''
     });
     
@@ -1126,7 +1174,7 @@ const Classes = () => {
       tipo_turma: 'Turma', // Valor padrão do banco
       data_inicio: '',
       data_fim: '',
-      total_aulas: 20
+      total_aulas: 0
     });
     
     // Reset de todos os estados relacionados
@@ -1748,129 +1796,287 @@ const Classes = () => {
                 <TableHead>Nível</TableHead>
                 <TableHead>Tipo de Turma</TableHead>
                 <TableHead>Materiais</TableHead>
+                <TableHead>Total de Aulas</TableHead>
                 <TableHead>Horário</TableHead>
                 <TableHead>Professor</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedClasses.map((classItem) => (
-                <TableRow key={classItem.id}>
-                  <TableCell className="font-medium text-base">{classItem.nome}</TableCell>
-                  <TableCell>
-                    <Badge className={`text-sm ${getIdiomaColor(classItem.idioma)}`}>
-                      {classItem.idioma}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-sm bg-red-50 text-red-700 border-red-200">
-                      {classItem.nivel || 'Não definido'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge 
-                      variant="outline" 
-                      className={`text-sm ${
-                        classItem.tipo_turma === 'Turma particular' 
-                          ? 'bg-purple-50 text-purple-700 border-purple-200' 
-                          : 'bg-blue-50 text-blue-700 border-blue-200'
-                      }`}
-                    >
-                      {classItem.tipo_turma === 'Turma particular' ? 'Particular' : 'Regular'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-base text-gray-600">
-                      {(classItem.materiais_ids?.length) || 0} materiais
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium text-base">{classItem.horario}</div>
-                      <div className="text-base text-gray-500">{classItem.dias_da_semana}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-base">
-                    {classItem.professores?.nome || (
-                      <span className="text-gray-400 italic">Sem professor</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openStudentsDialog(classItem)}
-                        className="text-blue-600 hover:text-blue-700"
-                        title="Ver alunos da turma"
-                      >
-                        <Users className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => increaseClassLevel(classItem)}
-                        className="text-green-600 hover:text-green-700"
-                        title="Aumentar nível da turma"
-                        disabled={classItem.nivel === 'Book 10'}
-                      >
-                        <GraduationCap className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openEditDialog(classItem)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openDeleteDialog(classItem)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+              {daysOrder.map(day => {
+                const dayClasses = classesByDay[day];
+                if (dayClasses.length === 0) return null;
+                
+                return (
+                  <React.Fragment key={day}>
+                    {/* Separador do dia da semana */}
+                    <TableRow className="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-l-blue-500">
+                      <TableCell colSpan={9} className="py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center justify-center w-8 h-8 bg-blue-500 text-white rounded-full text-sm font-bold">
+                            {day.charAt(0)}
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-semibold text-blue-900">{day}-feira</h3>
+                            <p className="text-sm text-blue-700">{dayClasses.length} turma{dayClasses.length !== 1 ? 's' : ''}</p>
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    
+                    {/* Turmas do dia */}
+                    {dayClasses.map((classItem) => (
+                      <TableRow key={`${day}-${classItem.id}`} className="hover:bg-blue-25">
+                        <TableCell className="font-medium text-base pl-12">{classItem.nome}</TableCell>
+                        <TableCell>
+                          <Badge className={`text-sm ${getIdiomaColor(classItem.idioma)}`}>
+                            {classItem.idioma}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-sm bg-red-50 text-red-700 border-red-200">
+                            {classItem.nivel || 'Não definido'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant="outline" 
+                            className={`text-sm ${
+                              classItem.tipo_turma === 'Turma particular' 
+                                ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                                : 'bg-blue-50 text-blue-700 border-blue-200'
+                            }`}
+                          >
+                            {classItem.tipo_turma === 'Turma particular' ? 'Particular' : 'Regular'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-base text-gray-600">
+                            {(classItem.materiais_ids?.length) || 0} materiais
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <BookCopy className="h-4 w-4 text-green-500" />
+                            <span className="text-base font-medium text-green-700">
+                              {classItem.total_aulas || 0} aulas
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium text-base flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-blue-500" />
+                              {classItem.horario}
+                            </div>
+                            <div className="text-sm text-gray-500">{classItem.dias_da_semana}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-base">
+                          {classItem.professores?.nome || (
+                            <span className="text-gray-400 italic">Sem professor</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openStudentsDialog(classItem)}
+                              className="text-blue-600 hover:text-blue-700"
+                              title="Ver alunos da turma"
+                            >
+                              <Users className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => increaseClassLevel(classItem)}
+                              className="text-green-600 hover:text-green-700"
+                              title="Aumentar nível da turma"
+                              disabled={classItem.nivel === 'Book 10'}
+                            >
+                              <GraduationCap className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openEditDialog(classItem)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openDeleteDialog(classItem)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </React.Fragment>
+                );
+              })}
+              
+              {/* Seção de turmas com múltiplos dias */}
+              {multiDayClasses.length > 0 && (
+                <React.Fragment>
+                  <TableRow className="bg-gradient-to-r from-purple-50 to-pink-50 border-l-4 border-l-purple-500">
+                    <TableCell colSpan={9} className="py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-center w-8 h-8 bg-purple-500 text-white rounded-full text-sm font-bold">
+                          M
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-purple-900">Turmas com Múltiplos Dias</h3>
+                          <p className="text-sm text-purple-700">{multiDayClasses.length} turma{multiDayClasses.length !== 1 ? 's' : ''}</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  
+                  {/* Turmas paginadas */}
+                  {paginatedMultiDayClasses.map((classItem) => (
+                    <TableRow key={`multi-${classItem.id}`} className="hover:bg-purple-25">
+                      <TableCell className="font-medium text-base pl-12">{classItem.nome}</TableCell>
+                      <TableCell>
+                        <Badge className={`text-sm ${getIdiomaColor(classItem.idioma)}`}>
+                          {classItem.idioma}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-sm bg-red-50 text-red-700 border-red-200">
+                          {classItem.nivel || 'Não definido'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant="outline" 
+                          className={`text-sm ${
+                            classItem.tipo_turma === 'Turma particular' 
+                              ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                              : 'bg-blue-50 text-blue-700 border-blue-200'
+                          }`}
+                        >
+                          {classItem.tipo_turma === 'Turma particular' ? 'Particular' : 'Regular'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-base text-gray-600">
+                          {(classItem.materiais_ids?.length) || 0} materiais
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <BookCopy className="h-4 w-4 text-green-500" />
+                          <span className="text-base font-medium text-green-700">
+                            {classItem.total_aulas || 0} aulas
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium text-base flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-blue-500" />
+                            {classItem.horario}
+                          </div>
+                          <div className="text-sm text-gray-500">{classItem.dias_da_semana}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-base">
+                        {classItem.professores?.nome || (
+                          <span className="text-gray-400 italic">Sem professor</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openStudentsDialog(classItem)}
+                            className="text-blue-600 hover:text-blue-700"
+                            title="Ver alunos da turma"
+                          >
+                            <Users className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => increaseClassLevel(classItem)}
+                            className="text-green-600 hover:text-green-700"
+                            title="Aumentar nível da turma"
+                            disabled={classItem.nivel === 'Book 10'}
+                          >
+                            <GraduationCap className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEditDialog(classItem)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openDeleteDialog(classItem)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </React.Fragment>
+              )}
+              
+              {/* Mensagem quando não há turmas */}
+              {filteredClasses.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                    Nenhuma turma encontrada
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
           
-          {/* Controles de paginação */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-6">
-              <div className="text-sm text-gray-600">
-                Mostrando {startIndex + 1} a {Math.min(endIndex, filteredClasses.length)} de {filteredClasses.length} turmas
+          {/* Controles de paginação para turmas de múltiplos dias */}
+          {multiDayClasses.length > 0 && totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 px-4 py-3 bg-purple-50 rounded-lg border border-purple-200">
+              <div className="text-sm text-purple-700">
+                Mostrando {startIndex + 1} a {Math.min(endIndex, multiDayClasses.length)} de {multiDayClasses.length} turmas com múltiplos dias
               </div>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={goToPreviousPage}
-                  disabled={currentPage === 1}
-                  className="flex items-center gap-1"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Anterior
-                </Button>
-                <span className="text-sm text-gray-600">
-                  Página {currentPage} de {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={goToNextPage}
-                  disabled={currentPage === totalPages}
-                  className="flex items-center gap-1"
-                >
-                  Próxima
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+                <span className="text-sm text-purple-600">Página {currentPage} de {totalPages || 0}</span>
+                <div className="flex gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={goToPreviousPage}
+                    disabled={currentPage === 1}
+                    className="h-8 w-8 p-0 border-purple-300 hover:bg-purple-100"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={goToNextPage}
+                    disabled={currentPage === totalPages}
+                    className="h-8 w-8 p-0 border-purple-300 hover:bg-purple-100"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           )}
+
         </CardContent>
       </Card>
 
@@ -1969,7 +2175,7 @@ const Classes = () => {
                      {selectedClassForStudents?.nome} - {selectedClassForStudents?.idioma}
                    </p>
                    <p className="text-sm text-blue-700">
-                     Nível: {selectedClassForStudents?.nivel} | Total de alunos: {classStudents.length}
+                     Nível: {selectedClassForStudents?.nivel} | Total de alunos: {classStudents?.length || 0}
                    </p>
                  </div>
                  <Button
@@ -2002,11 +2208,11 @@ const Classes = () => {
                     <Input
                       id="total_aulas"
                       type="number"
-                      min="1"
+                      min="0"
                       max="100"
                       {...register('total_aulas', {
                         required: 'Total de aulas é obrigatório',
-                        min: { value: 1, message: 'Mínimo 1 aula' },
+                        min: { value: 0, message: 'Mínimo 0 aulas' },
                         max: { value: 100, message: 'Máximo 100 aulas' }
                       })}
                       className="mt-1"

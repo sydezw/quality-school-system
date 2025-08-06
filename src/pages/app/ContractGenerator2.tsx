@@ -205,7 +205,7 @@ const ContractGenerator2 = () => {
     <p>Nome: ${selectedStudent?.nome || '<span class="placeholder-text">Nome do contratante</span>'}</p>
     <p>Data de Nascimento: ${selectedStudent?.data_nascimento ? new Date(selectedStudent.data_nascimento).toLocaleDateString('pt-BR') : '<span class="placeholder-text">Data de nascimento</span>'}</p>
     <p>CPF: ${selectedStudent?.cpf || '<span class="placeholder-text">CPF</span>'}</p>
-    <p>RG: <span class="placeholder-text">RG</span></p>
+    <!-- RG field removed as requested -->
     <p>Endereço: ${selectedStudent?.endereco || '<span class="placeholder-text">Endereço completo</span>'}</p>
     <p>Telefone: ${selectedStudent?.telefone || '<span class="placeholder-text">Telefone</span>'}</p>
     <p>E-mail: ${selectedStudent?.email || '<span class="placeholder-text">E-mail</span>'}</p>
@@ -220,8 +220,10 @@ const ContractGenerator2 = () => {
     <p>3.1. A CONTRATADA compromete-se a prestar serviços educacionais de ensino de idiomas ao CONTRATANTE, conforme as condições estabelecidas neste contrato.</p>
 
     <h4>04. DO VALOR E FORMA DE PAGAMENTO:</h4>
-    <p>4.1. O valor total do curso é de R$ ${selectedStudent?.financeiro_alunos?.[0]?.planos?.valor_total || '<span class="placeholder-text">valor total</span>'}, dividido em ${selectedStudent?.financeiro_alunos?.[0]?.planos?.numero_aulas || '<span class="placeholder-text">número de aulas</span>'} aulas.</p>
+    <p>4.1. O valor total do curso é de R$ <span class="placeholder-text">valor</span>, dividido em ${selectedStudent?.financeiro_alunos?.[0]?.planos?.numero_aulas || '<span class="placeholder-text">número de aulas</span>'} aulas.</p>
     <p>4.2. O pagamento será efetuado conforme a periodicidade: ${selectedStudent?.financeiro_alunos?.[0]?.planos?.frequencia || '<span class="placeholder-text">frequência</span>'}.</p>
+
+
 
     <div style="margin-top: 50px; page-break-inside: avoid;">
       <div style="text-align: center; font-weight: bold; margin-bottom: 30px; font-size: 14px;">ASSINATURAS</div>
@@ -264,10 +266,9 @@ const ContractGenerator2 = () => {
       </div>
     </div>
 
-    <div style="margin-top: 30px; display: flex; justify-content: space-between;">
-      <p><span class="placeholder-text">Data</span> horário: <span class="placeholder-text">horário</span></p>
-      <p>VISTO: <span class="placeholder-text">visto</span></p>
     </div>`;
+    
+    // Seções 'horário' e 'VISTO' removidas conforme solicitado
     
     return contractText;
   };
@@ -511,73 +512,9 @@ const ContractGenerator2 = () => {
                 // Os placeholders são removidos permanentemente quando editados
               }}
               onInput={(e) => {
-                // Verificar se estamos editando um campo de data
-                const selection = window.getSelection();
-                if (selection && selection.rangeCount > 0) {
-                  const range = selection.getRangeAt(0);
-                  let node = range.startContainer;
-                  
-                  // Procurar se estamos em um elemento de data
-                  while (node && node !== e.currentTarget) {
-                    if (node.nodeType === Node.TEXT_NODE && node.parentElement) {
-                      const parentElement = node.parentElement;
-                      const content = parentElement.textContent || '';
-                      
-                      // Verificar se o conteúdo parece ser uma data
-                      const isDateContent = content.includes('dd/mm/yyyy') || 
-                                           /^\d{1,2}(\/\d{0,2})?(\/\d{0,4})?$/.test(content) ||
-                                           /^\d{4,8}$/.test(content);
-                      
-                      if (isDateContent) {
-                        // Extrair apenas números
-                        let numbers = content.replace(/\D/g, '');
-                        
-                        // Limitar a 8 dígitos (ddmmaaaa)
-                        if (numbers.length > 8) {
-                          numbers = numbers.substring(0, 8);
-                        }
-                        
-                        let formattedValue = '';
-                        
-                        if (numbers.length > 0) {
-                          // Aplicar formatação dd/mm/yyyy
-                          if (numbers.length <= 2) {
-                            formattedValue = numbers;
-                          } else if (numbers.length <= 4) {
-                            formattedValue = numbers.substring(0, 2) + '/' + numbers.substring(2);
-                          } else {
-                            formattedValue = numbers.substring(0, 2) + '/' + 
-                                           numbers.substring(2, 4) + '/' + 
-                                           numbers.substring(4);
-                          }
-                        }
-                        
-                        if (formattedValue !== content) {
-                          parentElement.textContent = formattedValue;
-                          
-                          // Reposicionar cursor no final
-                          const newRange = document.createRange();
-                          const textNode = parentElement.firstChild;
-                          if (textNode) {
-                            const cursorPos = formattedValue.length;
-                            newRange.setStart(textNode, cursorPos);
-                            newRange.collapse(true);
-                            selection.removeAllRanges();
-                            selection.addRange(newRange);
-                          }
-                          return;
-                        }
-                      }
-                    }
-                    node = node.parentNode;
-                  }
-                }
+                // Formatação automática de números para datas removida
                 
-                // Salvar posição do scroll antes da edição
-                const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-                const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
-                
-                // Salvar posição do cursor
+                // Salvar posição do cursor antes da edição
                 const currentSelection = window.getSelection();
                 const currentRange = currentSelection?.getRangeAt(0);
                 const startOffset = currentRange?.startOffset;
@@ -586,11 +523,8 @@ const ContractGenerator2 = () => {
                 // Atualizar conteúdo
                 setEditableContent(e.currentTarget.innerHTML);
                 
-                // Restaurar posição do cursor e scroll após o próximo render
-                setTimeout(() => {
-                  // Restaurar scroll para a posição original
-                  window.scrollTo(scrollLeft, scrollTop);
-                  
+                // Restaurar cursor e manter scroll travado na posição do cursor
+                requestAnimationFrame(() => {
                   if (currentSelection && startContainer && typeof startOffset === 'number' && editableRef.current) {
                     try {
                       const newRange = document.createRange();
@@ -622,34 +556,16 @@ const ContractGenerator2 = () => {
                         currentSelection.addRange(newRange);
                       }
                       
-                      // Garantir que o cursor permaneça visível sem scroll desnecessário
-                      const rect = newRange.getBoundingClientRect();
-                      const viewportHeight = window.innerHeight;
-                      const isVisible = rect.top >= 0 && rect.bottom <= viewportHeight;
-                      
-                      if (!isVisible) {
-                        // Apenas fazer scroll se o cursor estiver fora da área visível
-                        newRange.startContainer.parentElement?.scrollIntoView({
-                          behavior: 'smooth',
-                          block: 'center',
-                          inline: 'nearest'
-                        });
-                      }
+                      // Scroll fixo - não fazer nenhum scroll automático para evitar jumping
                     } catch (error) {
                       console.log('Erro ao restaurar cursor:', error);
                     }
                   }
-                }, 0);
+                });
               }}
               onFocus={(e) => {
-                // Salvar posição atual do scroll para evitar movimento automático
-                const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-                const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
-                
-                // Restaurar posição do scroll após o foco
-                setTimeout(() => {
-                  window.scrollTo(scrollLeft, scrollTop);
-                }, 0);
+                // Manter posição de scroll fixa - sem scroll automático
+                e.preventDefault();
               }}
               suppressContentEditableWarning={true}
             />

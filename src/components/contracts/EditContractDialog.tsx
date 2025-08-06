@@ -262,6 +262,7 @@ export const EditContractDialog = ({ contract, onContractUpdated }: EditContract
                   }));
                 }}
                 placeholder="Selecione a data de início"
+                disableAutoFormat={true}
               />
             </div>
             
@@ -277,6 +278,7 @@ export const EditContractDialog = ({ contract, onContractUpdated }: EditContract
                   }));
                 }}
                 placeholder="Selecione a data de fim"
+                disableAutoFormat={true}
               />
             </div>
           </div>

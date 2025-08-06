@@ -107,7 +107,7 @@ const Auth = () => {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="secretaria@escola.com"
+                      placeholder="coordenacaotsbonsucesso@gmail.com"
                       required
                     />
                   </div>
@@ -151,7 +151,7 @@ const Auth = () => {
                       type="email"
                       value={registerEmail}
                       onChange={(e) => setRegisterEmail(e.target.value)}
-                      placeholder="seu.email@escola.com"
+                      placeholder="coordenacaotsbonsucesso@gmail.com"
                       required
                     />
                   </div>

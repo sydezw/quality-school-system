@@ -219,6 +219,7 @@ export const ContractFilters = ({ filters, stats, onFilterChange }: ContractFilt
                     handleDateFilter('data_inicio', date ? format(date, 'yyyy-MM-dd') : '');
                   }}
                   placeholder="Selecione a data de início"
+                  disableAutoFormat={true}
                 />
               </div>
               <div>
@@ -233,6 +234,7 @@ export const ContractFilters = ({ filters, stats, onFilterChange }: ContractFilt
                     handleDateFilter('data_fim', date ? format(date, 'yyyy-MM-dd') : '');
                   }}
                   placeholder="Selecione a data de fim"
+                  disableAutoFormat={true}
                 />
               </div>
             </div>
