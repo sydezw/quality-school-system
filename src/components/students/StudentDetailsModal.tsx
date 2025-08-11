@@ -39,6 +39,23 @@ interface Student {
   endereco?: string | null;
   cpf?: string | null;
   status?: string;
+  idioma?: string | null;
+  turma_id?: string | null;
+  nivel?: string | null;
+  observacoes?: string | null;
+  aulas_particulares?: boolean | null;
+  aulas_turma?: boolean | null;
+  turma_particular_id?: string | null;
+  tipo_turma?: string | null;
+  numero_endereco?: string | null;
+  bairro?: string | null;
+  cidade?: string | null;
+  estado?: string | null;
+  cep?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  turmas?: { nome: string } | null;
+  responsaveis?: { nome: string } | null;
 }
 
 interface FinanceiroAluno {

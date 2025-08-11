@@ -15,7 +15,8 @@ import {
   Package,
   FileSignature,
   UserCheck,
-  CreditCard
+  CreditCard,
+  BookOpen
 } from 'lucide-react';
 
 // Define os itens do menu com suas respectivas permissões
@@ -24,6 +25,7 @@ const menuItems = [
     { icon: Users, label: 'Alunos', path: '/students' },
     { icon: GraduationCap, label: 'Professores', path: '/teachers' },
     { icon: BookCopy, label: 'Turmas', path: '/classes' },
+    { icon: BookOpen, label: 'Aulas', path: '/lessons' },
     { icon: FileText, label: 'Contratos', path: '/contracts' },
     { icon: FileSignature, label: 'Gerador de Contratos', path: '/contract-generator' },
     { icon: CreditCard, label: 'Planos', path: '/plans' },

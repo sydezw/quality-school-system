@@ -13,6 +13,7 @@ import Reports from "./pages/app/Reports";
 import Students from "./pages/app/Students";
 import Teachers from "./pages/app/Teachers";
 import Classes from "./pages/app/Classes";
+import Lessons from "./pages/app/Lessons";
 import Financial from "./pages/app/Financial";
 import Agenda from "./pages/app/Agenda";
 import Materials from "./pages/app/Materials";
@@ -58,6 +59,7 @@ const App = () => {
                                 <Route path="/students" element={<Students />} />
                                 <Route path="/teachers" element={<Teachers />} />
                                 <Route path="/classes" element={<Classes />} />
+                                <Route path="/lessons" element={<Lessons />} />
                                 <Route path="/financial" element={
                                     <ErrorBoundary>
                                         <Financial />

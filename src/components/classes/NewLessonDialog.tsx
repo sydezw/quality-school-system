@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -24,47 +24,111 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
 import DatePicker from '@/components/shared/DatePicker';
 
-const lessonSchema = z.object({
+const lessonSchemaWithTurma = z.object({
+  turma_id: z.string().min(1, "Selecione uma turma."),
   data: z.date({
     required_error: "A data da aula é obrigatória.",
   }),
   conteudo: z.string().min(1, "O conteúdo é obrigatório.").max(500, "O conteúdo pode ter no máximo 500 caracteres."),
 });
 
-interface NewLessonDialogProps {
-  turmaId: string;
-  onSuccess: () => void;
-  children: React.ReactNode;
+const lessonSchemaWithoutTurma = z.object({
+  data: z.date({
+    required_error: "A data da aula é obrigatória.",
+  }),
+  conteudo: z.string().min(1, "O conteúdo é obrigatório.").max(500, "O conteúdo pode ter no máximo 500 caracteres."),
+});
+
+interface Turma {
+  id: string;
+  nome: string;
+  idioma: string;
+  nivel: string;
 }
 
-export function NewLessonDialog({ turmaId, onSuccess, children }: NewLessonDialogProps) {
+interface NewLessonDialogProps {
+  turmaId?: string;
+  onSuccess?: () => void;
+  children?: React.ReactNode;
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+export function NewLessonDialog({ 
+  turmaId, 
+  onSuccess, 
+  children, 
+  isOpen, 
+  onOpenChange 
+}: NewLessonDialogProps) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [turmas, setTurmas] = useState<Turma[]>([]);
   const { toast } = useToast();
   
-  const form = useForm<z.infer<typeof lessonSchema>>({
-    resolver: zodResolver(lessonSchema),
+  const needsTurmaSelection = !turmaId;
+  
+  // Criamos dois formulários diferentes dependendo se precisamos selecionar turma ou não
+  const formWithTurma = useForm<z.infer<typeof lessonSchemaWithTurma>>({
+    resolver: zodResolver(lessonSchemaWithTurma),
+    defaultValues: {
+      turma_id: '',
+      conteudo: '',
+      data: new Date(),
+    },
+  });
+
+  const formWithoutTurma = useForm<z.infer<typeof lessonSchemaWithoutTurma>>({
+    resolver: zodResolver(lessonSchemaWithoutTurma),
     defaultValues: {
       conteudo: '',
       data: new Date(),
     },
   });
 
-  const onSubmit = async (values: z.infer<typeof lessonSchema>) => {
+  // Escolhemos qual formulário usar
+  const form = needsTurmaSelection ? formWithTurma : formWithoutTurma;
+
+  // Controle de abertura do dialog
+  const dialogOpen = isOpen !== undefined ? isOpen : open;
+  const setDialogOpen = onOpenChange || setOpen;
+
+  useEffect(() => {
+    const fetchTurmas = async () => {
+      if (!needsTurmaSelection) return;
+      
+      const { data, error } = await supabase
+        .from('turmas')
+        .select('id, nome, idioma, nivel')
+        .eq('status', 'ativo')
+        .order('nome');
+
+      if (error) {
+        console.error('Erro ao buscar turmas:', error);
+        return;
+      }
+
+      setTurmas(data || []);
+    };
+
+    if (dialogOpen && needsTurmaSelection) {
+      fetchTurmas();
+    }
+  }, [dialogOpen, needsTurmaSelection]);
+
+  const onSubmit = async (values: any) => {
     setIsSubmitting(true);
     try {
+      const finalTurmaId = turmaId || values.turma_id;
+      
       const { error } = await supabase
         .from('aulas')
         .insert({
-          turma_id: turmaId,
+          turma_id: finalTurmaId,
           data: format(values.data, 'yyyy-MM-dd'),
           conteudo: values.conteudo,
         });
@@ -75,8 +139,9 @@ export function NewLessonDialog({ turmaId, onSuccess, children }: NewLessonDialo
         title: "Sucesso!",
         description: "Nova aula registrada.",
       });
-      onSuccess();
-      setOpen(false);
+      
+      if (onSuccess) onSuccess();
+      setDialogOpen(false);
       form.reset();
     } catch (error) {
       console.error('Erro ao registrar aula:', error);
@@ -91,16 +156,44 @@ export function NewLessonDialog({ turmaId, onSuccess, children }: NewLessonDialo
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {children}
-      </DialogTrigger>
+    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      {children && (
+        <DialogTrigger asChild>
+          {children}
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Registrar Nova Aula</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {needsTurmaSelection && (
+              <FormField
+                control={formWithTurma.control}
+                name="turma_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Turma</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma turma" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {turmas.map((turma) => (
+                          <SelectItem key={turma.id} value={turma.id}>
+                            {turma.nome} - {turma.idioma} {turma.nivel}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             <FormField
               control={form.control}
               name="data"
@@ -112,9 +205,6 @@ export function NewLessonDialog({ turmaId, onSuccess, children }: NewLessonDialo
                       value={field.value}
                       onChange={field.onChange}
                       placeholder="Selecione a data da aula"
-                      disabled={(date) =>
-                        date > new Date() || date < new Date("1900-01-01")
-                      }
                     />
                   </FormControl>
                   <FormMessage />

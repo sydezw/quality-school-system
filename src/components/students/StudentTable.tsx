@@ -26,10 +26,11 @@ interface StudentTableProps {
   onEdit: (student: Student) => void;
   onDelete?: (student: Student, hardDeleteOptions?: any) => void;
   onCreateFinancialPlan?: (student: Student) => void;
+  onViewDetails?: (student: Student) => void;
   isDeleting?: boolean;
 }
 
-const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, isDeleting }: StudentTableProps) => {
+const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, onViewDetails, isDeleting }: StudentTableProps) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
 
@@ -52,8 +53,12 @@ const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, isDel
   };
 
   const handleStudentClick = (student: Student) => {
-    // Função para lidar com clique no aluno - pode abrir modal de detalhes
-    console.log('Clicou no aluno:', student);
+    // Função para lidar com clique no aluno - abre modal de detalhes
+    if (onViewDetails) {
+      onViewDetails(student);
+    } else {
+      console.log('Clicou no aluno:', student);
+    }
   };
 
   const handleViewEnrollments = (student: Student) => {

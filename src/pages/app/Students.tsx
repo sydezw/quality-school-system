@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import StudentDialog from '@/components/students/StudentDialog';
 import StudentTable from '@/components/students/StudentTable';
+import { StudentDetailsModal } from '@/components/students/StudentDetailsModal';
 import FinancialPlanDialog from '@/components/financial/FinancialPlanDialog';
 import { StudentFilters } from '@/components/students/StudentFilters';
 import { useStudents } from '@/hooks/useStudents';
@@ -33,6 +34,8 @@ const Students = () => {
   const [isFinancialDialogOpen, setIsFinancialDialogOpen] = useState(false);
   const [selectedStudentForPlan, setSelectedStudentForPlan] = useState<Student | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [selectedStudentForDetails, setSelectedStudentForDetails] = useState<Student | null>(null);
   
   // Remover o estado showInactive e o useEffect relacionado
   // const [showInactive, setShowInactive] = useState(false);
@@ -77,6 +80,12 @@ const Students = () => {
   const handleDelete = async (student: Student, plan: any) => {
     console.log('Excluindo aluno:', student, plan); // Adicione esta linha
     await deleteStudentWithPlan(student, plan);
+  };
+
+  const handleViewDetails = (student: Student) => {
+    console.log('Visualizando detalhes do aluno:', student);
+    setSelectedStudentForDetails(student);
+    setIsDetailsModalOpen(true);
   };
 
   const handleFinancialPlanSuccess = () => {
@@ -246,6 +255,7 @@ const Students = () => {
               onEdit={handleEdit}
               onDelete={handleDelete}
               onCreateFinancialPlan={handleCreateFinancialPlan}
+              onViewDetails={handleViewDetails}
               isDeleting={isDeleting}
             />
             
@@ -319,6 +329,12 @@ const Students = () => {
           onOpenChange={setIsFinancialDialogOpen}
           selectedStudent={selectedStudentForPlan}
           onSuccess={handleFinancialPlanSuccess}
+        />
+
+        <StudentDetailsModal
+          isOpen={isDetailsModalOpen}
+          onClose={() => setIsDetailsModalOpen(false)}
+          student={selectedStudentForDetails}
         />
       </div>
     </div>
