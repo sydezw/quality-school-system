@@ -2,7 +2,7 @@ export interface User {
   id: string;
   nome: string;
   email: string;
-  cargo: 'Secretária' | 'Gerente' | 'Admin';
+  cargo: 'Secretária' | 'Gerente' | 'Admin' | 'Professor';
   created_at: string;
   updated_at: string;
 }
@@ -11,7 +11,7 @@ export interface PendingUser {
   id: string;
   nome: string;
   email: string;
-  cargo: 'Secretária' | 'Gerente' | 'Admin';
+  cargo: 'Secretária' | 'Gerente' | 'Admin' | 'Professor';
   status: 'pendente' | 'aprovado' | 'rejeitado';
   created_at: string;
 }
@@ -31,7 +31,7 @@ export interface SignUpData {
   nome: string;
   email: string;
   senha: string;
-  cargo: 'Secretária' | 'Gerente' | 'Admin';
+  cargo: 'Secretária' | 'Gerente' | 'Admin' | 'Professor';
 }
 
 export interface AuthResponse {

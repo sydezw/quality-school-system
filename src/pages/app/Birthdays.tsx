@@ -36,10 +36,14 @@ const calculateAge = (birthDate: string) => {
   return age;
 };
 
-const calculateAgeThisYear = (birthDate: string) => {
+// Nova função: Calcula quantos anos a pessoa VAI FAZER no aniversário deste ano
+const calculateBirthdayAge = (birthDate: string) => {
   const today = new Date();
   const birth = new Date(birthDate);
-  return today.getFullYear() - birth.getFullYear();
+  const currentYear = today.getFullYear();
+  
+  // A idade que a pessoa vai completar é sempre o ano atual menos o ano de nascimento
+  return currentYear - birth.getFullYear();
 };
 
 const getDaysUntilBirthday = (birthDate: string) => {
@@ -175,8 +179,7 @@ export default function Birthdays() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {students.map((student, index) => {
             const birthDay = student.data_nascimento ? Number(student.data_nascimento.split("-")[2]) : 0;
-            const currentAge = student.data_nascimento ? calculateAge(student.data_nascimento) : 0;
-            const ageThisYear = student.data_nascimento ? calculateAgeThisYear(student.data_nascimento) : 0;
+            const age = student.data_nascimento ? calculateBirthdayAge(student.data_nascimento) : 0; // MUDANÇA AQUI
             const daysUntil = student.data_nascimento ? getDaysUntilBirthday(student.data_nascimento) : 0;
             const isToday = daysUntil === 0;
             const isSoon = daysUntil <= 7 && daysUntil > 0;
@@ -191,6 +194,10 @@ export default function Birthdays() {
                     ? 'ring-1 ring-brand-red/30 bg-gradient-to-br from-brand-red/2 to-pink-25'
                     : 'hover:ring-1 hover:ring-brand-red/20'
                 }`}
+                style={{
+                  animationDelay: `${index * 100}ms`,
+                  animation: 'fadeInUp 0.6s ease-out forwards'
+                }}
               >
                 {/* Decorative Elements */}
                 <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-brand-red/10 to-transparent rounded-bl-full" />
@@ -224,7 +231,7 @@ export default function Birthdays() {
                           {student.nome}
                         </CardTitle>
                         <p className="text-sm text-muted-foreground">
-                          Fará {ageThisYear} {ageThisYear === 1 ? 'ano' : 'anos'} em {new Date().getFullYear()}
+                          {age} {age === 1 ? 'ano' : 'anos'}
                         </p>
                       </div>
                     </div>

@@ -1857,8 +1857,8 @@ const Classes = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <BookCopy className="h-4 w-4 text-green-500" />
-                            <span className="text-base font-medium text-green-700">
+                            <BookCopy className={`h-4 w-4 ${(classItem.total_aulas || 0) === 0 ? 'text-red-500' : 'text-green-500'}`} />
+                            <span className={`text-base font-medium ${(classItem.total_aulas || 0) === 0 ? 'text-red-700' : 'text-green-700'}`}>
                               {classItem.total_aulas || 0} aulas
                             </span>
                           </div>
@@ -1971,8 +1971,8 @@ const Classes = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <BookCopy className="h-4 w-4 text-green-500" />
-                          <span className="text-base font-medium text-green-700">
+                          <BookCopy className={`h-4 w-4 ${(classItem.total_aulas || 0) === 0 ? 'text-red-500' : 'text-green-500'}`} />
+                          <span className={`text-base font-medium ${(classItem.total_aulas || 0) === 0 ? 'text-red-700' : 'text-green-700'}`}>
                             {classItem.total_aulas || 0} aulas
                           </span>
                         </div>

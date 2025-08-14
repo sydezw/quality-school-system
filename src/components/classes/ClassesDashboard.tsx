@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Tables } from '@/integrations/supabase/types';
+import { NewLessonDialog } from './NewLessonDialog';
 
 // Tipos
 type Aula = Tables<'aulas'>;
@@ -305,10 +306,12 @@ const ClassesDashboard = () => {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Button className="h-20 flex flex-col items-center justify-center gap-2 bg-red-600 hover:bg-red-700">
-              <Calendar className="h-6 w-6" />
-              <span>Nova Aula</span>
-            </Button>
+            <NewLessonDialog onSuccess={loadDashboardStats}>
+              <Button className="h-20 flex flex-col items-center justify-center gap-2 bg-red-600 hover:bg-red-700">
+                <Calendar className="h-6 w-6" />
+                <span>Nova Aula</span>
+              </Button>
+            </NewLessonDialog>
             
             <Button variant="outline" className="h-20 flex flex-col items-center justify-center gap-2">
               <Users className="h-6 w-6" />

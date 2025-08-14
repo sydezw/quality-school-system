@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Users, Trash2 } from 'lucide-react';
+import { Plus, Edit, Users, Trash2, Eye, EyeOff, Key } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
@@ -25,6 +25,8 @@ const Teachers = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
+  const [showPasswords, setShowPasswords] = useState<{[key: string]: boolean}>({});
+  const [showFormPassword, setShowFormPassword] = useState(false);
   const { toast } = useToast();
 
   const {
@@ -43,6 +45,7 @@ const Teachers = () => {
       email: '',
       idiomas: '',
       salario: '',
+      senha: '',
       status: 'ativo'
     }
   });
@@ -78,6 +81,17 @@ const Teachers = () => {
     setValue('cpf', formattedCPF);
   };
 
+  const togglePasswordVisibility = (teacherId: string) => {
+    setShowPasswords(prev => ({
+      ...prev,
+      [teacherId]: !prev[teacherId]
+    }));
+  };
+
+  const toggleFormPasswordVisibility = () => {
+    setShowFormPassword(prev => !prev);
+  };
+
   const onSubmit = async (data: TeacherFormData) => {
     try {
       const teacherData = {
@@ -87,6 +101,8 @@ const Teachers = () => {
         email: data.email || null,
         idiomas: data.idiomas || '',
         salario: data.salario && data.salario !== '0,00' ? parseFloat(data.salario.replace(/\./g, '').replace(',', '.')) : null,
+        senha: data.senha || null,
+        cargo: editingTeacher ? undefined : 'Professor', // Adiciona cargo automaticamente apenas para novos professores
       };
 
       if (editingTeacher) {
@@ -139,6 +155,7 @@ const Teachers = () => {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
       }) : '0,00',
+      senha: teacher.senha || '',
       status: teacher.status || 'ativo'
     });
     setIsDialogOpen(true);
@@ -356,6 +373,35 @@ const Teachers = () => {
                 </div>
 
                 <div>
+                  <Label htmlFor="senha">Senha</Label>
+                  <div className="relative">
+                    <Input
+                      id="senha"
+                      {...register('senha')}
+                      type={showFormPassword ? "text" : "password"}
+                      placeholder="Digite a senha"
+                      className={errors.senha ? "border-red-500 pr-10" : "pr-10"}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleFormPasswordVisibility}
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    >
+                      {showFormPassword ? (
+                        <EyeOff className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-gray-400" />
+                      )}
+                    </Button>
+                  </div>
+                  {errors.senha && (
+                    <p className="text-sm text-red-500 mt-1">{errors.senha.message}</p>
+                  )}
+                </div>
+
+                <div>
                   <Label htmlFor="status">Status *</Label>
                   <Select onValueChange={(value) => setValue('status', value)} value={watch('status')}>
                     <SelectTrigger className={errors.status ? "border-red-500" : ""}>
@@ -407,6 +453,7 @@ const Teachers = () => {
                     <TableHead>Idiomas</TableHead>
                     <TableHead>Contato</TableHead>
                     <TableHead>Salário</TableHead>
+                    <TableHead>Senha</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Ações</TableHead>
                   </TableRow>
@@ -441,6 +488,29 @@ const Teachers = () => {
                         )}
                       </TableCell>
                       <TableCell>
+                        {teacher.senha ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-base font-mono">
+                              {showPasswords[teacher.id] ? teacher.senha : '••••••••'}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => togglePasswordVisibility(teacher.id)}
+                              className="h-6 w-6 p-0"
+                            >
+                              {showPasswords[teacher.id] ? (
+                                <EyeOff className="h-3 w-3" />
+                              ) : (
+                                <Eye className="h-3 w-3" />
+                              )}
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-base">Não definida</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <Badge 
                           variant={teacher.status === 'ativo' ? 'default' : 'secondary'}
                           className={`text-sm ${
@@ -461,6 +531,7 @@ const Teachers = () => {
                             variant="outline"
                             size="sm"
                             onClick={() => openEditDialog(teacher)}
+                            title="Editar professor"
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -469,6 +540,7 @@ const Teachers = () => {
                             size="sm"
                             onClick={() => handleDeleteClick(teacher)}
                             disabled={isDeleting}
+                            title="Excluir professor"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>

@@ -835,7 +835,7 @@ const ParcelasTable: React.FC<ParcelasTableProps> = ({ onRefresh }) => {
                   >
                     <Button
                       onClick={handleCreatePlan}
-                      className="w-full text-white border-0 px-6 py-2 shadow-lg transition-all duration-300 bg-[#D90429] hover:bg-[#1F2937]"
+                      className="w-full text-gray-800 border-0 px-6 py-2 shadow-lg transition-all duration-300 bg-white hover:bg-gray-100"
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       <Users className="h-4 w-4 mr-2" />

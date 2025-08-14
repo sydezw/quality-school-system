@@ -2,6 +2,8 @@
 import { useLocation } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { usePermissions } from '@/components/guards/ProfessorGuard';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 import { 
   Home, 
@@ -19,49 +21,83 @@ import {
   BookOpen
 } from 'lucide-react';
 
-// Define os itens do menu com suas respectivas permissões
-const menuItems = [
-    { icon: Home, label: 'Dashboard', path: '/dashboard' },
-    { icon: Users, label: 'Alunos', path: '/students' },
-    { icon: GraduationCap, label: 'Professores', path: '/teachers' },
-    { icon: BookCopy, label: 'Turmas', path: '/classes' },
-    { icon: BookOpen, label: 'Aulas', path: '/lessons' },
-    { icon: FileText, label: 'Contratos', path: '/contracts' },
-    { icon: FileSignature, label: 'Gerador de Contratos', path: '/contract-generator' },
-    { icon: CreditCard, label: 'Planos', path: '/plans' },
-    { icon: DollarSign, label: 'Financeiro', path: '/financial' },
-    { icon: Calendar, label: 'Agenda', path: '/agenda' },
-    { icon: Package, label: 'Materiais', path: '/materials' },
-    { icon: BarChart3, label: 'Relatórios', path: '/reports' },
-    { icon: FileText, label: 'Documentos', path: '/documents' },
-    { icon: Calendar, label: 'Aniversariantes do Mês', path: '/birthdays' },
-    { icon: UserCheck, label: 'Aprovar Logins', path: '/approve-logins' },
-  ];
+// Define os itens do menu com suas respectivas permissões - Sistema restritivo para professores
+const getAllMenuItems = (permissions: ReturnType<typeof usePermissions>) => {
+  // Para professores, apenas itens explicitamente permitidos
+  if (permissions.isProfessor) {
+    return [
+      { icon: BookCopy, label: 'Minhas Turmas', path: '/teacher-classes', visible: permissions.canAccessTeacherClasses },
+      { icon: BookOpen, label: 'Aulas', path: '/lessons', visible: permissions.canAccessLessons },
+    ].filter(item => item.visible);
+  }
+  
+  // Para administradores, todos os itens exceto "Minhas Turmas"
+  return [
+    { icon: Home, label: 'Dashboard', path: '/dashboard', visible: permissions.canAccessDashboard },
+    { icon: Users, label: 'Alunos', path: '/students', visible: permissions.canAccessStudents },
+    { icon: GraduationCap, label: 'Professores', path: '/teachers', visible: permissions.canAccessTeachers },
+    { icon: BookCopy, label: 'Turmas', path: '/classes', visible: permissions.canAccessClasses },
+    { icon: BookOpen, label: 'Aulas', path: '/lessons', visible: permissions.canAccessLessons },
+    { icon: FileText, label: 'Contratos', path: '/contracts', visible: permissions.canAccessContracts },
+    { icon: FileSignature, label: 'Gerador de Contratos', path: '/contract-generator', visible: permissions.canAccessContracts },
+    { icon: CreditCard, label: 'Planos', path: '/plans', visible: permissions.canAccessPlans },
+    { icon: DollarSign, label: 'Financeiro', path: '/financial', visible: permissions.canAccessFinancial },
+    { icon: Calendar, label: 'Agenda', path: '/agenda', visible: permissions.canAccessAgenda },
+    { icon: Package, label: 'Materiais', path: '/materials', visible: permissions.canAccessMaterials },
+    { icon: BarChart3, label: 'Relatórios', path: '/reports', visible: permissions.canAccessReports },
+    { icon: FileText, label: 'Documentos', path: '/documents', visible: permissions.canAccessDocuments },
+    { icon: UserCheck, label: 'Responsáveis', path: '/responsibles', visible: permissions.canAccessResponsibles },
+    { icon: Calendar, label: 'Aniversariantes do Mês', path: '/birthdays', visible: permissions.canAccessBirthdays },
+    { icon: UserCheck, label: 'Aprovar Logins', path: '/approve-logins', visible: permissions.canAccessApproveLogins }
+    // Nota: "Minhas Turmas" não aparece para administradores pois canAccessTeacherClasses é false para eles
+  ].filter(item => item.visible);
+};
 
 export const Sidebar = () => {
   const location = useLocation();
+  const permissions = usePermissions();
+  const isMobile = useIsMobile();
+
+  // Oculta a sidebar no mobile
+  if (isMobile) {
+    return null;
+  }
+  const menuItems = getAllMenuItems(permissions);
   const version = "v1.0.0";
+  
+  // Caminho padrão baseado no tipo de usuário
+  const defaultPath = permissions.isProfessor ? '/teacher-classes' : '/dashboard';
+  
+  // Verificação adicional de segurança - se professor tentar acessar rota não permitida via sidebar
+  const handleNavigation = (path: string) => {
+    if (permissions.isProfessor) {
+      const allowedPaths = ['/teacher-classes', '/lessons'];
+      if (!allowedPaths.includes(path)) {
+        console.warn('Tentativa de acesso não autorizado bloqueada:', path);
+        return '/teacher-classes';
+      }
+    }
+    return path;
+  };
 
   return (
-    <div className="group w-16 hover:w-64 bg-white border-r border-gray-200 transition-all duration-300 ease-in-out flex flex-col overflow-hidden">
-      {/* Header com logo */}
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center">
-          {/* Logo compacto sempre visível */}
-          <div className="w-8 h-8 bg-brand-red rounded-lg flex items-center justify-center flex-shrink-0">
-            <span className="text-white font-bold text-sm">SE</span>
+    <div className="hidden md:flex group w-16 hover:w-[250px] bg-white border-r border-gray-200 flex-col fixed left-0 top-0 h-full z-50 transition-all duration-300 ease-in-out overflow-hidden">
+      {/* Título/Logo no topo */}
+      <div className="pt-5 px-4 pb-5">
+        <div className="flex items-center gap-3">
+          {/* Logo quadrado arredondado - sempre visível */}
+          <div className="w-8 h-8 bg-[#DC2626] rounded-lg flex items-center justify-center flex-shrink-0">
+            <span className="text-white font-bold text-sm">TS</span>
           </div>
           
-          {/* Nome completo que aparece no hover */}
-          <div className="ml-3 opacity-0 scale-0 group-hover:opacity-100 group-hover:scale-100 transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap">
-            <h2 className="text-xl font-semibold text-brand-red">Sistema Escolar</h2>
-          </div>
+          {/* Nome do sistema - aparece no hover */}
+          <h2 className="text-[#DC2626] font-semibold text-base opacity-0 scale-0 group-hover:opacity-100 group-hover:scale-100 transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap" style={{fontFamily: '"Inter", sans-serif'}}>Sistema Escolar</h2>
         </div>
       </div>
 
       {/* Navegação */}
-      <nav className="flex-1 py-4">
-        <ul className="space-y-1 px-2">
+      <nav className="flex-1 px-4">
+        <ul className="space-y-[2px]">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -69,19 +105,41 @@ export const Sidebar = () => {
             return (
               <li key={item.path}>
                 <Link
-                  to={item.path}
+                  to={handleNavigation(item.path)}
                   className={cn(
-                    "flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 ease-in-out",
-                    isActive
-                      ? "bg-brand-red text-white"
-                      : "text-gray-700 hover:bg-gray-100"
+                    "flex items-center gap-3 px-2 py-1 rounded-lg transition-all duration-200 ease-in-out min-h-[32px]",
+                    "font-medium",
+                    !isActive && "hover:bg-gray-50"
                   )}
+                  style={{fontFamily: '"Inter", sans-serif'}}
                 >
-                  {/* Ícone sempre visível */}
-                  <Icon className="h-5 w-5 flex-shrink-0" />
+                  {/* Container do ícone com círculo */}
+                  <div className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 ease-in-out flex-shrink-0",
+                    isActive
+                      ? "bg-[#dc2626]"
+                      : "hover:bg-[#fee2e2]"
+                  )}>
+                    <Icon 
+                      className={cn(
+                        "w-5 h-5 transition-all duration-200 ease-in-out",
+                        isActive 
+                          ? "text-white" 
+                          : "text-[#6b7280] hover:text-[#dc2626]"
+                      )}
+                      size={20}
+                      strokeWidth={1.5}
+                      fill="none"
+                      stroke="currentColor"
+                      xmlns="http://www.w3.org/2000/svg"
+                    />
+                  </div>
                   
-                  {/* Texto que aparece no hover */}
-                  <span className="ml-3 opacity-0 scale-0 group-hover:opacity-100 group-hover:scale-100 transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap">
+                  {/* Texto - aparece no hover */}
+                  <span className={cn(
+                    "text-[0.75rem] opacity-0 scale-0 group-hover:opacity-100 group-hover:scale-100 transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap",
+                    isActive ? "text-[#1F2937] font-semibold" : "text-[#1F2937] font-medium"
+                  )}>
                     {item.label}
                   </span>
                 </Link>
@@ -90,21 +148,6 @@ export const Sidebar = () => {
           })}
         </ul>
       </nav>
-
-      {/* Componente de versão no rodapé */}
-      <div className="p-4 border-t border-gray-200">
-        <div className="flex items-center gap-2 text-sm text-gray-500 opacity-70 hover:opacity-100 transition-opacity duration-300">
-          {/* Ícone TS sempre visível */}
-          <div className="rounded-full bg-indigo-600 text-white w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">
-            TS
-          </div>
-          
-          {/* Versão que aparece no hover */}
-          <span className="text-xs font-medium text-gray-400 opacity-0 scale-0 group-hover:opacity-100 group-hover:scale-100 transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap">
-            {version}
-          </span>
-        </div>
-      </div>
     </div>
   );
 };

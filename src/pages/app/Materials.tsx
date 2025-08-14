@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, BookOpen, Package } from 'lucide-react';
+import { Plus, Edit, Trash2, BookOpen, Package, Layers } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { getIdiomaColor } from '@/utils/idiomaColors';
 
@@ -30,6 +30,7 @@ const Materials = () => {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
+  const [activeTab, setActiveTab] = useState('ingles');
   const { toast } = useToast();
   const { register, handleSubmit, reset, setValue } = useForm();
 
@@ -190,7 +191,7 @@ const Materials = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">Materiais Didáticos</h1>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button
               onClick={openCreateDialog}
@@ -280,6 +281,34 @@ const Materials = () => {
         </Dialog>
       </div>
 
+      {/* Botões de Navegação */}
+      <div className="space-y-4">
+        <div className="inline-flex h-10 items-center justify-center text-muted-foreground bg-gray-200 p-1 rounded-lg shadow-lg">
+          <div className="flex w-full">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'ingles'}
+              data-state={activeTab === 'ingles' ? 'active' : 'inactive'}
+              onClick={() => setActiveTab('ingles')}
+              className="inline-flex items-center justify-center whitespace-nowrap px-3 py-1.5 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 flex-1 data-[state=active]:bg-[#D90429] data-[state=active]:text-white data-[state=active]:shadow-lg text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-all duration-300 font-medium rounded-md"
+            >
+              <span>Inglês</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'japones'}
+              data-state={activeTab === 'japones' ? 'active' : 'inactive'}
+              onClick={() => setActiveTab('japones')}
+              className="inline-flex items-center justify-center whitespace-nowrap px-3 py-1.5 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 flex-1 data-[state=active]:bg-[#D90429] data-[state=active]:text-white data-[state=active]:shadow-lg text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-all duration-300 font-medium rounded-md"
+            >
+              <span>Japonês</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -288,67 +317,69 @@ const Materials = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {materials.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500">Nenhum material cadastrado ainda.</p>
-              <p className="text-sm text-gray-400">Clique no botão "Novo Material" para começar.</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Idioma</TableHead>
-                  <TableHead>Nível</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {materials.map((material) => (
-                  <TableRow key={material.id}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium text-base">{material.nome}</div>
-                        {material.descricao && (
-                          <div className="text-base text-gray-500">{material.descricao}</div>
-                        )}
+          {(() => {
+            const currentLanguage = activeTab === 'ingles' ? 'Inglês' : 'Japonês';
+            const filteredMaterials = materials.filter(m => m.idioma === currentLanguage);
+            
+            if (filteredMaterials.length === 0) {
+              return (
+                <div className="text-center py-8">
+                  <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500">Nenhum material de {currentLanguage} cadastrado ainda.</p>
+                  <p className="text-sm text-gray-400">Clique no botão "Novo Material" para começar.</p>
+                </div>
+              );
+            }
+            
+            return (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <Badge className={getIdiomaColor(currentLanguage)}>
+                    {currentLanguage}
+                  </Badge>
+                  <span className="text-sm text-gray-500">({filteredMaterials.length} materiais)</span>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredMaterials.map((material) => (
+                    <div key={material.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-base">{material.nome}</h4>
+                          <p className="text-sm text-gray-600">{material.nivel}</p>
+                          {material.descricao && (
+                            <p className="text-sm text-gray-500 mt-1">{material.descricao}</p>
+                          )}
+                        </div>
+                        <Badge className={getStatusColor(material.status)}>
+                          {material.status === 'disponivel' ? 'Disponível' : 'Indisponível'}
+                        </Badge>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getIdiomaColor(material.idioma)}>
-                        {material.idioma}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-base">{material.nivel}</TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(material.status)}>
-                        {material.status === 'disponivel' ? 'Disponível' : 'Indisponível'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 mt-3">
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => openEditDialog(material)}
+                          className="flex-1"
                         >
-                          <Edit className="h-4 w-4" />
+                          <Edit className="h-4 w-4 mr-1" />
+                          Editar
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => deleteMaterial(material.id)}
+                          className="text-red-600 hover:text-red-700"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </CardContent>
         </Card>
       </div>

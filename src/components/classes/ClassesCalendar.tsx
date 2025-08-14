@@ -10,6 +10,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Tables } from '@/integrations/supabase/types';
 import { motion } from 'framer-motion';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
 
 // FullCalendar imports
 import FullCalendar from '@fullcalendar/react';
@@ -75,6 +77,9 @@ const ClassesCalendar = () => {
 
   // Referência do calendário
   const calendarRef = useRef<FullCalendar>(null);
+
+  // Hook para detectar mobile
+  const isMobile = useIsMobile();
 
   const { toast } = useToast();
 
@@ -284,122 +289,176 @@ const ClassesCalendar = () => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      {/* Header com controles */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+      {/* Header com controles - Otimizado para mobile */}
+      <div className={cn(
+        "flex gap-4 items-start justify-between",
+        isMobile ? "flex-col space-y-4" : "flex-row items-center"
+      )}>
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-[#D90429]/10 rounded-lg">
-            <Calendar className="h-6 w-6 text-[#D90429]" />
+          <div className={cn(
+            "p-2 bg-[#D90429]/10 rounded-lg",
+            isMobile && "p-1.5"
+          )}>
+            <Calendar className={cn(
+              "text-[#D90429]",
+              isMobile ? "h-5 w-5" : "h-6 w-6"
+            )} />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Calendário de Aulas</h2>
-            <p className="text-sm text-gray-600">Visualize e gerencie suas aulas</p>
+            <h2 className={cn(
+              "font-bold text-gray-900",
+              isMobile ? "text-xl" : "text-2xl"
+            )}>Calendário de Aulas</h2>
+            <p className={cn(
+              "text-gray-600",
+              isMobile ? "text-xs" : "text-sm"
+            )}>Visualize e gerencie suas aulas</p>
           </div>
         </div>
         
-        <Button className="bg-[#D90429] hover:bg-[#B8001F] text-white shadow-lg hover:shadow-xl transition-all duration-200">
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Aula
-        </Button>
+
       </div>
 
-      {/* Filtros e busca */}
-      <Card className="border-0 shadow-md">
+      {/* Filtros e busca - Otimizado para mobile */}
+      <Card className={cn(
+        "border-0 shadow-md",
+        isMobile && "mx-2"
+      )}>
         <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
           <CollapsibleTrigger asChild>
-            <CardHeader className="cursor-pointer hover:bg-gray-50 transition-colors">
-              <CardTitle className="flex items-center justify-between">
+            <CardHeader className={cn(
+              "cursor-pointer hover:bg-gray-50 transition-colors",
+              isMobile ? "p-4" : "p-6"
+            )}>
+              <CardTitle className={cn(
+                "flex items-center justify-between",
+                isMobile ? "text-base" : "text-lg"
+              )}>
                 <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-[#D90429]" />
-                  Filtros de Busca
+                  <Filter className={cn(
+                    "text-[#D90429]",
+                    isMobile ? "h-4 w-4" : "h-5 w-5"
+                  )} />
+                  <span className={isMobile ? "text-sm" : ""}>Filtros de Busca</span>
                 </div>
                 <motion.div
                   animate={{ rotate: filtersOpen ? 180 : 0 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <ChevronDown className="h-4 w-4 text-gray-500" />
+                  <ChevronDown className={cn(
+                    "text-gray-500",
+                    isMobile ? "h-4 w-4" : "h-5 w-5"
+                  )} />
                 </motion.div>
               </CardTitle>
             </CardHeader>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {/* Busca */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Buscar aulas..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+            <CardContent className={isMobile ? "p-4" : "p-6"}>
+              <div className={cn(
+                "grid gap-4",
+                isMobile ? "grid-cols-1 space-y-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-5"
+              )}>
+                {/* Busca */}
+                <div className="relative">
+                  <Search className={cn(
+                    "absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400",
+                    isMobile ? "h-4 w-4" : "h-4 w-4"
+                  )} />
+                  <Input
+                    placeholder="Buscar aulas..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className={cn(
+                      "pl-10",
+                      isMobile && "h-12 text-base rounded-xl"
+                    )}
+                  />
+                </div>
 
-            {/* Filtro por turma */}
-            <select
-              value={filters.turmaId}
-              onChange={(e) => setFilters(prev => ({ ...prev, turmaId: e.target.value }))}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D90429] transition-all duration-200"
-            >
-              <option value="">Todas as turmas</option>
-              {turmas.map(turma => (
-                <option key={turma.id} value={turma.id}>
-                  {turma.nome}
-                </option>
-              ))}
-            </select>
+                {/* Filtro por turma */}
+                <select
+                  value={filters.turmaId}
+                  onChange={(e) => setFilters(prev => ({ ...prev, turmaId: e.target.value }))}
+                  className={cn(
+                    "px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D90429] transition-all duration-200",
+                    isMobile && "h-12 text-base rounded-xl"
+                  )}
+                >
+                  <option value="">Todas as turmas</option>
+                  {turmas.map(turma => (
+                    <option key={turma.id} value={turma.id}>
+                      {turma.nome}
+                    </option>
+                  ))}
+                </select>
 
-            {/* Filtro por idioma */}
-            <select
-              value={filters.idioma}
-              onChange={(e) => setFilters(prev => ({ ...prev, idioma: e.target.value }))}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D90429] transition-all duration-200"
-            >
-              <option value="">Todos os idiomas</option>
-              <option value="Inglês">Inglês</option>
-              <option value="Japonês">Japonês</option>
-              <option value="Inglês/Japonês">Inglês/Japonês</option>
-              <option value="particular">Particular</option>
-            </select>
+                {/* Filtro por idioma */}
+                <select
+                  value={filters.idioma}
+                  onChange={(e) => setFilters(prev => ({ ...prev, idioma: e.target.value }))}
+                  className={cn(
+                    "px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D90429] transition-all duration-200",
+                    isMobile && "h-12 text-base rounded-xl"
+                  )}
+                >
+                  <option value="">Todos os idiomas</option>
+                  <option value="Inglês">Inglês</option>
+                  <option value="Japonês">Japonês</option>
+                  <option value="Inglês/Japonês">Inglês/Japonês</option>
+                  <option value="particular">Particular</option>
+                </select>
 
-            {/* Filtro por status */}
-            <select
-              value={filters.status}
-              onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D90429] transition-all duration-200"
-            >
-              <option value="">Todos os status</option>
-              <option value="agendada">Agendada</option>
-              <option value="em_andamento">Em Andamento</option>
-              <option value="concluida">Concluída</option>
-              <option value="cancelada">Cancelada</option>
-            </select>
+                {/* Filtro por status */}
+                <select
+                  value={filters.status}
+                  onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                  className={cn(
+                    "px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D90429] transition-all duration-200",
+                    isMobile && "h-12 text-base rounded-xl"
+                  )}
+                >
+                  <option value="">Todos os status</option>
+                  <option value="agendada">Agendada</option>
+                  <option value="em_andamento">Em Andamento</option>
+                  <option value="concluida">Concluída</option>
+                  <option value="cancelada">Cancelada</option>
+                </select>
 
-            {/* Botão limpar filtros */}
-            <Button
-              variant="outline"
-              className="border-[#D90429] text-[#D90429] hover:bg-[#D90429] hover:text-white transition-all duration-200"
-              onClick={() => {
-                setFilters({ turmaId: '', professorId: '', idioma: '', status: '' });
-                setSearchTerm('');
-              }}
-            >
-              Limpar Filtros
-            </Button>
-          </div>
+                {/* Botão limpar filtros */}
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "border-[#D90429] text-[#D90429] hover:bg-[#D90429] hover:text-white transition-all duration-200",
+                    isMobile && "h-12 text-base rounded-xl w-full"
+                  )}
+                  onClick={() => {
+                    setFilters({ turmaId: '', professorId: '', idioma: '', status: '' });
+                    setSearchTerm('');
+                  }}
+                >
+                  Limpar Filtros
+                </Button>
+              </div>
             </CardContent>
           </CollapsibleContent>
         </Collapsible>
       </Card>
 
-      {/* Calendário FullCalendar */}
+      {/* Calendário FullCalendar - Otimizado para mobile */}
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5, delay: 0.2 }}
+        className={isMobile ? "mx-2" : ""}
       >
-        <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-white to-gray-50">
-          <CardContent className="p-6">
+        <Card className={cn(
+          "border-0 shadow-xl hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-white to-gray-50",
+          isMobile && "rounded-xl"
+        )}>
+          <CardContent className={cn(
+            isMobile ? "p-3" : "p-0"
+          )}>
             <style>{`
               /* Customização do FullCalendar com tema */
               .fc {
@@ -408,18 +467,20 @@ const ClassesCalendar = () => {
               
               /* Header do calendário */
               .fc-header-toolbar {
-                margin-bottom: 1.5rem !important;
-                padding: 1rem;
+                margin-bottom: ${isMobile ? '1rem' : '1.5rem'} !important;
+                padding: ${isMobile ? '0.75rem' : '1rem'};
                 background: linear-gradient(135deg, #D90429 0%, #B8001F 100%);
-                border-radius: 12px;
+                border-radius: ${isMobile ? '8px' : '12px'};
                 box-shadow: 0 4px 20px rgba(217, 4, 41, 0.3);
+                ${isMobile ? 'flex-direction: column !important; gap: 0.5rem !important;' : ''}
               }
               
               .fc-toolbar-title {
                 color: white !important;
-                font-size: 1.5rem !important;
+                font-size: ${isMobile ? '1.25rem' : '1.5rem'} !important;
                 font-weight: 700 !important;
                 text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                ${isMobile ? 'text-align: center !important; margin-bottom: 0.5rem !important;' : ''}
               }
               
               /* Botões do calendário */
@@ -427,11 +488,25 @@ const ClassesCalendar = () => {
                 background: rgba(255, 255, 255, 0.2) !important;
                 border: 1px solid rgba(255, 255, 255, 0.3) !important;
                 color: white !important;
-                border-radius: 8px !important;
+                border-radius: ${isMobile ? '6px' : '8px'} !important;
                 font-weight: 500 !important;
                 transition: all 0.3s ease !important;
                 backdrop-filter: blur(10px);
+                ${isMobile ? 'min-height: 36px !important; font-size: 0.875rem !important; padding: 0.25rem 0.5rem !important;' : ''}
               }
+              
+              /* Mobile: Reorganizar botões */
+              ${isMobile ? `
+              .fc-toolbar-chunk {
+                display: flex !important;
+                justify-content: center !important;
+                gap: 0.25rem !important;
+              }
+              
+              .fc-button-group {
+                gap: 0.25rem !important;
+              }
+              ` : ''}
               
               .fc-button:hover {
                 background: rgba(255, 255, 255, 0.3) !important;
@@ -449,11 +524,12 @@ const ClassesCalendar = () => {
               /* Grid do calendário */
               .fc-daygrid-day {
                 transition: all 0.3s ease;
+                ${isMobile ? 'min-height: 60px !important;' : ''}
               }
               
               .fc-daygrid-day:hover {
                 background-color: rgba(217, 4, 41, 0.05) !important;
-                transform: scale(1.02);
+                ${isMobile ? '' : 'transform: scale(1.02);'}
               }
               
               /* Cabeçalho dos dias */
@@ -462,14 +538,14 @@ const ClassesCalendar = () => {
                 border-color: #dee2e6 !important;
                 font-weight: 600 !important;
                 color: #495057 !important;
-                padding: 12px 8px !important;
+                padding: ${isMobile ? '8px 4px' : '12px 8px'} !important;
               }
               
               .fc-col-header-cell-cushion {
                 color: #D90429 !important;
                 font-weight: 700 !important;
                 text-transform: uppercase;
-                font-size: 0.75rem;
+                font-size: ${isMobile ? '0.625rem' : '0.75rem'};
                 letter-spacing: 0.5px;
               }
               
@@ -477,22 +553,24 @@ const ClassesCalendar = () => {
               .fc-daygrid-day-number {
                 color: #374151 !important;
                 font-weight: 600 !important;
-                padding: 8px !important;
+                padding: ${isMobile ? '4px' : '8px'} !important;
                 transition: all 0.3s ease;
+                font-size: ${isMobile ? '0.875rem' : '1rem'} !important;
               }
               
               .fc-day-today .fc-daygrid-day-number {
                 background: linear-gradient(135deg, #D90429 0%, #B8001F 100%) !important;
                 color: white !important;
                 border-radius: 50% !important;
-                width: 32px !important;
-                height: 32px !important;
+                width: ${isMobile ? '24px' : '32px'} !important;
+                height: ${isMobile ? '24px' : '32px'} !important;
                 display: flex !important;
                 align-items: center !important;
                 justify-content: center !important;
-                margin: 4px !important;
+                margin: ${isMobile ? '2px' : '4px'} !important;
                 box-shadow: 0 4px 12px rgba(217, 4, 41, 0.4);
                 animation: pulse 2s infinite;
+                font-size: ${isMobile ? '0.75rem' : '0.875rem'} !important;
               }
               
               @keyframes pulse {
@@ -502,25 +580,28 @@ const ClassesCalendar = () => {
               
               /* Eventos */
               .fc-event {
-                border-radius: 8px !important;
+                border-radius: ${isMobile ? '4px' : '8px'} !important;
                 border: none !important;
-                padding: 4px 8px !important;
-                margin: 2px 0 !important;
+                padding: ${isMobile ? '2px 4px' : '4px 8px'} !important;
+                margin: ${isMobile ? '1px 0' : '2px 0'} !important;
                 font-weight: 500 !important;
-                font-size: 0.875rem !important;
+                font-size: ${isMobile ? '0.625rem' : '0.875rem'} !important;
                 box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
                 transition: all 0.3s ease !important;
                 cursor: pointer !important;
+                ${isMobile ? 'min-height: 16px !important;' : ''}
               }
               
               .fc-event:hover {
-                transform: translateY(-2px) scale(1.02) !important;
+                ${isMobile ? '' : 'transform: translateY(-2px) scale(1.02) !important;'}
                 box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25) !important;
                 z-index: 10 !important;
               }
               
               .fc-event-title {
                 font-weight: 600 !important;
+                font-size: ${isMobile ? '0.625rem' : '0.875rem'} !important;
+                line-height: ${isMobile ? '1.2' : '1.4'} !important;
               }
               
               /* Bordas das células */

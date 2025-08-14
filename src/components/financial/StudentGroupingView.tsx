@@ -910,6 +910,24 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
               <span>Registros Migrados</span>
             </motion.button>
           </div>
+          {/* Botão Criar Plano posicionado 100px à direita */}
+          {tipoRegistro === 'ativos' && (
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="ml-[100px]"
+            >
+              <Button
+                onClick={handleCreatePlan}
+                size="sm"
+                className="bg-[#D90429] hover:bg-[#1F2937] text-white border-0 shadow-md transition-all duration-300"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                <Users className="h-4 w-4 mr-1" />
+                Criar Plano
+              </Button>
+            </motion.div>
+          )}
         </motion.div>
 
         {/* Enhanced Filters Section */}
@@ -929,22 +947,6 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
                   Filtros Avançados
                 </div>
                 <div className="flex items-center gap-4">
-                  {tipoRegistro === 'ativos' && (
-                    <motion.div
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      <Button
-                        onClick={handleCreatePlan}
-                        size="sm"
-                        className="bg-[#D90429] hover:bg-[#1F2937] text-white border-0 shadow-md transition-all duration-300"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        <Users className="h-4 w-4 mr-1" />
-                        Criar Plano
-                      </Button>
-                    </motion.div>
-                  )}
                   <motion.div
                     animate={{ rotate: isFiltersExpanded ? 180 : 0 }}
                     transition={{ duration: 0.3 }}

@@ -19,6 +19,7 @@ export const teacherFormSchema = z.object({
   }, "Email deve conter @ e um domínio válido (ex: usuario@gmail.com)"),
   idiomas: z.string().optional(),
   salario: z.string().optional(),
+  senha: z.string().optional(),
   status: z.string().min(1, "Status é obrigatório")
 });
 

@@ -74,13 +74,14 @@ export default function ApproveLogins() {
     setApprovedLoading(true);
     
     try {
-      const { data, error } = await supabase
+      // Buscar usuários da tabela usuarios
+      const { data: usuarios, error: usuariosError } = await supabase
         .from('usuarios')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) {
-         console.error('Erro ao buscar usuários aprovados:', error);
+      if (usuariosError) {
+         console.error('Erro ao buscar usuários aprovados:', usuariosError);
          toast({
            title: "Erro",
            description: "Erro ao carregar usuários aprovados",
@@ -89,7 +90,33 @@ export default function ApproveLogins() {
          return;
        }
 
-      setApprovedUsers(data || []);
+      // Buscar professores da tabela professores
+      const { data: professores, error: professoresError } = await supabase
+        .from('professores')
+        .select('id, nome, email, cargo, created_at, updated_at')
+        .eq('status', 'ativo')
+        .order('created_at', { ascending: false });
+
+      if (professoresError) {
+         console.error('Erro ao buscar professores:', professoresError);
+         toast({
+           title: "Erro",
+           description: "Erro ao carregar professores",
+           variant: "destructive",
+         });
+         return;
+       }
+
+      // Combinar usuários e professores
+      const todosUsuarios = [
+        ...(usuarios || []),
+        ...(professores || []).map(prof => ({
+          ...prof,
+          permissoes: 'professor' // Adicionar permissões padrão para professores
+        }))
+      ];
+
+      setApprovedUsers(todosUsuarios || []);
     } catch (error) {
        console.error('Erro ao buscar usuários aprovados:', error);
        toast({
@@ -293,7 +320,10 @@ export default function ApproveLogins() {
                         <CardTitle className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <span>{user.nome}</span>
-                            <Badge variant={user.cargo === 'Admin' ? 'default' : 'secondary'}>
+                            <Badge 
+                              variant={user.cargo === 'Admin' ? 'default' : 'secondary'}
+                              className={user.cargo === 'Professor' ? 'bg-blue-600 text-white hover:bg-blue-700' : ''}
+                            >
                               {user.cargo}
                             </Badge>
                           </div>

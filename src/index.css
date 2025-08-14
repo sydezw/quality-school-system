@@ -7,35 +7,35 @@
 
 @layer base {
   :root {
-    --background: 240 10% 99%; /* Almost white */
-    --foreground: 240 10% 3.9%;
+    --background: 0 0% 97.6%; /* #F9F9F9 */
+    --foreground: 0 0% 13.1%; /* #212121 */
 
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card: 0 0% 100%; /* White */
+    --card-foreground: 0 0% 13.1%; /* #212121 */
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
+    --popover-foreground: 0 0% 13.1%;
 
-    --primary: 352 70% 50%; /* Brand Red */
+    --primary: 4 82% 57%; /* #E53935 */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
+    --secondary: 0 0% 97.6%; /* #F9F9F9 */
+    --secondary-foreground: 0 0% 13.1%;
 
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
+    --muted: 0 0% 97.6%; /* #F9F9F9 */
+    --muted-foreground: 0 0% 45.1%;
 
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
+    --accent: 0 0% 97.6%;
+    --accent-foreground: 0 0% 13.1%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 4 82% 57%; /* #E53935 */
     --destructive-foreground: 0 0% 100%;
 
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 352 70% 50%; /* Brand Red for focus rings */
+    --border: 0 0% 89.8%; /* Light gray */
+    --input: 0 0% 89.8%;
+    --ring: 4 82% 57%; /* #E53935 */
 
-    --radius: 0.5rem;
+    --radius: 0.5rem; /* 8px */
   }
 
   .dark {
@@ -126,4 +126,425 @@
 .transition-colors {
   transition-property: color, background-color, border-color;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Mobile Optimization Styles */
+@media (max-width: 768px) {
+  /* Prevent zoom on input focus */
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="text"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+  
+  /* Optimize touch targets */
+  button,
+  .btn,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Improve scrolling performance */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Prevent horizontal scroll */
+  body {
+    overflow-x: hidden;
+  }
+  
+  /* Optimize card spacing for mobile */
+  .card {
+    margin: 0.5rem;
+  }
+  
+  /* Better mobile form styling */
+  .form-container {
+    padding: 1rem;
+  }
+  
+  /* Mobile-friendly shadows */
+  .shadow-lg {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+  
+  /* Mobile sidebar optimizations */
+  .group:hover::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 40;
+    pointer-events: auto;
+  }
+  
+  /* Ensure sidebar stays above overlay */
+  .group:hover {
+    z-index: 50;
+  }
+  
+  /* Better touch feedback for sidebar items */
+  .group nav a {
+    -webkit-tap-highlight-color: rgba(229, 57, 53, 0.1);
+    tap-highlight-color: rgba(229, 57, 53, 0.1);
+  }
+}
+
+/* PWA-like experience */
+@media (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* High DPI displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .crisp-edges {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+}
+
+/* Mobbin Design System - Mobile-First Rules */
+
+/* Grid System - Múltiplos de 8px */
+.grid-8 { @apply space-y-2; } /* 8px */
+.grid-16 { @apply space-y-4; } /* 16px */
+.grid-24 { @apply space-y-6; } /* 24px */
+.grid-32 { @apply space-y-8; } /* 32px */
+
+/* Padding System - Mobile First */
+.container-padding { @apply p-2; } /* 8px interno para mobile */
+.section-margin { @apply my-2; } /* 8px vertical entre seções para mobile */
+.element-spacing { @apply space-y-1; } /* 4px entre elementos para mobile */
+.element-spacing-lg { @apply space-y-1; } /* 4px entre elementos para mobile */
+
+/* Desktop - espaçamentos maiores */
+@media (min-width: 769px) {
+  .container-padding { @apply p-4; } /* 16px interno */
+  .section-margin { @apply my-6; } /* 24px vertical entre seções */
+  .element-spacing { @apply space-y-2; } /* 8px entre elementos */
+  .element-spacing-lg { @apply space-y-3; } /* 12px entre elementos */
+}
+
+/* Typography Hierarchy - Mobile First */
+.title-primary {
+  @apply font-semibold;
+  color: #212121;
+  font-size: 24px; /* Aumentado para mobile */
+}
+
+.subtitle {
+  @apply font-medium;
+  color: #616161;
+  font-size: 16px; /* Aumentado para mobile */
+}
+
+.text-auxiliary {
+  @apply font-normal;
+  color: #9E9E9E;
+  font-size: 10px; /* Muito menor para mobile */
+}
+
+/* Desktop - tamanhos maiores */
+@media (min-width: 769px) {
+  .title-primary {
+    font-size: 32px;
+  }
+  
+  .subtitle {
+    font-size: 20px;
+  }
+  
+  .text-auxiliary {
+    font-size: 14px;
+  }
+}
+
+/* Botões e Abas - Mobile First */
+.btn-primary {
+  @apply font-medium text-white transition-colors;
+  background-color: #E53935;
+  min-height: 32px; /* Muito menor para mobile */
+  padding: 0 8px; /* Padding reduzido */
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px; /* Texto menor */
+}
+
+.btn-primary:hover {
+  background-color: #D32F2F;
+}
+
+.btn-tab {
+  @apply font-medium transition-colors;
+  min-height: 32px; /* Muito menor para mobile */
+  padding: 0 8px; /* Padding reduzido */
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px; /* Gap reduzido */
+  font-size: 11px; /* Texto menor */
+}
+
+/* Desktop - tamanhos maiores */
+@media (min-width: 769px) {
+  .btn-primary {
+    min-height: 44px;
+    padding: 0 16px;
+    border-radius: 8px;
+    font-size: 14px;
+  }
+  
+  .btn-tab {
+    min-height: 44px;
+    padding: 0 16px;
+    border-radius: 8px;
+    gap: 8px;
+    font-size: 14px;
+  }
+}
+
+/* Cards e Boxes - Mobile First */
+.card-container {
+  background-color: #FFFFFF;
+  border-radius: 4px; /* Menor para mobile */
+  box-shadow: 0px 1px 2px rgba(0,0,0,0.05);
+  padding: 8px; /* Muito menor para mobile */
+}
+
+/* Calendário - Mobile First */
+.calendar-container {
+  padding: 0 8px; /* Menor para mobile */
+}
+
+.calendar-day {
+  min-height: 20px; /* Muito menor para mobile */
+  margin: 1px; /* Menor espaçamento */
+  font-size: 9px; /* Fonte muito pequena */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.calendar-day-current {
+  background-color: rgba(229,57,53,0.15);
+  color: #E53935;
+  border-radius: 2px;
+}
+
+/* Filtros de Busca - Mobile First */
+.filter-input {
+  padding: 6px 8px; /* Muito menor para mobile */
+  min-height: 28px; /* Altura reduzida */
+  border-radius: 4px;
+  border: 1px solid #E0E0E0;
+  display: flex;
+  align-items: center;
+  font-size: 11px; /* Fonte menor */
+}
+
+/* Desktop - tamanhos maiores */
+@media (min-width: 769px) {
+  .card-container {
+    border-radius: 8px;
+    padding: 16px;
+  }
+  
+  .calendar-container {
+    padding: 0 16px;
+  }
+  
+  .calendar-day {
+    min-height: 32px;
+    margin: 3px;
+    font-size: 12px;
+  }
+  
+  .calendar-day-current {
+    border-radius: 4px;
+  }
+  
+  .filter-input {
+    padding: 12px 16px;
+    min-height: 44px;
+    border-radius: 8px;
+    font-size: 14px;
+  }
+}
+
+/* Responsividade Mobile-First */
+@media (max-width: 768px) {
+  .mobile-single-column {
+    @apply flex flex-col space-y-4;
+  }
+  
+  .mobile-center {
+    @apply text-center;
+  }
+  
+  .mobile-padding {
+    @apply px-4;
+  }
+}
+
+@media (min-width: 769px) {
+  .desktop-margins {
+    @apply mx-6; /* 24px */
+  }
+  
+  .desktop-margins-lg {
+    @apply mx-8; /* 32px */
+  }
+  
+  .desktop-multi-column {
+    @apply grid grid-cols-2 gap-6;
+  }
+}
+
+/* Alinhamento e Consistência */
+.baseline-align {
+  @apply flex items-baseline;
+}
+
+.center-align {
+  @apply flex items-center;
+}
+
+.visual-breathing {
+  @apply my-4; /* Respiro visual */
+}
+
+/* Mobile Sidebar Optimizations */
+@media (max-width: 768px) {
+  .mobile-sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 40;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  
+  .mobile-sidebar-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  
+  .sidebar-item {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  .sidebar-item:active {
+    background-color: rgba(0, 0, 0, 0.05);
+    transform: scale(0.98);
+  }
+}
+
+/* Componentes específicos do Design System */
+
+/* Inputs e Forms */
+input, select, textarea {
+  font-size: 16px; /* Previne zoom no iOS */
+}
+
+.form-group {
+  @apply element-spacing;
+}
+
+.form-row {
+  @apply center-align gap-4;
+}
+
+/* Tables */
+.table-container {
+  @apply card-container overflow-x-auto;
+}
+
+.table-header {
+  @apply subtitle font-semibold;
+  color: #212121;
+}
+
+.table-cell {
+  @apply text-auxiliary;
+  padding: 12px 16px;
+}
+
+/* Status e Badges */
+.status-badge {
+  @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-medium;
+  min-height: 24px;
+}
+
+.status-success {
+  @apply bg-green-100 text-green-800;
+}
+
+.status-warning {
+  @apply bg-yellow-100 text-yellow-800;
+}
+
+.status-error {
+  @apply bg-red-100 text-red-800;
+}
+
+/* Loading States */
+.loading-skeleton {
+  @apply bg-gray-200 animate-pulse rounded;
+}
+
+/* Focus States */
+.focus-ring {
+  @apply focus:ring-2 focus:ring-red-500 focus:ring-offset-2;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Accessibility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Print Styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-break {
+    page-break-after: always;
+  }
 }

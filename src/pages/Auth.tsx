@@ -79,101 +79,116 @@ const Auth = () => {
 
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100 p-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="flex flex-col items-center text-center">
-          <School className="h-12 w-12 text-brand-red mb-4" />
-          <h1 className="text-3xl font-bold text-brand-dark">TS School</h1>
-          <p className="text-gray-500">Sistema de Gestão Escolar</p>
+    <div className="flex min-h-screen items-center justify-center bg-[#F9F9F9] px-4 py-8">
+      <div className="w-full max-w-md space-y-8">
+        <div className="flex flex-col items-center text-center space-y-8">
+          <div className="p-4 bg-white rounded-lg shadow-sm border border-gray-100">
+            <School className="h-12 w-12 text-[#E53935]" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-3xl font-semibold text-[#212121] tracking-tight">TS School</h1>
+            <p className="text-base text-gray-500 font-medium">Sistema de Gestão Escolar</p>
+          </div>
         </div>
         
-        <Card>
-          <CardHeader>
-            <CardTitle>Acesso ao Sistema</CardTitle>
+        <Card className="w-full max-w-md mx-auto card-container mobile-padding desktop-margins">
+          <CardHeader className="container-padding text-center mobile-center">
+            <CardTitle className="title-primary section-margin">Acesso ao Sistema</CardTitle>
           </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="login" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="login">Login</TabsTrigger>
-                <TabsTrigger value="register">Cadastrar</TabsTrigger>
+          <CardContent className="container-padding">
+            <Tabs defaultValue="login" className="w-full mobile-single-column">
+              <TabsList className="grid w-full grid-cols-2 section-margin bg-[#F9F9F9] rounded-lg p-1" style={{minHeight: '44px'}}>
+                <TabsTrigger value="login" className="btn-tab data-[state=active]:bg-white data-[state=active]:text-[#212121] data-[state=active]:shadow-sm">Login</TabsTrigger>
+                <TabsTrigger value="register" className="btn-tab data-[state=active]:bg-white data-[state=active]:text-[#212121] data-[state=active]:shadow-sm">Cadastrar</TabsTrigger>
               </TabsList>
               
-              <TabsContent value="login" className="space-y-4 mt-4">
-                <form onSubmit={handleSignIn} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">E-mail</Label>
+              <TabsContent value="login" className="element-spacing-lg mt-0 mobile-single-column">
+                <form onSubmit={handleSignIn} className="element-spacing-lg mobile-single-column">
+                  <div className="element-spacing">
+                    <Label htmlFor="email" className="subtitle">E-mail</Label>
                     <Input
                       id="email"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="coordenacaotsbonsucesso@gmail.com"
+                      placeholder="seu.email@exemplo.com"
+                      className="filter-input w-full bg-white text-gray-900 placeholder-gray-500"
                       required
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Senha</Label>
+                  <div className="element-spacing">
+                    <Label htmlFor="password" className="subtitle">Senha</Label>
                     <Input
                       id="password"
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Digite sua senha"
+                      className="filter-input w-full bg-white text-gray-900 placeholder-gray-500"
                       required
                     />
                   </div>
                   <Button 
                     type="submit" 
-                    className="w-full bg-brand-red hover:bg-red-700"
+                    className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={loading}
                   >
-                    {loading ? 'Entrando...' : 'Entrar'}
+                    {loading ? (
+                      <div className="flex items-center justify-center space-x-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Entrando...</span>
+                      </div>
+                    ) : 'Entrar'}
                   </Button>
                 </form>
               </TabsContent>
               
-              <TabsContent value="register" className="space-y-4 mt-4">
-                <form onSubmit={handleRegister} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="register-name">Nome Completo</Label>
+              <TabsContent value="register" className="element-spacing-lg mt-0 mobile-single-column">
+                <form onSubmit={handleRegister} className="element-spacing-lg mobile-single-column">
+                  <div className="element-spacing">
+                    <Label htmlFor="register-name" className="subtitle">Nome Completo</Label>
                     <Input
                       id="register-name"
                       type="text"
                       value={registerName}
                       onChange={(e) => setRegisterName(e.target.value)}
                       placeholder="Seu nome completo"
+                      className="filter-input w-full bg-white text-gray-900 placeholder-gray-500"
                       required
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="register-email">E-mail</Label>
+                  <div className="element-spacing">
+                    <Label htmlFor="register-email" className="subtitle">E-mail</Label>
                     <Input
                       id="register-email"
                       type="email"
                       value={registerEmail}
                       onChange={(e) => setRegisterEmail(e.target.value)}
-                      placeholder="coordenacaotsbonsucesso@gmail.com"
+                      placeholder="seu.email@exemplo.com"
+                      className="filter-input w-full bg-white text-gray-900 placeholder-gray-500"
                       required
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="register-password">Senha</Label>
+                  <div className="element-spacing">
+                    <Label htmlFor="register-password" className="subtitle">Senha</Label>
                     <Input
                       id="register-password"
                       type="password"
                       value={registerPassword}
                       onChange={(e) => setRegisterPassword(e.target.value)}
-                      placeholder="Crie uma senha segura"
+                      placeholder="Mínimo 6 caracteres"
+                      className="filter-input w-full bg-white text-gray-900 placeholder-gray-500"
                       required
                       minLength={6}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="register-cargo">Cargo</Label>
+                  <div className="element-spacing">
+                    <Label htmlFor="register-cargo" className="subtitle">Cargo</Label>
                     <select
                       id="register-cargo"
                       value={registerCargo}
                       onChange={(e) => setRegisterCargo(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-red"
+                      className="filter-input w-full bg-white text-gray-900"
                       required
                     >
                       <option value="Secretária">Secretária</option>
@@ -183,23 +198,35 @@ const Auth = () => {
                   </div>
                   <Button 
                     type="submit" 
-                    className="w-full bg-brand-red hover:bg-red-700"
+                    className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={registerLoading}
                   >
-                    {registerLoading ? 'Cadastrando...' : 'Solicitar Cadastro'}
+                    {registerLoading ? (
+                      <div className="flex items-center justify-center space-x-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Cadastrando...</span>
+                      </div>
+                    ) : 'Solicitar Cadastro'}
                   </Button>
-                  <p className="text-sm text-gray-600 text-center">
-                    Seu cadastro será analisado por um administrador antes da aprovação.
-                  </p>
+                  <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-4 mt-4">
+                    <p className="text-sm text-blue-700 text-center font-medium">
+                      📋 Seu cadastro será analisado por um administrador antes da aprovação.
+                    </p>
+                  </div>
                 </form>
               </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
         
-        <p className="text-center text-sm text-gray-600">
-          Acesso restrito à equipe da escola
-        </p>
+        <div className="text-center space-y-2">
+          <p className="text-sm text-gray-500 font-medium">
+            🔒 Acesso restrito à equipe da escola
+          </p>
+          <p className="text-auxiliary">
+            Design System Mobbin Inspired
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Database } from '@/integrations/supabase/types';
-import { Edit, Trash2, DollarSign, Eye, User, Users } from 'lucide-react';
+import { Edit, Trash2, DollarSign, Eye, User } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -61,10 +61,7 @@ const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, onVie
     }
   };
 
-  const handleViewEnrollments = (student: Student) => {
-    // Função para ver múltiplas matrículas
-    console.log('Ver matrículas do aluno:', student);
-  };
+
   
   const getStatusColor = (student: Student) => {
     switch (student.status) {
@@ -152,15 +149,7 @@ const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, onVie
                       <DollarSign className="h-4 w-4" />
                     </Button>
                   )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleViewEnrollments(student)}
-                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                    title="Ver Múltiplas Matrículas"
-                  >
-                    <Users className="h-4 w-4" />
-                  </Button>
+
                   {onDelete && (
                     <Button
                       variant="outline"

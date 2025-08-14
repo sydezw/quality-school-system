@@ -8,8 +8,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Tables } from '@/integrations/supabase/types';
 import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
+import { NewLessonDialog } from './NewLessonDialog';
 
 // Tipos para melhor organização e reutilização
 type Turma = Tables<'turmas'>;
@@ -50,6 +53,8 @@ interface AulaComDetalhes extends Aula {
  * - Paginação para performance
  */
 const ClassesList = () => {
+  const isMobile = useIsMobile();
+  
   // Estados principais
   const [aulas, setAulas] = useState<AulaComDetalhes[]>([]);
   const [turmas, setTurmas] = useState<Turma[]>([]);
@@ -256,89 +261,128 @@ const ClassesList = () => {
   return (
     <div className="space-y-6">
       {/* Header com controles */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+      <div className={cn(
+        "flex gap-4 items-start justify-between",
+        isMobile ? "flex-col" : "flex-col sm:flex-row sm:items-center"
+      )}>
         <div className="flex items-center gap-2">
-          <List className="h-5 w-5 text-red-600" />
-          <h2 className="text-xl font-semibold text-gray-900">Lista de Aulas</h2>
-          <Badge variant="outline">
+          <List className={cn("text-red-600", isMobile ? "h-4 w-4" : "h-5 w-5")} />
+          <h2 className={cn("font-semibold text-gray-900", isMobile ? "text-lg" : "text-xl")}>
+            Lista de Aulas
+          </h2>
+          <Badge variant="outline" className={isMobile ? "text-xs" : ""}>
             {sortedAulas.length} aula{sortedAulas.length !== 1 ? 's' : ''}
           </Badge>
         </div>
         
-        <Button className="bg-red-600 hover:bg-red-700">
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Aula
-        </Button>
+        <NewLessonDialog onSuccess={loadAulas}>
+          <Button className={cn(
+            "bg-red-600 hover:bg-red-700",
+            isMobile ? "w-full h-12 text-sm rounded-xl" : ""
+          )}>
+            <Plus className={cn("mr-2", isMobile ? "h-4 w-4" : "h-4 w-4")} />
+            Nova Aula
+          </Button>
+        </NewLessonDialog>
       </div>
 
       {/* Filtros avançados */}
-      <Card>
+      <Card className={isMobile ? "mx-2" : ""}>
         <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
           <CollapsibleTrigger asChild>
-            <CardHeader className="cursor-pointer hover:bg-gray-50 transition-colors">
-              <CardTitle className="flex items-center justify-between">
+            <CardHeader className={cn(
+              "cursor-pointer hover:bg-gray-50 transition-colors",
+              isMobile ? "p-4" : ""
+            )}>
+              <CardTitle className={cn(
+                "flex items-center justify-between",
+                isMobile ? "text-base" : ""
+              )}>
                 <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-[#D90429]" />
+                  <Filter className={cn("text-[#D90429]", isMobile ? "h-4 w-4" : "h-4 w-4")} />
                   Filtros Avançados
                 </div>
                 <motion.div
                   animate={{ rotate: filtersOpen ? 180 : 0 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <ChevronDown className="h-4 w-4 text-gray-500" />
+                  <ChevronDown className={cn("text-gray-500", isMobile ? "h-4 w-4" : "h-4 w-4")} />
                 </motion.div>
               </CardTitle>
             </CardHeader>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <CardContent className={isMobile ? "p-4" : ""}>
+          <div className={cn(
+            "gap-4 mb-4",
+            isMobile ? "grid grid-cols-1 space-y-2" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4"
+          )}>
             {/* Busca */}
-            <div className="relative lg:col-span-2">
+            <div className={cn("relative", isMobile ? "" : "lg:col-span-2")}>
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 placeholder="Buscar por título, descrição ou turma..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className={cn(
+                  "pl-10",
+                  isMobile ? "h-12 text-base rounded-xl" : ""
+                )}
               />
             </div>
 
             {/* Data início */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className={cn(
+                "block font-medium text-gray-700 mb-1",
+                isMobile ? "text-sm" : "text-sm"
+              )}>
                 Data Início
               </label>
               <Input
                 type="date"
                 value={filters.dataInicio}
                 onChange={(e) => setFilters(prev => ({ ...prev, dataInicio: e.target.value }))}
+                className={isMobile ? "h-12 text-base rounded-xl" : ""}
               />
             </div>
 
             {/* Data fim */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className={cn(
+                "block font-medium text-gray-700 mb-1",
+                isMobile ? "text-sm" : "text-sm"
+              )}>
                 Data Fim
               </label>
               <Input
                 type="date"
                 value={filters.dataFim}
                 onChange={(e) => setFilters(prev => ({ ...prev, dataFim: e.target.value }))}
+                className={isMobile ? "h-12 text-base rounded-xl" : ""}
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className={cn(
+            "gap-4",
+            isMobile ? "grid grid-cols-1 space-y-2" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5"
+          )}>
             {/* Filtro por turma */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className={cn(
+                "block font-medium text-gray-700 mb-1",
+                isMobile ? "text-sm" : "text-sm"
+              )}>
                 Turma
               </label>
               <select
                 value={filters.turmaId}
                 onChange={(e) => setFilters(prev => ({ ...prev, turmaId: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                className={cn(
+                  "w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500",
+                  isMobile ? "h-12 text-base rounded-xl" : "rounded-md"
+                )}
               >
                 <option value="">Todas</option>
                 {turmas.map(turma => (
@@ -351,13 +395,19 @@ const ClassesList = () => {
 
             {/* Filtro por professor */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className={cn(
+                "block font-medium text-gray-700 mb-1",
+                isMobile ? "text-sm" : "text-sm"
+              )}>
                 Professor
               </label>
               <select
                 value={filters.professorId}
                 onChange={(e) => setFilters(prev => ({ ...prev, professorId: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                className={cn(
+                  "w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500",
+                  isMobile ? "h-12 text-base rounded-xl" : "rounded-md"
+                )}
               >
                 <option value="">Todos</option>
                 {professores.map(professor => (
@@ -370,13 +420,19 @@ const ClassesList = () => {
 
             {/* Filtro por idioma */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className={cn(
+                "block font-medium text-gray-700 mb-1",
+                isMobile ? "text-sm" : "text-sm"
+              )}>
                 Idioma
               </label>
               <select
                 value={filters.idioma}
                 onChange={(e) => setFilters(prev => ({ ...prev, idioma: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                className={cn(
+                  "w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500",
+                  isMobile ? "h-12 text-base rounded-xl" : "rounded-md"
+                )}
               >
                 <option value="">Todos</option>
                 <option value="Inglês">Inglês</option>
@@ -388,13 +444,19 @@ const ClassesList = () => {
 
             {/* Filtro por nível */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className={cn(
+                "block font-medium text-gray-700 mb-1",
+                isMobile ? "text-sm" : "text-sm"
+              )}>
                 Nível
               </label>
               <select
                 value={filters.nivel}
                 onChange={(e) => setFilters(prev => ({ ...prev, nivel: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                className={cn(
+                  "w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500",
+                  isMobile ? "h-12 text-base rounded-xl" : "rounded-md"
+                )}
               >
                 <option value="">Todos</option>
                 <option value="Básico">Básico</option>
@@ -406,13 +468,19 @@ const ClassesList = () => {
 
             {/* Filtro por status */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className={cn(
+                "block font-medium text-gray-700 mb-1",
+                isMobile ? "text-sm" : "text-sm"
+              )}>
                 Status
               </label>
               <select
                 value={filters.status}
                 onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                className={cn(
+                  "w-full px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500",
+                  isMobile ? "h-12 text-base rounded-xl" : "rounded-md"
+                )}
               >
                 <option value="">Todos</option>
                 <option value="agendada">Agendada</option>
@@ -423,9 +491,13 @@ const ClassesList = () => {
             </div>
           </div>
 
-          <div className="flex justify-end mt-4">
+          <div className={cn(
+            "mt-4",
+            isMobile ? "flex justify-center" : "flex justify-end"
+          )}>
             <Button
               variant="outline"
+              className={isMobile ? "w-full h-12 text-base rounded-xl" : ""}
               onClick={() => {
                 setFilters({
                   turmaId: '',
@@ -448,9 +520,81 @@ const ClassesList = () => {
       </Card>
 
       {/* Tabela de aulas */}
-      <Card>
-        <CardContent className="p-0">
-          <Table>
+      <Card className={isMobile ? "mx-2" : ""}>
+        <CardContent className={isMobile ? "p-3" : "p-0"}>
+          {isMobile ? (
+            // Layout mobile com cards
+            <div className="space-y-3">
+              {paginatedAulas.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  Nenhuma aula encontrada.
+                </div>
+              ) : (
+                paginatedAulas.map(aula => (
+                  <motion.div
+                    key={aula.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm"
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-900 text-base">
+                          {aula.titulo || 'Sem título'}
+                        </h3>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {aula.turmas?.nome || 'Turma não definida'}
+                        </p>
+                      </div>
+                      <Badge className={cn("text-xs", getStatusColor(aula.status))}>
+                        {aula.status === 'agendada' && 'Agendada'}
+                        {aula.status === 'em_andamento' && 'Em Andamento'}
+                        {aula.status === 'concluida' && 'Concluída'}
+                        {aula.status === 'cancelada' && 'Cancelada'}
+                      </Badge>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-gray-400" />
+                        <span>{formatDate(aula.data)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-gray-400" />
+                        <span>{formatTime(aula.horario_inicio)} - {formatTime(aula.horario_fim)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-gray-400" />
+                        <span>{aula.turmas?.professores?.nome || 'Professor não definido'}</span>
+                      </div>
+                      <div className="text-gray-600">
+                        {aula.turmas?.idioma} • {aula.turmas?.nivel}
+                      </div>
+                    </div>
+                    
+                    {aula.descricao && (
+                      <p className="text-sm text-gray-600 mt-3 line-clamp-2">
+                        {aula.descricao}
+                      </p>
+                    )}
+                    
+                    <div className="flex gap-2 mt-4">
+                      <Button size="sm" variant="outline" className="flex-1 h-10 text-sm rounded-lg">
+                        <Edit className="h-4 w-4 mr-2" />
+                        Editar
+                      </Button>
+                      <Button size="sm" variant="outline" className="flex-1 h-10 text-sm rounded-lg">
+                        <Users className="h-4 w-4 mr-2" />
+                        Presença
+                      </Button>
+                    </div>
+                  </motion.div>
+                ))
+              )}
+            </div>
+          ) : (
+            // Layout desktop com tabela
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead 
@@ -573,22 +717,33 @@ const ClassesList = () => {
               )}
             </TableBody>
           </Table>
+          )}
         </CardContent>
       </Card>
 
       {/* Paginação */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-gray-700">
+        <div className={cn(
+          "flex items-center justify-between",
+          isMobile ? "flex-col gap-4 mx-2" : ""
+        )}>
+          <div className={cn(
+            "text-gray-700",
+            isMobile ? "text-sm text-center" : "text-sm"
+          )}>
             Mostrando {(currentPage - 1) * itemsPerPage + 1} a{' '}
             {Math.min(currentPage * itemsPerPage, sortedAulas.length)} de{' '}
             {sortedAulas.length} aulas
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className={cn(
+            "flex items-center gap-2",
+            isMobile ? "w-full justify-center" : ""
+          )}>
             <Button
               variant="outline"
-              size="sm"
+              size={isMobile ? "default" : "sm"}
+              className={isMobile ? "h-10 px-4 rounded-xl" : ""}
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               disabled={currentPage === 1}
             >
@@ -602,9 +757,11 @@ const ClassesList = () => {
                   <Button
                     key={page}
                     variant={currentPage === page ? "default" : "outline"}
-                    size="sm"
+                    size={isMobile ? "default" : "sm"}
                     onClick={() => setCurrentPage(page)}
-                    className="w-8 h-8 p-0"
+                    className={cn(
+                      isMobile ? "h-10 w-10 rounded-xl" : "w-8 h-8 p-0"
+                    )}
                   >
                     {page}
                   </Button>
@@ -614,7 +771,8 @@ const ClassesList = () => {
             
             <Button
               variant="outline"
-              size="sm"
+              size={isMobile ? "default" : "sm"}
+              className={isMobile ? "h-10 px-4 rounded-xl" : ""}
               onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
               disabled={currentPage === totalPages}
             >

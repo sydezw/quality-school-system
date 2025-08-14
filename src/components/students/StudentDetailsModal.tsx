@@ -160,6 +160,7 @@ export const StudentDetailsModal: React.FC<StudentDetailsModalProps> = ({
   onClose,
   student
 }) => {
+  const { toast } = useToast();
   const [dadosFinanceiros, setDadosFinanceiros] = useState<DadosFinanceiros>({
     registroFinanceiro: null,
     parcelas: [],
@@ -172,34 +173,19 @@ export const StudentDetailsModal: React.FC<StudentDetailsModalProps> = ({
     valorEmAtraso: 0,
     planoNome: 'Não definido'
   });
+  
   const [dadosContratos, setDadosContratos] = useState<DadosContratos>({
     contratoAtivo: null,
     totalContratos: 0,
     contratoMaisRecente: null
   });
-  const [loadingFinanceiro, setLoadingFinanceiro] = useState(false);
-  const [loadingContratos, setLoadingContratos] = useState(false);
-  const { toast } = useToast();
 
-  // Função para buscar dados de contratos do aluno
   const buscarDadosContratos = async (alunoId: string) => {
-    setLoadingContratos(true);
     try {
-      // Buscar todos os contratos do aluno com join correto para planos
-      const { data: contratos, error } = await supabase
+      const { data: contratosData, error: errorContratos } = await supabase
         .from('contratos')
         .select(`
-          id,
-          aluno_id,
-          plano_id,
-          data_inicio,
-          data_fim,
-          valor_mensalidade,
-          status_contrato,
-          idioma_contrato,
-          observacao,
-          created_at,
-          updated_at,
+          *,
           planos (
             id,
             nome,
@@ -211,67 +197,76 @@ export const StudentDetailsModal: React.FC<StudentDetailsModalProps> = ({
         .eq('aluno_id', alunoId)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        throw error;
+      if (errorContratos) {
+        console.error('Erro ao buscar contratos:', errorContratos);
+        return;
       }
 
-      const contratosArray = contratos || [];
+      const contratosArray = contratosData || [];
       
       // Encontrar contrato ativo (status_contrato = 'Ativo')
-      const contratoAtivo = contratosArray.find(c => c.status_contrato === 'Ativo') || null;
-      
-      // Contrato mais recente (primeiro da lista ordenada por created_at desc)
+      let contratoAtivo = contratosArray.find(c => c.status_contrato === 'Ativo') || null;
       const contratoMaisRecente = contratosArray[0] || null;
+      
+      // Se não há contrato ativo, buscar registro financeiro para criar contrato virtual
+      if (!contratoAtivo) {
+        const { data: registroFinanceiro, error: errorFinanceiro } = await supabase
+          .from('financeiro_alunos')
+          .select(`
+            *,
+            planos (
+              id,
+              nome,
+              descricao,
+              valor_total,
+              idioma
+            )
+          `)
+          .eq('aluno_id', alunoId)
+          .eq('ativo_ou_encerrado', 'ativo')
+          .single();
 
+        if (!errorFinanceiro && registroFinanceiro) {
+          contratoAtivo = {
+            id: 'virtual',
+            aluno_id: alunoId,
+            plano_id: registroFinanceiro.plano_id,
+            data_inicio: registroFinanceiro.created_at || new Date().toISOString(),
+            data_fim: null,
+            valor_mensalidade: registroFinanceiro.valor_plano,
+            status_contrato: 'Ativo',
+            idioma_contrato: registroFinanceiro.idioma_registro,
+            observacao: 'Contrato baseado em registro financeiro',
+            created_at: registroFinanceiro.created_at || new Date().toISOString(),
+            updated_at: registroFinanceiro.updated_at || new Date().toISOString(),
+            planos: registroFinanceiro.planos
+          };
+        }
+      }
+      
       setDadosContratos({
         contratoAtivo,
         totalContratos: contratosArray.length,
         contratoMaisRecente
       });
-
+      
     } catch (error) {
       console.error('Erro ao buscar dados de contratos:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar os dados de contratos do aluno.",
-        variant: "destructive",
+      setDadosContratos({
+        contratoAtivo: null,
+        totalContratos: 0,
+        contratoMaisRecente: null
       });
-    } finally {
-      setLoadingContratos(false);
     }
   };
 
-  // Função para buscar dados financeiros do aluno
   const buscarDadosFinanceiros = async (alunoId: string) => {
-    setLoadingFinanceiro(true);
     try {
-      // Buscar registro financeiro do aluno com join correto para planos
+      // Buscar registro financeiro ativo
       const { data: registroFinanceiro, error: errorRegistro } = await supabase
         .from('financeiro_alunos')
         .select(`
-          id,
-          aluno_id,
-          plano_id,
-          valor_plano,
-          valor_material,
-          valor_matricula,
-          valor_total,
-          desconto_total,
-          status_geral,
-          data_primeiro_vencimento,
-          forma_pagamento_plano,
-          forma_pagamento_material,
-          forma_pagamento_matricula,
-          numero_parcelas_plano,
-          numero_parcelas_material,
-          numero_parcelas_matricula,
-          porcentagem_progresso,
-          porcentagem_total,
-          idioma_registro,
-          ativo_ou_encerrado,
-          migrado,
-          created_at,
-          updated_at,
+          *,
           planos (
             id,
             nome,
@@ -285,102 +280,85 @@ export const StudentDetailsModal: React.FC<StudentDetailsModalProps> = ({
         .single();
 
       if (errorRegistro && errorRegistro.code !== 'PGRST116') {
-        throw errorRegistro;
-      }
-
-      if (!registroFinanceiro) {
-        setDadosFinanceiros(prev => ({
-          ...prev,
+        console.error('Erro ao buscar registro financeiro:', errorRegistro);
+        setDadosFinanceiros({
           registroFinanceiro: null,
           parcelas: [],
+          valorTotal: 0,
+          statusGeral: 'Sem dados',
+          proximoVencimento: null,
+          progresso: 0,
+          parcelasPagas: 0,
+          parcelasPendentes: 0,
+          valorEmAtraso: 0,
           planoNome: 'Nenhum plano ativo'
-        }));
+        });
         return;
       }
 
-      // Buscar parcelas do registro financeiro com todos os campos necessários
-      const { data: parcelas, error: errorParcelas } = await supabase
+      // Buscar parcelas se houver registro financeiro
+      const { data: parcelasData, error: errorParcelas } = await supabase
         .from('parcelas_alunos')
-        .select(`
-          id,
-          registro_financeiro_id,
-          numero_parcela,
-          valor,
-          data_vencimento,
-          data_pagamento,
-          status_pagamento,
-          tipo_item,
-          descricao_item,
-          forma_pagamento,
-          idioma_registro,
-          observacoes,
-          comprovante,
-          criado_em,
-          atualizado_em
-        `)
+        .select('*')
         .eq('registro_financeiro_id', registroFinanceiro.id)
         .order('data_vencimento', { ascending: true });
 
       if (errorParcelas) {
-        throw errorParcelas;
+        console.error('Erro ao buscar parcelas:', errorParcelas);
+        return;
       }
 
-      // Calcular dados derivados
-      const parcelasArray = parcelas || [];
-      const hoje = new Date();
-      
+      const parcelasArray = parcelasData || [];
       const parcelasPagas = parcelasArray.filter(p => p.status_pagamento === 'pago').length;
       const parcelasPendentes = parcelasArray.filter(p => p.status_pagamento === 'pendente').length;
       
-      // Calcular valor em atraso (parcelas vencidas não pagas)
-      const valorEmAtraso = parcelasArray
-        .filter(p => {
-          const dataVencimento = new Date(p.data_vencimento);
-          return dataVencimento < hoje && p.status_pagamento !== 'pago';
-        })
-        .reduce((total, p) => total + Number(p.valor), 0);
-
+      // Calcular valor em atraso
+      const hoje = new Date();
+      const parcelasVencidas = parcelasArray.filter(p => {
+        const dataVencimento = new Date(p.data_vencimento);
+        return dataVencimento < hoje && p.status_pagamento !== 'pago';
+      });
+      
+      const valorEmAtraso = parcelasVencidas.reduce((total, p) => total + p.valor, 0);
+      
       // Encontrar próximo vencimento
       const parcelasNaoPagas = parcelasArray.filter(p => p.status_pagamento !== 'pago');
-      const proximaParcela = parcelasNaoPagas
-        .sort((a, b) => new Date(a.data_vencimento).getTime() - new Date(b.data_vencimento).getTime())[0];
-
-      const proximoVencimento = proximaParcela ? proximaParcela.data_vencimento : null;
+      const proximaParcelaVencimento = parcelasNaoPagas.length > 0 ? parcelasNaoPagas[0].data_vencimento : null;
+      
+      // Calcular progresso
+      const totalParcelas = parcelasArray.length;
+      const progresso = totalParcelas > 0 ? (parcelasPagas / totalParcelas) * 100 : 0;
 
       setDadosFinanceiros({
         registroFinanceiro,
         parcelas: parcelasArray,
-        valorTotal: Number(registroFinanceiro.valor_total),
+        valorTotal: registroFinanceiro.valor_total,
         statusGeral: registroFinanceiro.status_geral,
-        proximoVencimento,
-        progresso: Number(registroFinanceiro.porcentagem_progresso || 0),
+        proximoVencimento: proximaParcelaVencimento,
+        progresso,
         parcelasPagas,
         parcelasPendentes,
         valorEmAtraso,
         planoNome: registroFinanceiro.planos?.nome || 'Plano não definido'
       });
-
+      
     } catch (error) {
       console.error('Erro ao buscar dados financeiros:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar os dados financeiros do aluno.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingFinanceiro(false);
     }
   };
 
-  // Buscar dados financeiros e de contratos quando o modal abrir
   useEffect(() => {
-    if (isOpen && student?.id) {
-      buscarDadosFinanceiros(student.id);
-      buscarDadosContratos(student.id);
+    if (student?.id) {
+      const fetchData = async () => {
+        await buscarDadosFinanceiros(student.id);
+        await buscarDadosContratos(student.id);
+      };
+      fetchData();
     }
-  }, [isOpen, student?.id]);
+  }, [student?.id]);
 
-  // Função para formatar valor monetário
+  if (!student) return null;
+
   const formatarMoeda = (valor: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -388,57 +366,42 @@ export const StudentDetailsModal: React.FC<StudentDetailsModalProps> = ({
     }).format(valor);
   };
 
-  // Função para formatar data
   const formatarData = (data: string) => {
-    return formatDate(data);
+    return new Date(data).toLocaleDateString('pt-BR');
   };
 
-  // Função para calcular duração do contrato
-  const calcularDuracaoContrato = (dataInicio: string, dataFim?: string | null) => {
-    const inicio = new Date(dataInicio);
-    const fim = dataFim ? new Date(dataFim) : new Date();
-    
-    const diffTime = Math.abs(fim.getTime() - inicio.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    return `${diffDays} dias`;
-  };
-
-  // Função para obter cor do status do contrato
-  const getStatusContratoColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'ativo':
-        return 'text-green-400';
-      case 'inativo':
-        return 'text-gray-400';
-      case 'suspenso':
-        return 'text-yellow-400';
-      case 'cancelado':
-        return 'text-red-400';
-      default:
-        return 'text-gray-400';
-    }
-  };
-
-  // Função para obter ícone do status do contrato
-  const getStatusContratoIcon = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'ativo':
-        return <CheckCircle className="h-4 w-4" />;
-      case 'inativo':
-        return <Clock className="h-4 w-4" />;
-      case 'suspenso':
-        return <AlertCircle className="h-4 w-4" />;
-      case 'cancelado':
-        return <X className="h-4 w-4" />;
-      default:
-        return <Clock className="h-4 w-4" />;
-    }
-  };
-
-  // Função para obter cor do status
   const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
+    switch (status?.toLowerCase()) {
+      case 'ativo':
+        return 'text-green-400';
+      case 'inativo':
+        return 'text-gray-400';
+      case 'suspenso':
+        return 'text-yellow-400';
+      case 'cancelado':
+        return 'text-red-400';
+      default:
+        return 'text-gray-400';
+    }
+  };
+
+  const getStatusBadgeColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'ativo':
+        return 'bg-green-500 text-white';
+      case 'inativo':
+        return 'bg-gray-500 text-white';
+      case 'suspenso':
+        return 'bg-yellow-500 text-white';
+      case 'cancelado':
+        return 'bg-red-500 text-white';
+      default:
+        return 'bg-gray-500 text-white';
+    }
+  };
+
+  const getPaymentStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
       case 'pago':
         return 'text-green-400';
       case 'pendente':
@@ -451,726 +414,694 @@ export const StudentDetailsModal: React.FC<StudentDetailsModalProps> = ({
     }
   };
 
-  // Função para obter ícone do status
-  const getStatusIcon = (status: string) => {
-    switch (status.toLowerCase()) {
+  const getPaymentStatusBadgeColor = (status: string) => {
+    switch (status?.toLowerCase()) {
       case 'pago':
-        return <CheckCircle className="h-4 w-4" />;
+        return 'bg-green-500 text-white';
       case 'pendente':
-        return <Clock className="h-4 w-4" />;
+        return 'bg-yellow-500 text-white';
       case 'atrasado':
       case 'vencido':
-        return <AlertCircle className="h-4 w-4" />;
+        return 'bg-red-500 text-white';
       default:
-        return <Clock className="h-4 w-4" />;
+        return 'bg-gray-500 text-white';
     }
   };
-
-  if (!student) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[90vw] w-[90vw] max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="relative">
-          <DialogTitle className="flex items-center space-x-3 text-2xl font-bold text-[#1F2937]">
-            <div className="p-2 bg-gradient-to-r from-[#D90429] to-pink-500 rounded-lg">
-              <User className="h-6 w-6 text-white" />
-            </div>
-            <span>Detalhes do Aluno</span>
-          </DialogTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-            className="absolute right-0 top-0 h-8 w-8 p-0 hover:bg-gray-100"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </DialogHeader>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="space-y-6"
-        >
-          {/* Header com informações básicas */}
-          <div className="bg-gradient-to-r from-[#D90429] to-pink-500 rounded-lg p-6 text-white">
-            <div className="flex items-center justify-between">
+      <DialogContent className="max-w-7xl max-h-[95vh] overflow-y-auto bg-gradient-to-br from-slate-50 to-gray-100 border-0 shadow-2xl">
+        <DialogHeader className="relative pb-6">
+          <motion.div 
+            className="absolute inset-0 bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 rounded-t-lg"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          />
+          <div className="relative z-10 flex items-center justify-between text-white p-6">
+            <div className="flex items-center gap-4">
+              <motion.div 
+                className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border border-white/30"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+              >
+                <User className="w-8 h-8 text-white" />
+              </motion.div>
               <div>
-                <h2 className="text-2xl font-bold">{student.nome}</h2>
-                <p className="text-white/80">ID: {student.id}</p>
-              </div>
-              <div className="text-right">
-                <Badge className="bg-white/20 text-white border-white/30">
+                <DialogTitle className="text-2xl font-bold text-white mb-2">{student.nome}</DialogTitle>
+                <Badge className={`${getStatusBadgeColor(student.status || 'ativo')} text-sm font-medium px-3 py-1`}>
                   {student.status || 'Ativo'}
                 </Badge>
               </div>
             </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={onClose}
+              className="text-white hover:bg-white/20 rounded-full w-10 h-10"
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
+        </DialogHeader>
+
+        <motion.div 
+          className="space-y-8 p-6"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          {/* Informações Pessoais */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                  <Mail className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-sm font-medium text-gray-600">Email</span>
+              </div>
+              <span className="font-semibold text-[#111827] text-base">{student.email || 'Não informado'}</span>
+            </div>
+
+            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                  <Phone className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-sm font-medium text-gray-600">Telefone</span>
+              </div>
+              <span className="font-semibold text-[#111827] text-base">{student.telefone || 'Não informado'}</span>
+            </div>
+
+            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-sm font-medium text-gray-600">Data de Nascimento</span>
+              </div>
+              <span className="font-semibold text-[#111827] text-base">{student.data_nascimento ? formatarData(student.data_nascimento) : 'Não informado'}</span>
+            </div>
+
+            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
+                  <MapPin className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-sm font-medium text-gray-600">Endereço</span>
+              </div>
+              <span className="font-semibold text-[#111827] text-base">{student.endereco || 'Não informado'}</span>
+            </div>
           </div>
 
-          {/* Informações Pessoais - Topo, expandido horizontalmente, baixo em altura */}
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-gradient-to-r from-gray-600 to-gray-800 rounded-lg p-6 shadow-lg text-white mb-6"
-          >
-            <div className="flex items-center space-x-2 mb-4">
-              <User className="h-6 w-6 text-white" />
-              <h3 className="text-xl font-semibold">Informações Pessoais</h3>
-            </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
-              <div className="flex flex-col">
-                <span className="text-white/70 text-sm flex items-center gap-1">
-                  <User className="h-3 w-3" />
-                  Nome:
-                </span>
-                <span className="font-medium text-lg">{student.nome}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-white/70 text-sm flex items-center gap-1">
-                  <Mail className="h-3 w-3" />
-                  Email:
-                </span>
-                <span className="font-medium">{student.email || 'Não informado'}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-white/70 text-sm flex items-center gap-1">
-                  <Phone className="h-3 w-3" />
-                  Telefone:
-                </span>
-                <span className="font-medium">{student.telefone || 'Não informado'}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-white/70 text-sm flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  Data de Nascimento:
-                </span>
-                <span className="font-medium">{student.data_nascimento ? formatarData(student.data_nascimento) : 'Não informado'}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-white/70 text-sm flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  Endereço:
-                </span>
-                <span className="font-medium">{student.endereco || 'Não informado'}</span>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Cards principais - Registro Financeiro, Desempenho e Contratos */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            
-            {/* Coluna esquerda - Registro Financeiro e Desempenho */}
-            <div className="lg:col-span-2 flex flex-col">
-              {/* Registro Financeiro - Expandido */}
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2 }}
-                className="bg-gradient-to-r from-[#2BC96D] to-[#27B561] rounded-lg p-8 shadow-lg text-white flex-1 mb-6"
-              >
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center space-x-3">
-                  <CreditCard className="h-7 w-7 text-white" />
-                  <h3 className="text-2xl font-semibold">Registro Financeiro</h3>
-                  {loadingFinanceiro && (
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  )}
+          {/* Cards Principais */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Card Financeiro */}
+            <motion.div 
+              className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 shadow-lg hover:shadow-xl transition-all duration-300"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <CreditCard className="w-6 h-6 text-white" />
                 </div>
-                
-                {/* Idioma - Movido para a mesma altura do título */}
-                <div className="bg-white/10 backdrop-blur-sm border border-white/30 rounded-full px-4 py-2">
-                  <span className="text-white/70 text-xs uppercase tracking-wide">Idioma: </span>
-                  <span className="font-semibold text-white">
+                <div>
+                  <h3 className="text-xl font-bold text-[#111827]">Situação Financeira</h3>
+                  <p className="text-sm text-gray-600 mt-1">
                     {dadosFinanceiros.registroFinanceiro?.idioma_registro || 'Não definido'}
-                  </span>
+                  </p>
                 </div>
               </div>
-              
-              {/* Linha Superior - 3 cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                {/* Valor Total - Card destacado */}
-                <div className="bg-gradient-to-r from-white/20 to-white/10 rounded-lg p-4 backdrop-blur-sm border border-white/30 shadow-lg">
-                  <span className="text-white/90 text-sm block mb-1 font-medium">Valor Total:</span>
-                  <span className="font-bold text-xl text-white">{formatarMoeda(dadosFinanceiros.valorTotal)}</span>
+
+              <div className="space-y-4">
+                <div className="flex justify-between items-center p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
+                  <span className="text-sm font-medium text-gray-700">Valor Total</span>
+                  <span className="font-bold text-lg text-[#111827]">{formatarMoeda(dadosFinanceiros.valorTotal)}</span>
                 </div>
-                
-                {/* Status Geral - Mesmo design do Valor Total */}
-                <div className="bg-gradient-to-r from-white/20 to-white/10 rounded-lg p-4 backdrop-blur-sm border border-white/30 shadow-lg">
-                  <span className="text-white/90 text-sm block mb-1 font-medium flex items-center gap-1">
-                    {getStatusIcon(dadosFinanceiros.statusGeral)}
-                    Status Geral:
-                  </span>
-                  <span className="font-bold text-xl text-white">{dadosFinanceiros.statusGeral}</span>
+
+                <div className="flex justify-between items-center p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
+                  <span className="text-sm font-medium text-gray-700">Plano</span>
+                  <span className="font-bold text-lg text-[#111827]">{dadosFinanceiros.planoNome}</span>
                 </div>
-                
-                {/* Próximo Vencimento - Mesmo design do Valor Total */}
-                <div className="bg-gradient-to-r from-white/20 to-white/10 rounded-lg p-4 backdrop-blur-sm border border-white/30 shadow-lg">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-white/90 text-sm font-medium">Próximo Vencimento:</span>
+
+                <div className="flex justify-between items-center p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
+                  <span className="text-sm font-medium text-gray-700">Status</span>
+                  <Badge className={`${getPaymentStatusBadgeColor(dadosFinanceiros.statusGeral)} px-3 py-1`}>
+                    {dadosFinanceiros.statusGeral}
+                  </Badge>
+                </div>
+
+                <div className="flex justify-between items-center p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
+                  <span className="text-sm font-medium text-gray-700">Próximo Vencimento</span>
+                  <div className="text-right">
                     {dadosFinanceiros.proximoVencimento && (() => {
                       const hoje = new Date();
                       const vencimento = new Date(dadosFinanceiros.proximoVencimento);
                       const diffTime = vencimento.getTime() - hoje.getTime();
                       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                      
                       return (
-                        <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          diffDays < 0 ? 'bg-red-500/20 text-red-300 border border-red-400/30' :
-                          diffDays <= 7 ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-400/30' :
-                          'bg-green-500/20 text-green-300 border border-green-400/30'
-                        }`}>
-                          {diffDays < 0 ? `${Math.abs(diffDays)}d atraso` : 
-                           diffDays === 0 ? 'Hoje' : 
-                           `${diffDays}d`}
-                        </div>
+                        <Badge className={`${
+                          diffDays < 0 ? 'bg-[#FEE2E2] text-[#DC2626] border border-[#FECACA]' :
+                          diffDays <= 7 ? 'bg-[#FEF3C7] text-[#D97706] border border-[#FDE68A]' :
+                          'bg-[#D1FAE5] text-[#059669] border border-[#A7F3D0]'
+                        } px-3 py-1 text-xs font-medium`}>
+                          {diffDays === 0 ? 'Hoje' :
+                           diffDays < 0 ? `${Math.abs(diffDays)} dias em atraso` :
+                           `${diffDays} dias`}
+                        </Badge>
                       );
                     })()}
+                    <div className="text-sm font-semibold text-[#111827] mt-1">
+                      {dadosFinanceiros.proximoVencimento ? formatarData(dadosFinanceiros.proximoVencimento) : 'Nenhum'}
+                    </div>
                   </div>
-                  <span className="font-bold text-xl text-white block">
-                    {dadosFinanceiros.proximoVencimento ? formatarData(dadosFinanceiros.proximoVencimento) : 'Nenhum'}
-                  </span>
+                </div>
+
+                <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-sm font-medium text-gray-700">Progresso de Pagamento</span>
+                    <span className="text-sm font-bold text-[#111827]">{Math.round(dadosFinanceiros.progresso)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <motion.div 
+                      className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full"
+                      style={{ width: `${Math.min(dadosFinanceiros.progresso, 100)}%` }}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.min(dadosFinanceiros.progresso, 100)}%` }}
+                      transition={{ duration: 1, ease: "easeOut" }}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className={`p-4 rounded-xl border-l-4 ${
+                    dadosFinanceiros.valorEmAtraso > 0 ? 'border-l-[#F44336]' : 'border-l-[#4CAF50]'
+                  } bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-2 ${
+                      dadosFinanceiros.valorEmAtraso > 0 ? 'bg-[#F44336]' : 'bg-[#4CAF50]'
+                    }`}>
+                      <CheckCircle className="w-4 h-4 text-white" />
+                    </div>
+                    <span className={`text-sm font-medium ${
+                      dadosFinanceiros.valorEmAtraso > 0 ? 'text-[#F44336]' : 'text-[#4CAF50]'
+                    }`}>Parcelas Pagas</span>
+                    <div className="font-bold text-xl text-[#111827] mt-1">{dadosFinanceiros.parcelasPagas}</div>
+                  </div>
+
+                  <div className="p-4 rounded-xl border-l-4 border-l-[#FF9800] bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200">
+                    <div className="w-8 h-8 bg-[#FF9800] rounded-full flex items-center justify-center mb-2">
+                      <Clock className="w-4 h-4 text-white" />
+                    </div>
+                    <span className="text-sm font-medium text-[#FF9800]">Pendentes</span>
+                    <div className="font-bold text-xl text-[#111827] mt-1">{dadosFinanceiros.parcelasPendentes}</div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
+                  <span className="text-sm font-medium text-gray-700">Forma de Pagamento</span>
+                  <span className="font-bold text-xl text-[#111827]">{dadosFinanceiros.registroFinanceiro?.forma_pagamento_plano || 'Não definido'}</span>
                 </div>
               </div>
-              
-              {/* Barra de Progresso - Ocupando toda largura horizontal */}
-              <div className="bg-gradient-to-r from-white/20 to-white/10 rounded-lg p-6 backdrop-blur-sm border border-white/30 shadow-lg mb-6">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-white/90 text-sm flex items-center gap-1 font-medium">
-                    <TrendingUp className="h-4 w-4" />
-                    Progresso:
-                  </span>
-                  <span className="font-bold text-xl text-white">{dadosFinanceiros.progresso.toFixed(1)}%</span>
-                </div>
-                <div className="w-full bg-white/20 rounded-full h-4 backdrop-blur-sm">
-                  <div 
-                    className="bg-gradient-to-r from-green-400 to-emerald-300 h-4 rounded-full transition-all duration-500 ease-out shadow-sm"
-                    style={{ width: `${Math.min(dadosFinanceiros.progresso, 100)}%` }}
-                  ></div>
-                </div>
-              </div>
-              
-              {/* Linha Inferior - Cards com estilos diferenciados */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                {/* Parcelas Pagas - Card com borda verde */}
-                <div className="bg-black/15 rounded-lg p-4 backdrop-blur-sm border-l-4 border-l-green-400 border-t border-r border-b border-white/20">
-                  <div className="flex items-center justify-between">
-                    <span className="text-white/90 text-sm">Parcelas Pagas:</span>
-                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                  </div>
-                  <span className="font-bold text-2xl text-green-300 block mt-1">{dadosFinanceiros.parcelasPagas}</span>
-                </div>
-                
-                {/* Parcelas Pendentes - Card com borda verde */}
-                <div className="bg-black/15 rounded-lg p-4 backdrop-blur-sm border-l-4 border-l-green-400 border-t border-r border-b border-white/20">
-                  <div className="flex items-center justify-between">
-                    <span className="text-white/90 text-sm">Parcelas Pendentes:</span>
-                    <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
-                  </div>
-                  <span className="font-bold text-2xl text-yellow-300 block mt-1">{dadosFinanceiros.parcelasPendentes}</span>
-                </div>
-                
-                {/* Valor em Atraso - Card com borda verde */}
-                <div className="bg-black/15 rounded-lg p-4 backdrop-blur-sm border-l-4 border-l-green-400 border-t border-r border-b border-white/20">
-                  <div className="flex items-center justify-between">
-                    <span className="text-white/90 text-sm">Valor em Atraso:</span>
-                    <div className={`w-2 h-2 rounded-full ${
-                      dadosFinanceiros.valorEmAtraso > 0 ? 'bg-red-400' : 'bg-green-400'
-                    }`}></div>
-                  </div>
-                  <span className={`font-bold text-2xl block mt-1 ${
-                    dadosFinanceiros.valorEmAtraso > 0 ? 'text-red-300' : 'text-green-300'
-                  }`}>
-                    {formatarMoeda(dadosFinanceiros.valorEmAtraso)}
-                  </span>
-                </div>
-              </div>
+            </motion.div>
 
-                {/* Informações Adicionais - Layout horizontal */}
-                <div className="flex flex-col sm:flex-row gap-4">
-                  {/* Plano - Mesmo design do Valor Total */}
-                  <div className="flex-1 bg-gradient-to-r from-white/20 to-white/10 rounded-lg p-4 backdrop-blur-sm border border-white/30 shadow-lg">
-                    <span className="text-white/90 text-sm block mb-1 font-medium flex items-center gap-1">
-                      <BookOpen className="h-4 w-4" />
-                      Plano Contratado:
-                    </span>
-                    <span className="font-bold text-xl text-white">{dadosFinanceiros.planoNome}</span>
-                  </div>
-                  
-                  {/* Forma de Pagamento - Mesmo design do Valor Total */}
-                  <div className="flex-1 bg-gradient-to-r from-white/20 to-white/10 rounded-lg p-4 backdrop-blur-sm border border-white/30 shadow-lg">
-                    <span className="text-white/90 text-sm block mb-1 font-medium">Forma de Pagamento:</span>
-                    <span className="font-bold text-xl text-white">{dadosFinanceiros.registroFinanceiro?.forma_pagamento_plano || 'Não definido'}</span>
-                  </div>
-                </div>
-              </motion.div>
-
-
-            </div>
-
-            {/* Contratos - Azul, ao lado direito */}
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
-              className="bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg p-8 shadow-lg text-white relative overflow-hidden"
+            {/* Card Contratos */}
+            <motion.div 
+              className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 shadow-lg hover:shadow-xl transition-all duration-300"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
             >
-              {/* Header com idioma */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center space-x-3">
-                  <FileText className="h-7 w-7 text-white" />
-                  <h3 className="text-2xl font-semibold">Contratos</h3>
-                  {loadingContratos && (
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  )}
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <FileText className="w-6 h-6 text-white" />
                 </div>
-                <div className="bg-white/20 px-3 py-1 rounded-full text-sm font-medium border border-white/30">
-                  {dadosContratos.contratoAtivo?.idioma_contrato || 'N/A'}
+                <div>
+                  <h3 className="text-xl font-bold text-[#111827]">Contratos</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {dadosContratos.contratoAtivo?.idioma_contrato || 'N/A'}
+                  </p>
                 </div>
               </div>
-              
-              {/* Layout Vertical */}
+
               <div className="space-y-4">
-                {/* Status do Contrato - Card Destacado */}
-                <div className="bg-gradient-to-r from-white/20 to-white/10 rounded-xl p-5 border border-white/20 backdrop-blur-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    {dadosContratos.contratoAtivo ? 
-                      getStatusContratoIcon(dadosContratos.contratoAtivo.status_contrato) : 
-                      <Clock className="h-5 w-5" />
-                    }
-                    <span className="text-white/90 text-base font-medium">Status do Contrato</span>
-                  </div>
-                  <div className="text-3xl font-bold text-white mb-1">
+                <div className="flex justify-between items-center p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
+                  <span className="text-sm font-medium text-gray-700">Status do Contrato</span>
+                  <Badge className={`${getStatusBadgeColor(dadosContratos.contratoAtivo?.status_contrato || 'inativo')} px-3 py-1`}>
                     {dadosContratos.contratoAtivo?.status_contrato || 'Inativo'}
-                  </div>
-                  <div className="text-white/80 text-base">
-                    {dadosContratos.contratoAtivo?.planos?.nome || 'Nenhum plano ativo'}
-                  </div>
+                  </Badge>
+                </div>
+                <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
+                  <span className="text-sm font-medium text-gray-700">Plano Ativo</span>
+                  <div className="font-bold text-lg text-[#111827] mt-1">{dadosContratos.contratoAtivo?.planos?.nome || 'Nenhum plano ativo'}</div>
                 </div>
 
                 {/* Barra de Progresso do Contrato */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-white/90 text-base font-medium">Progresso do Contrato</span>
-                    <span className="text-white text-base font-bold">
+                <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-sm font-medium text-gray-700">Progresso do Contrato</span>
+                    <span className="text-sm font-bold text-[#111827]">
                       {dadosContratos.contratoAtivo?.data_inicio && dadosContratos.contratoAtivo?.data_fim ? 
                         `${Math.round(((new Date().getTime() - new Date(dadosContratos.contratoAtivo.data_inicio).getTime()) / (new Date(dadosContratos.contratoAtivo.data_fim).getTime() - new Date(dadosContratos.contratoAtivo.data_inicio).getTime())) * 100)}%` : 
                         '0%'
                       }
                     </span>
                   </div>
-                  <div className="w-full bg-white/20 rounded-full h-3 overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-white to-blue-200 rounded-full transition-all duration-500 ease-out"
-                      style={{
+                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <motion.div 
+                      className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full"
+                      initial={{ width: 0 }}
+                      animate={{
                         width: dadosContratos.contratoAtivo?.data_inicio && dadosContratos.contratoAtivo?.data_fim ? 
                           `${Math.min(100, Math.max(0, ((new Date().getTime() - new Date(dadosContratos.contratoAtivo.data_inicio).getTime()) / (new Date(dadosContratos.contratoAtivo.data_fim).getTime() - new Date(dadosContratos.contratoAtivo.data_inicio).getTime())) * 100))}%` : 
                           '0%'
                       }}
-                    ></div>
+                      transition={{ duration: 1, ease: "easeOut" }}
+                    />
                   </div>
                 </div>
 
                 {/* Cards de Informações em Layout Vertical */}
-                <div className="space-y-4">
-                  {/* Data de Início */}
-                  <div className="bg-black/20 rounded-lg p-5 border border-white/20">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Calendar className="h-5 w-5 text-white/80" />
-                      <span className="text-white/80 text-sm font-medium">INÍCIO</span>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                        <Calendar className="w-4 h-4 text-white" />
+                      </div>
+                      <span className="text-xs font-medium text-gray-600">Data de Início</span>
                     </div>
-                    <div className="text-white font-bold text-base">
-                      {dadosContratos.contratoAtivo?.data_inicio ? 
-                        formatarData(dadosContratos.contratoAtivo.data_inicio) : 
+                    <span className="font-semibold text-[#111827] text-sm">
+                      {dadosContratos.contratoAtivo?.data_inicio ? formatarData(dadosContratos.contratoAtivo.data_inicio) : 
                         'Não definido'
                       }
-                    </div>
+                    </span>
                   </div>
 
-                  {/* Data de Fim */}
-                  <div className="bg-black/20 rounded-lg p-5 border border-white/20">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Clock className="h-5 w-5 text-white/80" />
-                      <span className="text-white/80 text-sm font-medium">FIM</span>
+                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-8 h-8 bg-gradient-to-r from-red-500 to-red-600 rounded-lg flex items-center justify-center">
+                        <Calendar className="w-4 h-4 text-white" />
+                      </div>
+                      <span className="text-xs font-medium text-gray-600">Data de Fim</span>
                     </div>
-                    <div className="text-white font-bold text-base">
-                      {dadosContratos.contratoAtivo?.data_fim ? 
-                        formatarData(dadosContratos.contratoAtivo.data_fim) : 
+                    <span className="font-semibold text-[#111827] text-sm">
+                      {dadosContratos.contratoAtivo?.data_fim ? formatarData(dadosContratos.contratoAtivo.data_fim) : 
                         'Indeterminado'
                       }
-                    </div>
+                    </span>
                   </div>
 
-                  {/* Duração */}
-                  <div className="bg-black/20 rounded-lg p-5 border border-white/20">
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="w-2 h-2 bg-blue-300 rounded-full"></span>
-                      <span className="text-white/80 text-sm font-medium">DURAÇÃO</span>
+                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
+                        <Clock className="w-4 h-4 text-white" />
+                      </div>
+                      <span className="text-xs font-medium text-gray-600">Duração</span>
                     </div>
-                    <div className="text-white font-bold text-base">
-                      {dadosContratos.contratoAtivo?.data_inicio ? 
-                        calcularDuracaoContrato(dadosContratos.contratoAtivo.data_inicio, dadosContratos.contratoAtivo.data_fim) : 
+                    <span className="font-semibold text-[#111827] text-sm">
+                      {dadosContratos.contratoAtivo?.data_inicio && dadosContratos.contratoAtivo?.data_fim ? 
+                        `${Math.ceil((new Date(dadosContratos.contratoAtivo.data_fim).getTime() - new Date(dadosContratos.contratoAtivo.data_inicio).getTime()) / (1000 * 60 * 60 * 24 * 30))} meses` : 
                         'Não calculado'
                       }
-                    </div>
+                    </span>
                   </div>
 
-                  {/* Total de Contratos */}
-                  <div className="bg-black/20 rounded-lg p-5 border border-white/20">
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="w-2 h-2 bg-white rounded-full"></span>
-                      <span className="text-white/80 text-sm font-medium">TOTAL DE CONTRATOS</span>
+                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
+                        <FileText className="w-4 h-4 text-white" />
+                      </div>
+                      <span className="text-xs font-medium text-gray-600">Total de Contratos</span>
                     </div>
-                    <div className="text-white font-bold text-xl">
-                      {dadosContratos.totalContratos}
-                    </div>
+                    <span className="font-semibold text-[#111827] text-sm">{dadosContratos.totalContratos}</span>
                   </div>
                 </div>
-              </div>
 
-              {/* Observações - Sempre visível */}
-              <div className="mt-4 bg-black/10 rounded-lg p-6 border border-white/20">
-                <div className="flex items-center gap-2 mb-3">
-                  <AlertCircle className="h-5 w-5 text-white/80" />
-                  <span className="text-white/80 text-sm font-medium">OBSERVAÇÕES</span>
-                </div>
-                <div 
-                  className="text-white/90 text-base leading-relaxed cursor-help overflow-hidden" 
-                  style={{
+                {/* Observações */}
+                <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-8 h-8 bg-gradient-to-r from-amber-500 to-amber-600 rounded-lg flex items-center justify-center">
+                      <AlertCircle className="w-4 h-4 text-white" />
+                    </div>
+                    <span className="text-sm font-medium text-gray-700">OBSERVAÇÕES</span>
+                  </div>
+                  <p className="text-sm text-gray-600 leading-relaxed" style={{
                     display: '-webkit-box',
                     WebkitLineClamp: 3,
                     WebkitBoxOrient: 'vertical',
                     maxHeight: '4.5rem'
-                  }}
-                  title={dadosContratos.contratoAtivo?.observacao || 'Nenhuma observação registrada para este contrato.'}
-                >
-                  {dadosContratos.contratoAtivo?.observacao || 'Nenhuma observação registrada para este contrato.'}
+                  }} title={dadosContratos.contratoAtivo?.observacao || 'Nenhuma observação registrada para este contrato.'}>
+                    {dadosContratos.contratoAtivo?.observacao || 'Nenhuma observação registrada para este contrato.'}
+                  </p>
                 </div>
               </div>
             </motion.div>
           </div>
 
-          {/* Cards secundários - Grid menor */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-
+          {/* Cards secundários */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Histórico Acadêmico */}
-            <motion.div
+            <motion.div 
+              className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 shadow-lg hover:shadow-xl transition-all duration-300"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.5 }}
-              className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm"
             >
-              <div className="flex items-center space-x-2 mb-4">
-                <BookOpen className="h-5 w-5 text-indigo-600" />
-                <h3 className="text-lg font-semibold text-[#1F2937]">Histórico Acadêmico</h3>
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <BookOpen className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-[#111827]">Histórico Acadêmico</h3>
+                </div>
               </div>
-              
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Data de Matrícula:</span>
-                  <span className="font-medium">Em desenvolvimento...</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Progresso:</span>
-                  <span className="font-medium">Em desenvolvimento...</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Certificações:</span>
-                  <span className="font-medium">Em desenvolvimento...</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Frequência:</span>
-                  <span className="font-medium">Em desenvolvimento...</span>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 border border-gray-200/50">
+                    <span className="text-xs font-medium text-gray-600">Data de Matrícula</span>
+                    <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
+                  </div>
+                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 border border-gray-200/50">
+                    <span className="text-xs font-medium text-gray-600">Progresso</span>
+                    <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
+                  </div>
+                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 border border-gray-200/50">
+                    <span className="text-xs font-medium text-gray-600">Certificações</span>
+                    <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
+                  </div>
                 </div>
               </div>
             </motion.div>
 
             {/* Responsáveis */}
-            <motion.div
+            <motion.div 
+              className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 shadow-lg hover:shadow-xl transition-all duration-300"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.6 }}
-              className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm"
             >
-              <div className="flex items-center space-x-2 mb-4">
-                <Users className="h-5 w-5 text-orange-600" />
-                <h3 className="text-lg font-semibold text-[#1F2937]">Responsáveis</h3>
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 bg-gradient-to-r from-pink-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <Users className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-[#111827]">Responsáveis</h3>
+                </div>
               </div>
-              
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Responsável Principal:</span>
-                  <span className="font-medium">Em desenvolvimento...</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Telefone:</span>
-                  <span className="font-medium">Em desenvolvimento...</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Email:</span>
-                  <span className="font-medium">Em desenvolvimento...</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Parentesco:</span>
-                  <span className="font-medium">Em desenvolvimento...</span>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 border border-gray-200/50">
+                    <span className="text-xs font-medium text-gray-600">Responsável Principal</span>
+                    <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
+                  </div>
+                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 border border-gray-200/50">
+                    <span className="text-xs font-medium text-gray-600">Telefone</span>
+                    <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
+                  </div>
+                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 border border-gray-200/50">
+                    <span className="text-xs font-medium text-gray-600">Email</span>
+                    <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
+                  </div>
+                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 border border-gray-200/50">
+                    <span className="text-xs font-medium text-gray-600">Parentesco</span>
+                    <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
+                  </div>
                 </div>
               </div>
             </motion.div>
 
-            {/* Horários e Frequência */}
-            <motion.div
+            {/* Horários & Frequência */}
+            <motion.div 
+              className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 shadow-lg hover:shadow-xl transition-all duration-300"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.7 }}
-              className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm"
             >
-              <div className="flex items-center space-x-2 mb-4">
-                <Clock className="h-5 w-5 text-teal-600" />
-                <h3 className="text-lg font-semibold text-[#1F2937]">Horários & Frequência</h3>
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 bg-gradient-to-r from-teal-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <Clock className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-[#111827]">Horários & Frequência</h3>
+                </div>
               </div>
-              
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Horário das Aulas:</span>
-                  <span className="font-medium">Em desenvolvimento...</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Dias da Semana:</span>
-                  <span className="font-medium">Em desenvolvimento...</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Faltas no Mês:</span>
-                  <span className="font-medium">Em desenvolvimento...</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Última Presença:</span>
-                  <span className="font-medium">Em desenvolvimento...</span>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 border border-gray-200/50">
+                    <span className="text-xs font-medium text-gray-600">Frequência</span>
+                    <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
+                  </div>
+                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 border border-gray-200/50">
+                    <span className="text-xs font-medium text-gray-600">Horário das Aulas</span>
+                    <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
+                  </div>
+                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 border border-gray-200/50">
+                    <span className="text-xs font-medium text-gray-600">Dias da Semana</span>
+                    <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
+                  </div>
+                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 border border-gray-200/50">
+                    <span className="text-xs font-medium text-gray-600">Faltas no Mês</span>
+                    <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
+                  </div>
+                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 border border-gray-200/50">
+                    <span className="text-xs font-medium text-gray-600">Última Presença</span>
+                    <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
+                  </div>
                 </div>
               </div>
             </motion.div>
-
           </div>
 
-          {/* Informações Acadêmicas - Card Horizontal Completo */}
-          <motion.div
+          {/* Informações Acadêmicas */}
+          <motion.div 
+            className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 shadow-lg hover:shadow-xl transition-all duration-300"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
-            className="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-lg p-6 shadow-sm col-span-full"
           >
-            <div className="flex items-center space-x-3 mb-6">
-              <GraduationCap className="h-6 w-6 text-purple-600" />
-              <h3 className="text-xl font-semibold text-[#1F2937]">Informações Acadêmicas</h3>
-            </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
-              <div className="space-y-1">
-                <span className="text-sm text-gray-500 font-medium">Turma</span>
-                <div className="text-base font-semibold text-gray-900">A1-Manhã</div>
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <GraduationCap className="w-6 h-6 text-white" />
               </div>
-              <div className="space-y-1">
-                <span className="text-sm text-gray-500 font-medium">Idioma</span>
-                <div className="text-base font-semibold text-gray-900">Inglês</div>
-              </div>
-              <div className="space-y-1">
-                <span className="text-sm text-gray-500 font-medium">Nível</span>
-                <div className="text-base font-semibold text-gray-900">Intermediário</div>
-              </div>
-              <div className="space-y-1">
-                <span className="text-sm text-gray-500 font-medium">Data Matrícula</span>
-                <div className="text-base font-semibold text-gray-900">15/01/2024</div>
-              </div>
-              <div className="space-y-1">
-                <span className="text-sm text-gray-500 font-medium">Progresso</span>
-                <div className="text-base font-semibold text-purple-600">75%</div>
-              </div>
-              <div className="space-y-1">
-                <span className="text-sm text-gray-500 font-medium">Frequência</span>
-                <div className="text-base font-semibold text-green-600">92%</div>
-              </div>
-              <div className="space-y-1">
-                <span className="text-sm text-gray-500 font-medium">Horário</span>
-                <div className="text-base font-semibold text-gray-900">08:00-10:00</div>
-              </div>
-              <div className="space-y-1">
-                <span className="text-sm text-gray-500 font-medium">Dia da Semana</span>
-                <div className="text-base font-semibold text-gray-900">Seg/Qua/Sex</div>
-              </div>
-              <div className="space-y-1">
-                <span className="text-sm text-gray-500 font-medium">Faltas no Mês</span>
-                <div className="text-base font-semibold text-red-600">2</div>
-              </div>
-              <div className="space-y-1">
-                <span className="text-sm text-gray-500 font-medium">Última Presença</span>
-                <div className="text-base font-semibold text-gray-900">18/12/2024</div>
-              </div>
-              <div className="space-y-1">
-                <span className="text-sm text-gray-500 font-medium">Professor</span>
-                <div className="text-base font-semibold text-gray-900">Prof. Maria Silva</div>
+              <div>
+                <h3 className="text-xl font-bold text-[#111827]">Informações Acadêmicas</h3>
               </div>
             </div>
             
-            <div className="mt-6 pt-6 border-t border-purple-200">
-              <div className="flex items-start space-x-3">
-                <AlertCircle className="h-5 w-5 text-purple-600 mt-0.5 flex-shrink-0" />
-                <div className="flex-1">
-                  <span className="text-sm font-semibold text-purple-700 mb-2 block">Observações Acadêmicas:</span>
-                  <div className="text-sm text-gray-700 leading-relaxed">
-                    Aluno demonstra excelente progresso na conversação e compreensão auditiva. Recomenda-se foco em gramática avançada e exercícios de escrita para o próximo módulo. Participação ativa nas aulas e boa interação com colegas.
-                  </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                <span className="text-xs font-medium text-gray-600">Turma</span>
+                <div className="font-semibold text-[#111827] text-sm mt-1">{student.turmas?.nome || 'Sem turma'}</div>
+              </div>
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                <span className="text-xs font-medium text-gray-600">Idioma</span>
+                <div className="font-semibold text-[#111827] text-sm mt-1">{student.idioma || 'Não definido'}</div>
+              </div>
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                <span className="text-xs font-medium text-gray-600">Nível</span>
+                <div className="font-semibold text-[#111827] text-sm mt-1">{student.nivel || 'Não definido'}</div>
+              </div>
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                <span className="text-xs font-medium text-gray-600">Data Matrícula</span>
+                <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
+              </div>
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                <span className="text-xs font-medium text-gray-600">Progresso</span>
+                <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
+              </div>
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                <span className="text-xs font-medium text-gray-600">Frequência</span>
+                <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
+              </div>
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                <span className="text-xs font-medium text-gray-600">Horário</span>
+                <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
+              </div>
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                <span className="text-xs font-medium text-gray-600">Dia da Semana</span>
+                <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
+              </div>
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                <span className="text-xs font-medium text-gray-600">Faltas no Mês</span>
+                <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
+              </div>
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                <span className="text-xs font-medium text-gray-600">Última Presença</span>
+                <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
+              </div>
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                <span className="text-xs font-medium text-gray-600">Professor</span>
+                <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
+              </div>
+            </div>
+
+            {/* Observações Acadêmicas */}
+            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-8 h-8 bg-gradient-to-r from-amber-500 to-amber-600 rounded-lg flex items-center justify-center">
+                  <AlertCircle className="w-4 h-4 text-white" />
                 </div>
+                <span className="text-sm font-medium text-gray-700">Observações Acadêmicas</span>
               </div>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                {student.observacoes || 'O aluno demonstra excelente progresso nas atividades propostas, mantendo boa participação em aula e demonstrando interesse pelo conteúdo. Recomenda-se continuar com o ritmo atual de estudos.'}
+              </p>
             </div>
           </motion.div>
 
-          {/* Card de Desempenho */}
-          <motion.div
+          {/* Desempenho Acadêmico */}
+          <motion.div 
+            className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 shadow-lg hover:shadow-xl transition-all duration-300"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.8 }}
-            className="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg p-6 shadow-lg text-white col-span-full"
           >
-            <div className="flex items-center space-x-3 mb-6">
-              <Award className="h-7 w-7 text-white" />
-              <h3 className="text-2xl font-semibold">Desempenho Acadêmico</h3>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {/* Nota Geral */}
-              <div className="bg-white/20 rounded-lg p-4 backdrop-blur-sm border border-white/30">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-white/90 text-sm font-medium">Nota Geral</span>
-                  <TrendingUp className="h-4 w-4 text-white/80" />
-                </div>
-                <div className="text-3xl font-bold text-white mb-1">8.7</div>
-                <div className="text-white/80 text-sm">Excelente</div>
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Award className="w-6 h-6 text-white" />
               </div>
-              
-              {/* Participação */}
-              <div className="bg-white/20 rounded-lg p-4 backdrop-blur-sm border border-white/30">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-white/90 text-sm font-medium">Participação</span>
-                  <Users className="h-4 w-4 text-white/80" />
-                </div>
-                <div className="text-3xl font-bold text-white mb-1">9.2</div>
-                <div className="text-white/80 text-sm">Muito Ativo</div>
-              </div>
-              
-              {/* Evolução */}
-              <div className="bg-white/20 rounded-lg p-4 backdrop-blur-sm border border-white/30">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-white/90 text-sm font-medium">Evolução</span>
-                  <TrendingUp className="h-4 w-4 text-white/80" />
-                </div>
-                <div className="text-3xl font-bold text-green-300 mb-1">+15%</div>
-                <div className="text-white/80 text-sm">Último mês</div>
-              </div>
-              
-              {/* Pontualidade */}
-              <div className="bg-white/20 rounded-lg p-4 backdrop-blur-sm border border-white/30">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-white/90 text-sm font-medium">Pontualidade</span>
-                  <Clock className="h-4 w-4 text-white/80" />
-                </div>
-                <div className="text-3xl font-bold text-white mb-1">96%</div>
-                <div className="text-white/80 text-sm">Excelente</div>
+              <div>
+                <h3 className="text-xl font-bold text-[#111827]">Desempenho Acadêmico</h3>
               </div>
             </div>
-            
-            {/* Habilidades */}
-            <div className="mt-6">
-              <h4 className="text-lg font-semibold text-white mb-4">Habilidades por Área</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Speaking */}
-                <div className="bg-black/20 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-white/90 text-sm">Speaking</span>
-                    <span className="text-white font-bold">8.5</span>
-                  </div>
-                  <div className="w-full bg-white/20 rounded-full h-2">
-                    <div className="bg-gradient-to-r from-green-400 to-emerald-300 h-2 rounded-full" style={{width: '85%'}}></div>
-                  </div>
-                </div>
-                
-                {/* Listening */}
-                <div className="bg-black/20 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-white/90 text-sm">Listening</span>
-                    <span className="text-white font-bold">9.0</span>
-                  </div>
-                  <div className="w-full bg-white/20 rounded-full h-2">
-                    <div className="bg-gradient-to-r from-green-400 to-emerald-300 h-2 rounded-full" style={{width: '90%'}}></div>
-                  </div>
-                </div>
-                
-                {/* Reading */}
-                <div className="bg-black/20 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-white/90 text-sm">Reading</span>
-                    <span className="text-white font-bold">8.2</span>
-                  </div>
-                  <div className="w-full bg-white/20 rounded-full h-2">
-                    <div className="bg-gradient-to-r from-green-400 to-emerald-300 h-2 rounded-full" style={{width: '82%'}}></div>
-                  </div>
-                </div>
-                
-                {/* Writing */}
-                <div className="bg-black/20 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-white/90 text-sm">Writing</span>
-                    <span className="text-white font-bold">7.8</span>
-                  </div>
-                  <div className="w-full bg-white/20 rounded-full h-2">
-                    <div className="bg-gradient-to-r from-yellow-400 to-orange-300 h-2 rounded-full" style={{width: '78%'}}></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Feedback do Professor */}
-            <div className="mt-6 bg-black/20 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-3">
-                <User className="h-4 w-4 text-white/80" />
-                <span className="text-white/90 text-sm font-medium">Feedback do Professor</span>
-              </div>
-              <p className="text-white/90 text-sm leading-relaxed">
-                "Aluno demonstra excelente progresso em todas as áreas. Destaque especial para listening e participação em aula. 
-                Recomendo continuar com exercícios de writing para equilibrar todas as habilidades."
-              </p>
-              <div className="mt-2 text-white/70 text-xs">
-                - Prof. Maria Silva, 15/12/2024
-              </div>
-            </div>
-          </motion.div>
-          
-          {/* Placeholder para futuras seções */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.9 }}
-            className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center col-span-full"
-          >
-            <div className="text-gray-500">
-              <h3 className="text-xl font-medium mb-3">Modal de detalhes do aluno implementado com sucesso!</h3>
-              <p className="text-base max-w-2xl mx-auto">
-                O modal agora exibe dados reais e mockados para:
-                <br />
-                <strong>Registro Financeiro:</strong> valor total, status geral, próximo vencimento, progresso, parcelas pagas/pendentes, valor em atraso, plano, idioma e forma de pagamento.
-                <br />
-                <strong>Contratos:</strong> status do contrato ativo, datas de início e fim, valor da mensalidade, duração, idioma do contrato, total de contratos e observações.
-                <br />
-                <strong>Informações Acadêmicas:</strong> turma, idioma, nível, datas, progresso, frequência, horários, professor e observações.
-                <br />
-                <strong>Desempenho:</strong> notas por habilidade, evolução, participação, pontualidade e feedback do professor.
-              </p>
-            </div>
-          </motion.div>
-        </motion.div>
-      </DialogContent>
-    </Dialog>
-  );
-};
 
-export default StudentDetailsModal;
+            {/* Métricas de Desempenho */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                    <TrendingUp className="w-4 h-4 text-white" />
+                  </div>
+                  <span className="text-xs font-medium text-gray-600">Nota Geral</span>
+                </div>
+                <div className="font-bold text-2xl text-[#111827]">8.5</div>
+                <div className="text-xs text-green-600 font-medium">Excelente</div>
+              </div>
+
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                    <Users className="w-4 h-4 text-white" />
+                  </div>
+                  <span className="text-xs font-medium text-gray-600">Participação</span>
+                </div>
+                <div className="font-bold text-2xl text-[#111827]">9.0</div>
+                <div className="text-xs text-green-600 font-medium">Muito Ativa</div>
+              </div>
+
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
+                    <TrendingUp className="w-4 h-4 text-white" />
+                  </div>
+                  <span className="text-xs font-medium text-gray-600">Evolução</span>
+                </div>
+                <div className="font-bold text-2xl text-[#111827]">+15%</div>
+                <div className="text-xs text-green-600 font-medium">Em Crescimento</div>
+              </div>
+
+              <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
+                    <Clock className="w-4 h-4 text-white" />
+                  </div>
+                  <span className="text-xs font-medium text-gray-600">Pontualidade</span>
+                </div>
+                <div className="font-bold text-2xl text-[#111827]">95%</div>
+                <div className="text-xs text-green-600 font-medium">Excelente</div>
+              </div>
+            </div>
+
+            {/* Habilidades por Área */}
+            <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300 mb-6">
+              <h4 className="text-lg font-bold text-[#111827] mb-4">Habilidades por Área</h4>
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium text-gray-700">Speaking</span>
+                    <span className="text-sm font-bold text-[#111827]">85%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <motion.div 
+                      className="bg-gradient-to-r from-emerald-400 to-emerald-500 h-2 rounded-full" 
+                      initial={{ width: '0%' }}
+                      animate={{ width: '85%' }}
+                      transition={{ duration: 1, delay: 0.5 }}
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                   <div className="flex justify-between items-center mb-2">
+                     <span className="text-sm font-medium text-gray-700">Listening</span>
+                     <span className="text-sm font-bold text-[#111827]">90%</span>
+                   </div>
+                   <div className="w-full bg-gray-200 rounded-full h-2">
+                     <motion.div 
+                       className="bg-gradient-to-r from-emerald-400 to-emerald-500 h-2 rounded-full" 
+                       initial={{ width: '0%' }}
+                       animate={{ width: '90%' }}
+                       transition={{ duration: 1, delay: 0.6 }}
+                     />
+                   </div>
+                 </div>
+                 
+                 <div>
+                   <div className="flex justify-between items-center mb-2">
+                     <span className="text-sm font-medium text-gray-700">Reading</span>
+                     <span className="text-sm font-bold text-[#111827]">82%</span>
+                   </div>
+                   <div className="w-full bg-gray-200 rounded-full h-2">
+                     <motion.div 
+                       className="bg-gradient-to-r from-emerald-400 to-emerald-500 h-2 rounded-full" 
+                       initial={{ width: '0%' }}
+                       animate={{ width: '82%' }}
+                       transition={{ duration: 1, delay: 0.7 }}
+                     />
+                   </div>
+                 </div>
+                 
+                 <div>
+                   <div className="flex justify-between items-center mb-2">
+                     <span className="text-sm font-medium text-gray-700">Writing</span>
+                     <span className="text-sm font-bold text-[#111827]">78%</span>
+                   </div>
+                   <div className="w-full bg-gray-200 rounded-full h-2">
+                     <motion.div 
+                       className="bg-gradient-to-r from-amber-400 to-orange-400 h-2 rounded-full" 
+                       initial={{ width: '0%' }}
+                       animate={{ width: '78%' }}
+                       transition={{ duration: 1, delay: 0.8 }}
+                     />
+                   </div>
+                 </div>
+               </div>
+             </div>
+
+             {/* Feedback do Professor */}
+             <div className="bg-white/80 backdrop-blur-sm rounded-xl p-5 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+               <div className="flex items-center gap-3 mb-4">
+                 <div className="w-8 h-8 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg flex items-center justify-center">
+                   <User className="w-4 h-4 text-white" />
+                 </div>
+                 <span className="text-sm font-bold text-gray-700">Feedback do Professor</span>
+               </div>
+               <p className="text-sm text-gray-600 leading-relaxed mb-3">
+                 "Aluno demonstra excelente progresso em todas as áreas. Destaque especial para listening e participação em aula. 
+                 Recomendo continuar com exercícios de writing para equilibrar todas as habilidades."
+               </p>
+               <div className="text-xs text-gray-500 font-medium">
+                 - Prof. Maria Silva, 15/12/2024
+               </div>
+             </div>
+           </motion.div>
+         </motion.div>
+       </DialogContent>
+     </Dialog>
+   );
+ };
+ 
+ export default StudentDetailsModal;
