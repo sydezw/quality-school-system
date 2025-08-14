@@ -173,23 +173,7 @@
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   }
   
-  /* Mobile sidebar optimizations */
-  .group:hover::before {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 40;
-    pointer-events: auto;
-  }
-  
-  /* Ensure sidebar stays above overlay */
-  .group:hover {
-    z-index: 50;
-  }
+  /* Mobile sidebar optimizations removed - causing black trail effect */
   
   /* Better touch feedback for sidebar items */
   .group nav a {
