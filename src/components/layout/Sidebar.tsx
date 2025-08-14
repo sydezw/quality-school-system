@@ -96,8 +96,8 @@ export const Sidebar = () => {
       </div>
 
       {/* Navegação */}
-      <nav className="flex-1 px-4">
-        <ul className="space-y-[2px]">
+      <nav className="flex-1 py-4">
+        <ul className="space-y-0 px-2">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -107,8 +107,8 @@ export const Sidebar = () => {
                 <Link
                   to={handleNavigation(item.path)}
                   className={cn(
-                    "flex items-center gap-3 px-2 py-1 rounded-lg transition-all duration-200 ease-in-out min-h-[32px]",
-                    "font-medium",
+                    "flex items-center px-3 py-1 rounded-lg text-sm font-bold transition-all duration-300 ease-in-out min-h-[24px]",
+                    "font-bold",
                     !isActive && "hover:bg-gray-50"
                   )}
                   style={{fontFamily: '"Inter", sans-serif'}}
