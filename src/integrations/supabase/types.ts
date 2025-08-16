@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -22,10 +22,10 @@ export type Database = {
     Functions: {
       graphql: {
         Args: {
+          extensions?: Json
           operationName?: string
           query?: string
           variables?: Json
-          extensions?: Json
         }
         Returns: Json
       }
@@ -80,6 +80,96 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "usuarios"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      aluno_turma: {
+        Row: {
+          aluno_id: string
+          created_at: string | null
+          data_matricula: string | null
+          id: string
+          observacoes: string | null
+          status: string | null
+          turma_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          aluno_id: string
+          created_at?: string | null
+          data_matricula?: string | null
+          id?: string
+          observacoes?: string | null
+          status?: string | null
+          turma_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          aluno_id?: string
+          created_at?: string | null
+          data_matricula?: string | null
+          id?: string
+          observacoes?: string | null
+          status?: string | null
+          turma_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aluno_turma_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "alunos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_turma_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_turma_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_turma_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aluno_turma_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["turma_id"]
+          },
+          {
+            foreignKeyName: "aluno_turma_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["turma_id"]
+          },
+          {
+            foreignKeyName: "aluno_turma_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "turmas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aluno_turma_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["turma_id"]
           },
         ]
       }
@@ -177,8 +267,57 @@ export type Database = {
             foreignKeyName: "alunos_turma_id_fkey"
             columns: ["turma_id"]
             isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["turma_id"]
+          },
+          {
+            foreignKeyName: "alunos_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["turma_id"]
+          },
+          {
+            foreignKeyName: "alunos_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
             referencedRelation: "turmas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alunos_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["turma_id"]
+          },
+          {
+            foreignKeyName: "alunos_turma_particular_id_fkey"
+            columns: ["turma_particular_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["turma_id"]
+          },
+          {
+            foreignKeyName: "alunos_turma_particular_id_fkey"
+            columns: ["turma_particular_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["turma_id"]
+          },
+          {
+            foreignKeyName: "alunos_turma_particular_id_fkey"
+            columns: ["turma_particular_id"]
+            isOneToOne: false
+            referencedRelation: "turmas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alunos_turma_particular_id_fkey"
+            columns: ["turma_particular_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["turma_id"]
           },
         ]
       }
@@ -187,7 +326,16 @@ export type Database = {
           conteudo: string | null
           created_at: string
           data: string
+          descricao: string | null
+          horario_fim: string | null
+          horario_inicio: string | null
           id: string
+          material_necessario: string | null
+          observacoes: string | null
+          professor_id: string | null
+          semestre: string | null
+          status: string | null
+          titulo: string | null
           turma_id: string
           updated_at: string
         }
@@ -195,7 +343,16 @@ export type Database = {
           conteudo?: string | null
           created_at?: string
           data: string
+          descricao?: string | null
+          horario_fim?: string | null
+          horario_inicio?: string | null
           id?: string
+          material_necessario?: string | null
+          observacoes?: string | null
+          professor_id?: string | null
+          semestre?: string | null
+          status?: string | null
+          titulo?: string | null
           turma_id: string
           updated_at?: string
         }
@@ -203,11 +360,41 @@ export type Database = {
           conteudo?: string | null
           created_at?: string
           data?: string
+          descricao?: string | null
+          horario_fim?: string | null
+          horario_inicio?: string | null
           id?: string
+          material_necessario?: string | null
+          observacoes?: string | null
+          professor_id?: string | null
+          semestre?: string | null
+          status?: string | null
+          titulo?: string | null
           turma_id?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "aulas_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "professores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aulas_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["turma_id"]
+          },
+          {
+            foreignKeyName: "aulas_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["turma_id"]
+          },
           {
             foreignKeyName: "aulas_turma_id_fkey"
             columns: ["turma_id"]
@@ -215,11 +402,101 @@ export type Database = {
             referencedRelation: "turmas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "aulas_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["turma_id"]
+          },
+          {
+            foreignKeyName: "fk_aulas_professor"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "professores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      aulas_particulares: {
+        Row: {
+          aluno_id: string
+          created_at: string | null
+          data_aula: string
+          duracao_minutos: number | null
+          id: string
+          observacoes: string | null
+          professor_id: string | null
+          status: string | null
+          updated_at: string | null
+          valor: number | null
+        }
+        Insert: {
+          aluno_id: string
+          created_at?: string | null
+          data_aula: string
+          duracao_minutos?: number | null
+          id?: string
+          observacoes?: string | null
+          professor_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          valor?: number | null
+        }
+        Update: {
+          aluno_id?: string
+          created_at?: string | null
+          data_aula?: string
+          duracao_minutos?: number | null
+          id?: string
+          observacoes?: string | null
+          professor_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aulas_particulares_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "alunos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aulas_particulares_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aulas_particulares_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aulas_particulares_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "aulas_particulares_professor_id_fkey"
+            columns: ["professor_id"]
+            isOneToOne: false
+            referencedRelation: "professores"
+            referencedColumns: ["id"]
+          },
         ]
       }
       avaliacoes: {
         Row: {
           aluno_id: string
+          aluno_turma_id: string | null
           created_at: string
           data: string
           id: string
@@ -230,6 +507,7 @@ export type Database = {
         }
         Insert: {
           aluno_id: string
+          aluno_turma_id?: string | null
           created_at?: string
           data: string
           id?: string
@@ -240,6 +518,7 @@ export type Database = {
         }
         Update: {
           aluno_id?: string
+          aluno_turma_id?: string | null
           created_at?: string
           data?: string
           id?: string
@@ -257,17 +536,67 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "avaliacoes_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_aluno_turma_id_fkey"
+            columns: ["aluno_turma_id"]
+            isOneToOne: false
+            referencedRelation: "aluno_turma"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["turma_id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["turma_id"]
+          },
+          {
             foreignKeyName: "avaliacoes_turma_id_fkey"
             columns: ["turma_id"]
             isOneToOne: false
             referencedRelation: "turmas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "avaliacoes_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["turma_id"]
+          },
         ]
       }
       avaliacoes_competencia: {
         Row: {
           aluno_id: string
+          aluno_turma_id: string | null
           competencia: Database["public"]["Enums"]["competencia"]
           created_at: string
           data: string
@@ -279,6 +608,7 @@ export type Database = {
         }
         Insert: {
           aluno_id: string
+          aluno_turma_id?: string | null
           competencia: Database["public"]["Enums"]["competencia"]
           created_at?: string
           data: string
@@ -290,6 +620,7 @@ export type Database = {
         }
         Update: {
           aluno_id?: string
+          aluno_turma_id?: string | null
           competencia?: Database["public"]["Enums"]["competencia"]
           created_at?: string
           data?: string
@@ -308,11 +639,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "avaliacoes_competencia_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_competencia_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_competencia_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_competencia_aluno_turma_id_fkey"
+            columns: ["aluno_turma_id"]
+            isOneToOne: false
+            referencedRelation: "aluno_turma"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_competencia_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["turma_id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_competencia_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["turma_id"]
+          },
+          {
             foreignKeyName: "avaliacoes_competencia_turma_id_fkey"
             columns: ["turma_id"]
             isOneToOne: false
             referencedRelation: "turmas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_competencia_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["turma_id"]
           },
         ]
       }
@@ -378,6 +758,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "alunos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "boletos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "boletos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "boletos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["aluno_id"]
           },
           {
             foreignKeyName: "boletos_contrato_id_fkey"
@@ -468,6 +869,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "contratos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "contratos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "contratos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
             foreignKeyName: "contratos_plano_id_fkey"
             columns: ["plano_id"]
             isOneToOne: false
@@ -550,6 +972,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "alunos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "documentos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "documentos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["aluno_id"]
           },
           {
             foreignKeyName: "documentos_professor_id_fkey"
@@ -643,6 +1086,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "alunos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financeiro_alunos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "financeiro_alunos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "financeiro_alunos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["aluno_id"]
           },
           {
             foreignKeyName: "financeiro_alunos_plano_id_fkey"
@@ -767,6 +1231,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "historico_pagamentos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "historico_pagamentos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "historico_pagamentos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
             foreignKeyName: "historico_pagamentos_boleto_id_fkey"
             columns: ["boleto_id"]
             isOneToOne: false
@@ -867,6 +1352,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "alunos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historico_parcelas_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "historico_parcelas_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "historico_parcelas_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["aluno_id"]
           },
           {
             foreignKeyName: "historico_parcelas_registro_financeiro_id_fkey"
@@ -985,6 +1491,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "materiais_entregues_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "materiais_entregues_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "materiais_entregues_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
             foreignKeyName: "materiais_entregues_material_id_fkey"
             columns: ["material_id"]
             isOneToOne: false
@@ -1031,6 +1558,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "alunos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notificacoes_destinatario_id_fkey"
+            columns: ["destinatario_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "notificacoes_destinatario_id_fkey"
+            columns: ["destinatario_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "notificacoes_destinatario_id_fkey"
+            columns: ["destinatario_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["aluno_id"]
           },
         ]
       }
@@ -1141,6 +1689,7 @@ export type Database = {
       pesquisas_satisfacao: {
         Row: {
           aluno_id: string
+          aluno_turma_id: string | null
           comentario: string | null
           created_at: string
           data: string
@@ -1151,6 +1700,7 @@ export type Database = {
         }
         Insert: {
           aluno_id: string
+          aluno_turma_id?: string | null
           comentario?: string | null
           created_at?: string
           data: string
@@ -1161,6 +1711,7 @@ export type Database = {
         }
         Update: {
           aluno_id?: string
+          aluno_turma_id?: string | null
           comentario?: string | null
           created_at?: string
           data?: string
@@ -1178,11 +1729,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "pesquisas_satisfacao_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "pesquisas_satisfacao_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "pesquisas_satisfacao_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "pesquisas_satisfacao_aluno_turma_id_fkey"
+            columns: ["aluno_turma_id"]
+            isOneToOne: false
+            referencedRelation: "aluno_turma"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pesquisas_satisfacao_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["turma_id"]
+          },
+          {
+            foreignKeyName: "pesquisas_satisfacao_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["turma_id"]
+          },
+          {
             foreignKeyName: "pesquisas_satisfacao_turma_id_fkey"
             columns: ["turma_id"]
             isOneToOne: false
             referencedRelation: "turmas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pesquisas_satisfacao_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["turma_id"]
           },
         ]
       }
@@ -1286,33 +1886,63 @@ export type Database = {
             foreignKeyName: "planos_aula_turma_id_fkey"
             columns: ["turma_id"]
             isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["turma_id"]
+          },
+          {
+            foreignKeyName: "planos_aula_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["turma_id"]
+          },
+          {
+            foreignKeyName: "planos_aula_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
             referencedRelation: "turmas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planos_aula_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["turma_id"]
           },
         ]
       }
       presencas: {
         Row: {
           aluno_id: string | null
+          aluno_turma_id: string | null
           aula_id: string
           created_at: string
           id: string
+          justificativa: string | null
+          observacoes: string | null
           status: Database["public"]["Enums"]["status_presenca"]
           updated_at: string
         }
         Insert: {
           aluno_id?: string | null
+          aluno_turma_id?: string | null
           aula_id: string
           created_at?: string
           id?: string
+          justificativa?: string | null
+          observacoes?: string | null
           status?: Database["public"]["Enums"]["status_presenca"]
           updated_at?: string
         }
         Update: {
           aluno_id?: string | null
+          aluno_turma_id?: string | null
           aula_id?: string
           created_at?: string
           id?: string
+          justificativa?: string | null
+          observacoes?: string | null
           status?: Database["public"]["Enums"]["status_presenca"]
           updated_at?: string
         }
@@ -1322,6 +1952,34 @@ export type Database = {
             columns: ["aluno_id"]
             isOneToOne: false
             referencedRelation: "alunos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presencas_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "presencas_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "presencas_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "presencas_aluno_turma_id_fkey"
+            columns: ["aluno_turma_id"]
+            isOneToOne: false
+            referencedRelation: "aluno_turma"
             referencedColumns: ["id"]
           },
           {
@@ -1335,6 +1993,7 @@ export type Database = {
       }
       professores: {
         Row: {
+          cargo: Database["public"]["Enums"]["cargo_usuario"] | null
           cpf: string | null
           created_at: string
           data_exclusao: string | null
@@ -1344,11 +2003,13 @@ export type Database = {
           idiomas: string
           nome: string
           salario: number | null
+          senha: string | null
           status: string
           telefone: string | null
           updated_at: string
         }
         Insert: {
+          cargo?: Database["public"]["Enums"]["cargo_usuario"] | null
           cpf?: string | null
           created_at?: string
           data_exclusao?: string | null
@@ -1358,11 +2019,13 @@ export type Database = {
           idiomas: string
           nome: string
           salario?: number | null
+          senha?: string | null
           status?: string
           telefone?: string | null
           updated_at?: string
         }
         Update: {
+          cargo?: Database["public"]["Enums"]["cargo_usuario"] | null
           cpf?: string | null
           created_at?: string
           data_exclusao?: string | null
@@ -1372,6 +2035,7 @@ export type Database = {
           idiomas?: string
           nome?: string
           salario?: number | null
+          senha?: string | null
           status?: string
           telefone?: string | null
           updated_at?: string
@@ -1381,6 +2045,7 @@ export type Database = {
       ranking: {
         Row: {
           aluno_id: string
+          aluno_turma_id: string | null
           created_at: string
           data: string
           id: string
@@ -1390,6 +2055,7 @@ export type Database = {
         }
         Insert: {
           aluno_id: string
+          aluno_turma_id?: string | null
           created_at?: string
           data: string
           id?: string
@@ -1399,6 +2065,7 @@ export type Database = {
         }
         Update: {
           aluno_id?: string
+          aluno_turma_id?: string | null
           created_at?: string
           data?: string
           id?: string
@@ -1415,11 +2082,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ranking_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "ranking_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "ranking_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "ranking_aluno_turma_id_fkey"
+            columns: ["aluno_turma_id"]
+            isOneToOne: false
+            referencedRelation: "aluno_turma"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ranking_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["turma_id"]
+          },
+          {
+            foreignKeyName: "ranking_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["turma_id"]
+          },
+          {
             foreignKeyName: "ranking_turma_id_fkey"
             columns: ["turma_id"]
             isOneToOne: false
             referencedRelation: "turmas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ranking_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["turma_id"]
           },
         ]
       }
@@ -1461,6 +2177,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "alunos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recibos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "recibos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "recibos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["aluno_id"]
           },
         ]
       }
@@ -1535,6 +2272,8 @@ export type Database = {
       }
       turmas: {
         Row: {
+          cor_calendario: string | null
+          cor_prova: string | null
           created_at: string
           data_fim: string | null
           data_inicio: string | null
@@ -1545,6 +2284,7 @@ export type Database = {
           materiais_ids: Json | null
           nivel: Database["public"]["Enums"]["nivel"] | null
           nome: string
+          plano_id: string | null
           professor_id: string | null
           sala_id: string | null
           status: string
@@ -1553,6 +2293,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cor_calendario?: string | null
+          cor_prova?: string | null
           created_at?: string
           data_fim?: string | null
           data_inicio?: string | null
@@ -1563,6 +2305,7 @@ export type Database = {
           materiais_ids?: Json | null
           nivel?: Database["public"]["Enums"]["nivel"] | null
           nome: string
+          plano_id?: string | null
           professor_id?: string | null
           sala_id?: string | null
           status?: string
@@ -1571,6 +2314,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cor_calendario?: string | null
+          cor_prova?: string | null
           created_at?: string
           data_fim?: string | null
           data_inicio?: string | null
@@ -1581,6 +2326,7 @@ export type Database = {
           materiais_ids?: Json | null
           nivel?: Database["public"]["Enums"]["nivel"] | null
           nome?: string
+          plano_id?: string | null
           professor_id?: string | null
           sala_id?: string | null
           status?: string
@@ -1589,6 +2335,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "turmas_plano_id_fkey"
+            columns: ["plano_id"]
+            isOneToOne: false
+            referencedRelation: "planos"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "turmas_professor_id_fkey"
             columns: ["professor_id"]
@@ -1708,33 +2461,140 @@ export type Database = {
             referencedRelation: "alunos"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "contratos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "contratos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "contratos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["aluno_id"]
+          },
         ]
+      }
+      estatisticas_presenca_aluno: {
+        Row: {
+          aluno_id: string | null
+          aluno_nome: string | null
+          faltas: number | null
+          faltas_justificadas: number | null
+          percentual_presenca: number | null
+          presencas: number | null
+          total_aulas: number | null
+          turma_id: string | null
+          turma_nome: string | null
+        }
+        Relationships: []
+      }
+      progresso_competencia_aluno: {
+        Row: {
+          aluno_id: string | null
+          aluno_nome: string | null
+          competencia: Database["public"]["Enums"]["competencia"] | null
+          nota_media: number | null
+          total_avaliacoes: number | null
+          turma_id: string | null
+          turma_nome: string | null
+          ultima_avaliacao: string | null
+        }
+        Relationships: []
+      }
+      view_alunos_turmas: {
+        Row: {
+          aluno_id: string | null
+          aluno_nome: string | null
+          aluno_status: Database["public"]["Enums"]["status_aluno"] | null
+          data_matricula: string | null
+          matricula_observacoes: string | null
+          matricula_status: string | null
+          turma_dias: string | null
+          turma_horario: string | null
+          turma_id: string | null
+          turma_idioma: Database["public"]["Enums"]["idioma"] | null
+          turma_nivel: Database["public"]["Enums"]["nivel"] | null
+          turma_nome: string | null
+        }
+        Relationships: []
       }
     }
     Functions: {
+      calcular_valor_total_correto: {
+        Args: {
+          p_desconto_total: number
+          p_tipo_valor?: string
+          p_valor_material: number
+          p_valor_matricula: number
+          p_valor_plano: number
+        }
+        Returns: number
+      }
       check_aluno_dependencies: {
         Args: { p_aluno_id: string }
         Returns: Json
       }
+      check_horario_conflito: {
+        Args: { aluno_uuid: string; nova_turma_id: string }
+        Returns: boolean
+      }
       check_professor_dependencies: {
         Args: { p_professor_id: string }
         Returns: Json
+      }
+      get_aluno_turmas: {
+        Args: { aluno_uuid: string }
+        Returns: {
+          data_matricula: string
+          matricula_status: string
+          turma_id: string
+          turma_idioma: string
+          turma_nivel: string
+          turma_nome: string
+        }[]
+      }
+      get_turma_alunos: {
+        Args: { turma_uuid: string }
+        Returns: {
+          aluno_id: string
+          aluno_nome: string
+          aluno_status: string
+          data_matricula: string
+          matricula_status: string
+        }[]
+      }
+      get_turma_color: {
+        Args: {
+          p_idioma: Database["public"]["Enums"]["idioma"]
+          p_nivel: Database["public"]["Enums"]["nivel"]
+        }
+        Returns: string
       }
       obter_permissoes_usuario: {
         Args: { usuario_id: string }
         Returns: Json
       }
       verificar_permissao: {
-        Args: { usuario_id: string; permissao: string }
+        Args: { permissao: string; usuario_id: string }
         Returns: boolean
       }
     }
     Enums: {
       ativo_ou_encerrado: "ativo" | "encerrado"
-      cargo_usuario: "Secretária" | "Gerente" | "Admin"
+      cargo_usuario: "Secretária" | "Gerente" | "Admin" | "Professor"
       categoria_despesa: "salário" | "aluguel" | "material" | "manutenção"
       competencia: "Listening" | "Speaking" | "Writing" | "Reading"
-      idioma: "Inglês" | "Japonês" | "Inglês/Japonês"
+      idioma: "Inglês" | "Japonês" | "Inglês/Japonês" | "particular"
       idioma_registro_financeiro: "Inglês" | "Japonês"
       migrado: "sim" | "nao"
       nivel:
@@ -1775,6 +2635,7 @@ export type Database = {
         | "documento_pessoal"
       tipo_item: "plano" | "material" | "matrícula" | "cancelamento" | "outros"
       tipo_notificacao: "boleto" | "presenca" | "lembrete" | "geral"
+      tipo_turma: "Turma particular" | "Turma"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1906,7 +2767,7 @@ export const Constants = {
   public: {
     Enums: {
       ativo_ou_encerrado: ["ativo", "encerrado"],
-      cargo_usuario: ["Secretária", "Gerente", "Admin"],
+      cargo_usuario: ["Secretária", "Gerente", "Admin", "Professor"],
       categoria_despesa: ["salário", "aluguel", "material", "manutenção"],
       competencia: ["Listening", "Speaking", "Writing", "Reading"],
       idioma: ["Inglês", "Japonês", "Inglês/Japonês", "particular"],
@@ -1941,7 +2802,6 @@ export const Constants = {
       status_pagamento: ["pago", "pendente", "vencido", "cancelado"],
       status_presenca: ["Presente", "Falta", "Justificada"],
       tipo_arquivamento: ["renovacao", "cancelamento", "conclusao"],
-      tipo_turma: ["Turma particular", "Turma"],
       tipo_documento: [
         "contrato",
         "declaracao_matricula",
@@ -1954,6 +2814,7 @@ export const Constants = {
       ],
       tipo_item: ["plano", "material", "matrícula", "cancelamento", "outros"],
       tipo_notificacao: ["boleto", "presenca", "lembrete", "geral"],
+      tipo_turma: ["Turma particular", "Turma"],
     },
   },
 } as const

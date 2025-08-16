@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
+import { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, BookCopy, Calendar, Clock, Globe, Book, Users, GraduationCap, AlertTriangle, CheckCircle, X, CalendarDays, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
@@ -20,14 +21,14 @@ import HolidayModal from '@/components/classes/HolidayModal';
 interface Class {
   id: string;
   nome: string;
-  idioma: string;
-  nivel?: string;
+  idioma: Database["public"]["Enums"]["idioma"];
+  nivel?: Database["public"]["Enums"]["nivel"] | null;
   dias_da_semana: string;
   horario: string;
   professor_id: string | null;
   materiais_ids?: string[];
   professores?: { nome: string };
-  tipo_turma?: string | null;
+  tipo_turma?: Database["public"]["Enums"]["tipo_turma"] | null;
   data_inicio?: string | null;
   data_fim?: string | null;
   total_aulas?: number | null;
@@ -42,8 +43,8 @@ interface Teacher {
 interface Material {
   id: string;
   nome: string;
-  idioma: string;
-  nivel: string;
+  idioma: Database["public"]["Enums"]["idioma"];
+  nivel: Database["public"]["Enums"]["nivel"];
   status: string;
 }
 
@@ -103,6 +104,55 @@ const Classes = () => {
   const watchedDataFim = watch('data_fim');
   const watchedTotalAulas = watch('total_aulas');
   const watchedDiasSemana = watch('dias_da_semana');
+  const watchedNivel = watch('nivel');
+  const watchedHorario = watch('horario');
+
+  // Função para gerar nome padrão da turma
+  const generateStandardName = () => {
+    const nivel = getValues('nivel');
+    const horario = getValues('horario');
+    
+    // Verificar se os campos obrigatórios estão preenchidos
+    if (!nivel) {
+      toast({
+        title: "Campo obrigatório",
+        description: "Por favor, selecione o nível antes de gerar o nome padrão.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (selectedDays.length === 0) {
+      toast({
+        title: "Campo obrigatório",
+        description: "Por favor, selecione pelo menos um dia da semana antes de gerar o nome padrão.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!horario || !horario.includes(' - ')) {
+      toast({
+        title: "Campo obrigatório",
+        description: "Por favor, preencha o horário completo (ex: 16:00 - 18:00) antes de gerar o nome padrão.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Gerar o nome seguindo o padrão: Book X - Dia da Semana - Horário às Horário
+    const diasTexto = selectedDays.join(' e ');
+    const horarioFormatado = horario.replace(' - ', ' às ');
+    const nomeGerado = `${nivel} - ${diasTexto} - ${horarioFormatado}`;
+    
+    // Definir o nome no formulário
+    setValue('nome', nomeGerado);
+    
+    toast({
+      title: "Nome gerado",
+      description: "Nome padrão da turma foi gerado com sucesso!",
+    });
+  };
 
   // Atualizar total de aulas quando plano for selecionado
   useEffect(() => {
@@ -1246,16 +1296,28 @@ const Classes = () => {
                 <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Informações Básicas</h3>
                 
                 <div>
-                  <Label htmlFor="nome" className="text-sm font-medium text-gray-700">
-                    Nome da Turma *
-                  </Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="nome" className="text-sm font-medium text-gray-700">
+                      Nome da Turma *
+                    </Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={generateStandardName}
+                      className="text-xs px-2 py-1 h-7"
+                    >
+                      <BookCopy className="h-3 w-3 mr-1" />
+                      Nome Padrão
+                    </Button>
+                  </div>
                   <Input
                     id="nome"
                     {...register('nome', { 
                       required: 'Nome é obrigatório',
                       minLength: { value: 2, message: 'Nome deve ter pelo menos 2 caracteres' }
                     })}
-                    placeholder="Ex: Book 1 - Manhã"
+                    placeholder="Ex: Book 1 - Quinta - 16:00 às 18:00"
                     className="mt-1"
                   />
                   {errors.nome && (
@@ -1264,6 +1326,9 @@ const Classes = () => {
                       <p className="text-sm text-red-600">{errors.nome.message}</p>
                     </div>
                   )}
+                  <div className="mt-1 text-xs text-gray-500">
+                    💡 Use o botão "Nome Padrão" para gerar automaticamente: Book X - Dia - Horário às Horário
+                  </div>
                 </div>
 
                 <div>
