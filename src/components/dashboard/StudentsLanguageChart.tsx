@@ -10,7 +10,7 @@ const StudentsLanguageChart = ({ data }: StudentsLanguageChartProps) => {
   const COLORS = ['#D72638', '#1A1A1A'];
 
   return (
-    <Card className="md:col-span-2">
+    <Card>
       <CardHeader>
         <CardTitle>Alunos por Idioma</CardTitle>
       </CardHeader>

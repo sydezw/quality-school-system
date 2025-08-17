@@ -1,6 +1,6 @@
 
 import StatCard from '@/components/shared/StatCard';
-import { Users, BookCopy, CircleDollarSign, AlertTriangle, UserCheck, FileText } from 'lucide-react';
+import { Users, BookCopy, AlertTriangle, UserCheck, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface DashboardStatsProps {
@@ -18,7 +18,7 @@ const DashboardStats = ({ data }: DashboardStatsProps) => {
   const navigate = useNavigate();
 
   return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-6">
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
 
       {/* Total de Alunos */}
       <div
@@ -63,20 +63,7 @@ const DashboardStats = ({ data }: DashboardStatsProps) => {
         />
       </div>
 
-      {/* Faturamento do Mês */}
-      <div
-        className="cursor-pointer"
-        onClick={() => navigate('/financial')}
-        tabIndex={0}
-        title="Ir para Financeiro"
-      >
-        <StatCard 
-          title="Faturamento do Mês" 
-          value={`R$ ${data.faturamentoMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
-          icon={<CircleDollarSign className="h-4 w-4 text-muted-foreground" />} 
-          details="Boletos pagos no mês" 
-        />
-      </div>
+
       
       {/* Inadimplentes */}
       <div

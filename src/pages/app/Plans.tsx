@@ -6,12 +6,14 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Plus, Search, Edit, Trash2, Users, Clock, BookOpen, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Users, Clock, BookOpen, CheckCircle, XCircle, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import PlanForm from '@/components/plans/PlanForm';
 import PlanStudentsModal from '@/components/plans/PlanStudentsModal';
 import { getIdiomaColor } from '@/utils/idiomaColors';
+import { usePermissions } from '@/components/guards/ProfessorGuard';
+import { useAuth } from '@/hooks/useAuth';
 
 
 interface Plan {
@@ -48,8 +50,11 @@ const Plans = () => {
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [studentCounts, setStudentCounts] = useState<Record<string, number>>({});
   const [selectedLanguage, setSelectedLanguage] = useState<string>('todos');
+  const [isViewMode, setIsViewMode] = useState(false);
   
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isSecretaria = user?.cargo === 'Secretária';
 
   useEffect(() => {
     const initializePlans = async () => {
@@ -163,16 +168,41 @@ const Plans = () => {
   };
 
   const handleNewPlan = () => {
+    if (isSecretaria) {
+      toast({
+        title: 'Acesso Restrito',
+        description: 'Secretárias não podem criar novos planos.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setEditingPlan(null);
+    setIsViewMode(false);
     setIsFormOpen(true);
   };
 
   const handleEditPlan = (plan: Plan) => {
+    if (isSecretaria) {
+      // Para secretárias, abrir em modo visualização
+      setEditingPlan(plan);
+      setIsViewMode(true);
+      setIsFormOpen(true);
+      return;
+    }
     setEditingPlan(plan);
+    setIsViewMode(false);
     setIsFormOpen(true);
   };
 
   const handleDeletePlan = (plan: Plan) => {
+    if (isSecretaria) {
+      toast({
+        title: 'Acesso Restrito',
+        description: 'Secretárias não podem excluir planos.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setDeletingPlan(plan);
   };
 
@@ -298,10 +328,12 @@ const Plans = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Planos</h1>
-        <Button onClick={handleNewPlan}>
-          <Plus className="mr-2 h-4 w-4" />
-          Novo Plano
-        </Button>
+        {!isSecretaria && (
+          <Button onClick={handleNewPlan}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Plano
+          </Button>
+        )}
       </div>
 
       <div className="flex items-center space-x-4">
@@ -442,18 +474,21 @@ const Plans = () => {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleEditPlan(plan)}
+                      title={isSecretaria ? "Visualizar plano" : "Editar plano"}
                     >
-                      <Edit className="w-3 h-3" />
+                      {isSecretaria ? <Eye className="w-3 h-3" /> : <Edit className="w-3 h-3" />}
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeletePlan(plan)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="w-3 h-3" />
+                    {!isSecretaria && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeletePlan(plan)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="w-3 h-3" />
                       </Button>
-                    </div>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -466,13 +501,14 @@ const Plans = () => {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingPlan ? 'Editar Plano' : 'Criar Novo Plano'}
+              {isViewMode ? 'Visualizar Plano' : editingPlan ? 'Editar Plano' : 'Criar Novo Plano'}
             </DialogTitle>
           </DialogHeader>
           <PlanForm
             plan={editingPlan}
             onSuccess={handleFormSuccess}
             onCancel={handleFormCancel}
+            isViewMode={isViewMode}
           />
         </DialogContent>
       </Dialog>

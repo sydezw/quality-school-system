@@ -62,6 +62,89 @@ export const formatCurrency = (value: number): string => {
   }).format(value);
 };
 
+// Função para converter números em valores por extenso
+export const numberToWords = (value: number): string => {
+  if (value === 0) return 'zero';
+  
+  const unidades = ['', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove'];
+  const especiais = ['dez', 'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove'];
+  const dezenas = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
+  const centenas = ['', 'cento', 'duzentos', 'trezentos', 'quatrocentos', 'quinhentos', 'seiscentos', 'setecentos', 'oitocentos', 'novecentos'];
+  
+  const convertGroup = (num: number): string => {
+    if (num === 0) return '';
+    if (num === 100) return 'cem';
+    
+    let result = '';
+    const c = Math.floor(num / 100);
+    const d = Math.floor((num % 100) / 10);
+    const u = num % 10;
+    
+    if (c > 0) {
+      result += centenas[c];
+      if (d > 0 || u > 0) result += ' e ';
+    }
+    
+    if (d === 1 && u > 0) {
+      result += especiais[u];
+    } else {
+      if (d > 0) {
+        result += dezenas[d];
+        if (u > 0) result += ' e ';
+      }
+      if (u > 0 && d !== 1) {
+        result += unidades[u];
+      }
+    }
+    
+    return result;
+  };
+  
+  let integerPart = Math.floor(value);
+  const decimalPart = Math.round((value - integerPart) * 100);
+  
+  let result = '';
+  
+  if (integerPart >= 1000000) {
+    const millions = Math.floor(integerPart / 1000000);
+    result += convertGroup(millions);
+    result += millions === 1 ? ' milhão' : ' milhões';
+    
+    const remainder = integerPart % 1000000;
+    if (remainder > 0) {
+      result += remainder < 100 ? ' e ' : ', ';
+    }
+    
+    integerPart = remainder;
+  }
+  
+  if (integerPart >= 1000) {
+    const thousands = Math.floor(integerPart / 1000);
+    result += convertGroup(thousands) + ' mil';
+    
+    const remainder = integerPart % 1000;
+    if (remainder > 0) {
+      result += remainder < 100 ? ' e ' : ', ';
+    }
+    
+    integerPart = remainder;
+  }
+  
+  if (integerPart > 0) {
+    result += convertGroup(integerPart);
+  }
+  
+  // Adicionar centavos se houver
+  if (decimalPart > 0) {
+    result += ' reais e ' + convertGroup(decimalPart);
+    result += decimalPart === 1 ? ' centavo' : ' centavos';
+  } else {
+    result += ' reais';
+  }
+  
+  return result.trim();
+};
+
 // Função para formatar datas
 export const formatDate = (dateString: string): string => {
   if (!dateString) return '';

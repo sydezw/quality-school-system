@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Database } from '@/integrations/supabase/types';
-import { Edit, Trash2, DollarSign, Eye, User } from 'lucide-react';
+import { Edit, Trash2, DollarSign, Eye, User, FileText, Plus } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -13,7 +13,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import AdvancedStudentDeleteDialog from './AdvancedStudentDeleteDialog';
+import StudentContractGeneratorModal from './StudentContractGeneratorModal';
+import { NewContractDialog } from './StudentNewContractModal';
+import { EditContractDialog } from './StudentEditContractModal';
 import { formatCPF } from '@/utils/formatters';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 // Definir o tipo Student baseado na tabela alunos do banco
 type Student = Database['public']['Tables']['alunos']['Row'] & {
@@ -33,6 +38,11 @@ interface StudentTableProps {
 const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, onViewDetails, isDeleting }: StudentTableProps) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+  const [contractGeneratorOpen, setContractGeneratorOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [selectedContract, setSelectedContract] = useState<any>(null);
+  const [studentsWithContracts, setStudentsWithContracts] = useState<Set<string>>(new Set());
+  const { toast } = useToast();
 
   const handleDeleteClick = (student: Student) => {
     setStudentToDelete(student);
@@ -52,6 +62,31 @@ const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, onVie
     setStudentToDelete(null);
   };
 
+  // Verificar quais alunos têm contratos ativos
+  useEffect(() => {
+    const checkStudentContracts = async () => {
+      const studentIds = students.map(s => s.id);
+      if (studentIds.length === 0) return;
+
+      try {
+        const { data: contracts, error } = await supabase
+          .from('contratos')
+          .select('aluno_id')
+          .in('aluno_id', studentIds)
+          .in('status_contrato', ['Ativo', 'Agendado', 'Vencendo']);
+
+        if (error) throw error;
+
+        const studentIdsWithContracts = new Set(contracts?.map(c => c.aluno_id) || []);
+        setStudentsWithContracts(studentIdsWithContracts);
+      } catch (error) {
+        console.error('Erro ao verificar contratos dos alunos:', error);
+      }
+    };
+
+    checkStudentContracts();
+  }, [students]);
+
   const handleStudentClick = (student: Student) => {
     // Função para lidar com clique no aluno - abre modal de detalhes
     if (onViewDetails) {
@@ -59,6 +94,65 @@ const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, onVie
     } else {
       console.log('Clicou no aluno:', student);
     }
+  };
+
+  const handleContractGenerator = (student: Student) => {
+    setSelectedStudent(student);
+    setContractGeneratorOpen(true);
+  };
+
+  const handleNewContract = (student: Student) => {
+    // Os novos modais controlam seu próprio estado
+    console.log('Novo contrato para:', student.nome);
+  };
+
+  const handleEditContract = async (student: Student) => {
+    try {
+      // Buscar contrato ativo do aluno
+      const { data: contracts, error } = await supabase
+        .from('contratos')
+        .select(`
+          *,
+          planos(nome)
+        `)
+        .eq('aluno_id', student.id)
+        .in('status_contrato', ['Ativo', 'Agendado'])
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      if (contracts && contracts.length > 0) {
+        const contract = {
+          ...contracts[0],
+          aluno_nome: student.nome,
+          plano_nome: contracts[0].planos?.nome
+        };
+        setSelectedContract(contract);
+        setSelectedStudent(student);
+      } else {
+        toast({
+          title: "Aviso",
+          description: "Este aluno não possui contrato ativo para editar.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao buscar contrato:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao buscar contrato do aluno.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleContractUpdated = () => {
+    // Callback para atualizar dados após modificação de contrato
+    toast({
+      title: "Sucesso",
+      description: "Contrato atualizado com sucesso!",
+    });
   };
 
 
@@ -131,31 +225,88 @@ const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, onVie
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
+                  {/* Botão Editar */}
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => onEdit(student)}
+                    className="h-8 w-8 p-0 rounded-full border-2 border-blue-600 bg-white hover:bg-blue-600 text-blue-600 hover:text-white transition-all duration-200 shadow-md hover:shadow-lg"
+                    title="Editar Aluno"
                   >
                     <Edit className="h-4 w-4" />
                   </Button>
+
+                  {/* Botão Gerador de Contrato */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleContractGenerator(student)}
+                    className="h-8 w-8 p-0 rounded-full border-2 border-purple-600 bg-white hover:bg-purple-600 text-purple-600 hover:text-white transition-all duration-200 shadow-md hover:shadow-lg"
+                    title="Gerar Contrato"
+                  >
+                    <FileText className="h-4 w-4" />
+                  </Button>
+
+
+
+                  {/* Modais dentro da célula de ações */}
+                  <AdvancedStudentDeleteDialog
+                    student={studentToDelete}
+                    isOpen={deleteDialogOpen && studentToDelete?.id === student.id}
+                    onClose={handleDeleteCancel}
+                    onConfirm={handleDeleteConfirm}
+                    isLoading={isDeleting}
+                  />
+
+                  <StudentContractGeneratorModal
+                    student={selectedStudent}
+                    isOpen={contractGeneratorOpen && selectedStudent?.id === student.id}
+                    onClose={() => {
+                      setContractGeneratorOpen(false);
+                      setSelectedStudent(null);
+                    }}
+                  />
+
+                  {/* Mostrar botão de Novo Contrato apenas para alunos SEM contratos */}
+                  {!studentsWithContracts.has(student.id) && (
+                    <NewContractDialog
+                      student={{ id: student.id, nome: student.nome }}
+                      onContractCreated={handleContractUpdated}
+                    />
+                  )}
+
+                  {/* Mostrar botão de Editar Contrato apenas para alunos COM contratos */}
+                  {studentsWithContracts.has(student.id) && (
+                    <EditContractDialog
+                      student={{ id: student.id, nome: student.nome }}
+                      onContractUpdated={handleContractUpdated}
+                    />
+                  )}
+
+
+
+                  {/* Botão Plano Financeiro */}
                   {onCreateFinancialPlan && (
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => onCreateFinancialPlan(student)}
-                      className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                      className="h-8 w-8 p-0 rounded-full border-2 border-green-600 bg-white hover:bg-green-600 text-green-600 hover:text-white transition-all duration-200 shadow-md hover:shadow-lg"
                       title="Criar Plano Financeiro"
                     >
                       <DollarSign className="h-4 w-4" />
                     </Button>
                   )}
 
+                  {/* Botão Deletar */}
                   {onDelete && (
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleDeleteClick(student)}
                       disabled={isDeleting}
+                      className="h-8 w-8 p-0 rounded-full border-2 border-red-600 bg-white hover:bg-red-600 text-red-600 hover:text-white transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Deletar Aluno"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -166,14 +317,7 @@ const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, onVie
           ))}
         </TableBody>
       </Table>
-      
-      <AdvancedStudentDeleteDialog
-        student={studentToDelete}
-        isOpen={deleteDialogOpen}
-        onClose={handleDeleteCancel}
-        onConfirm={handleDeleteConfirm}
-        isLoading={isDeleting}
-      />
+
     </div>
   );
 };
