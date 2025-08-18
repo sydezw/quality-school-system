@@ -253,16 +253,8 @@ const Reports = () => {
             </Card>
 
             <SimpleBarChart 
-              data={[
-                { name: 'Turma A', pv: 24, uv: 13 },
-                { name: 'Turma B', pv: 13, uv: 98 },
-                { name: 'Turma C', pv: 98, uv: 39 },
-                { name: 'Turma D', pv: 39, uv: 48 },
-                { name: 'Turma E', pv: 48, uv: 38 },
-                { name: 'Turma F', pv: 38, uv: 43 }
-              ]}
-              title="Dados por Turma"
-              description="Visualização de dados das turmas"
+              title="Preços das Turmas"
+              description="Valores dos planos e totais por turma - cores preto e vermelho"
             />
           </div>
         </TabsContent>
