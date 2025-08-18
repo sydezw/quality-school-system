@@ -1,18 +1,22 @@
-import { useState, useEffect } from 'react';
-import { List, Plus, Filter, Search, Edit, Users, Clock, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { List, Plus, Filter, Search, Edit, Users, Clock, Calendar, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Tables } from '@/integrations/supabase/types';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { NewLessonDialog } from './NewLessonDialog';
+import { useAulas } from '@/hooks/useAulas';
+import { useMultipleSelection } from '@/hooks/useMultipleSelection';
+import { MultipleSelectionBar } from '@/components/shared/MultipleSelectionBar';
+import { SelectionCheckbox } from '@/components/shared/SelectionCheckbox';
+import { ConfirmDeleteModal } from '@/components/shared/ConfirmDeleteModal';
 
 // Tipos para melhor organização e reutilização
 type Turma = Tables<'turmas'>;
@@ -50,19 +54,27 @@ interface AulaComDetalhes extends Aula {
  * - Busca por título/descrição
  * - Ordenação por colunas
  * - Ações rápidas (editar, presença, etc.)
+ * - Seleção múltipla e exclusão em lote
  * - Paginação para performance
  */
 const ClassesList = () => {
   const isMobile = useIsMobile();
+  const { toast } = useToast();
   
-  // Estados principais
-  const [aulas, setAulas] = useState<AulaComDetalhes[]>([]);
-  const [turmas, setTurmas] = useState<Turma[]>([]);
-  const [professores, setProfessores] = useState<Usuario[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Hook personalizado para gerenciar aulas
+  const {
+    aulas,
+    turmas,
+    professores,
+    loading,
+    excluirAula,
+    excluirMultiplasAulas,
+    buscarAulas,
+    recarregarAulas
+  } = useAulas();
+
+  // Estados de filtros e busca
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // Estados de filtros
   const [filters, setFilters] = useState({
     turmaId: '',
     professorId: '',
@@ -82,86 +94,78 @@ const ClassesList = () => {
   // Estado para controlar o toggle dos filtros
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const { toast } = useToast();
+  // Estados para modais de confirmação
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+
 
   /**
-   * Carrega as aulas do banco de dados com relacionamentos
+   * Aplica filtros e busca
    */
-  const loadAulas = async () => {
-    try {
-      setLoading(true);
-      
-      const { data, error } = await supabase
-        .from('aulas')
-        .select(`
-          *,
-          turmas (
-            id,
-            nome,
-            idioma,
-            nivel,
-            cor_calendario,
-            professor_id,
-            status,
-            professores (
-              id,
-              nome,
-              email
-            )
-          )
-        `)
-        .order('data', { ascending: false })
-        .order('horario_inicio', { ascending: true });
+  const aplicarFiltros = useCallback(() => {
+    const filtrosAtivos = {
+      termo: searchTerm,
+      turmaId: filters.turmaId,
+      professorId: filters.professorId,
+      idioma: filters.idioma,
+      nivel: filters.nivel,
+      status: filters.status,
+      dataInicio: filters.dataInicio,
+      dataFim: filters.dataFim
+    };
 
-      if (error) throw error;
+    buscarAulas(filtrosAtivos);
+  }, [searchTerm, filters, buscarAulas]);
 
-      setAulas(data || []);
-    } catch (error) {
-      console.error('Erro ao carregar aulas:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível carregar as aulas.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
-   * Carrega turmas e professores para os filtros
-   */
-  const loadFilterData = async () => {
-    try {
-      // Carregar turmas
-      const { data: turmasData, error: turmasError } = await supabase
-        .from('turmas')
-        .select('*')
-        .order('nome');
-
-      if (turmasError) throw turmasError;
-      setTurmas(turmasData || []);
-
-      // Carregar professores
-      const { data: professoresData, error: professoresError } = await supabase
-        .from('usuarios')
-        .select('*')
-        .eq('cargo', 'Professor')
-        .order('nome');
-
-      if (professoresError) throw professoresError;
-      setProfessores(professoresData || []);
-
-    } catch (error) {
-      console.error('Erro ao carregar dados dos filtros:', error);
-    }
-  };
-
-  // Carrega dados iniciais
+  // Aplica filtros quando os valores mudam
   useEffect(() => {
-    loadAulas();
-    loadFilterData();
-  }, []);
+    const timeoutId = setTimeout(() => {
+      aplicarFiltros();
+    }, 300); // Debounce de 300ms
+
+    return () => clearTimeout(timeoutId);
+  }, [aplicarFiltros]);
+
+  /**
+   * Funções de exclusão
+   */
+  const handleDelete = (aula: AulaComDetalhes) => {
+    if (isSelectionMode) {
+      toggleSelection(aula);
+    } else {
+      enterSelectionMode();
+      toggleSelection(aula);
+    }
+  };
+
+  const handleConfirmMultipleDelete = () => {
+    setShowDeleteModal(true);
+  };
+
+  const executeDelete = async () => {
+    try {
+      setDeleteLoading(true);
+      const selectedAulas = getSelectedItems();
+      
+      if (selectedAulas.length === 1) {
+        await excluirAula(selectedAulas[0].id);
+      } else {
+        const ids = selectedAulas.map(aula => aula.id);
+        await excluirMultiplasAulas(ids);
+      }
+
+      // Limpar seleção e sair do modo de seleção
+      clearSelection();
+      exitSelectionMode();
+      setShowDeleteModal(false);
+
+    } catch (error) {
+      console.error('Erro ao excluir aulas:', error);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   /**
    * Aplica filtros e busca nas aulas
@@ -203,12 +207,29 @@ const ClassesList = () => {
   /**
    * Aplica paginação
    */
-  const paginatedAulas = sortedAulas.slice(
+  const aulasPaginadas = sortedAulas.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
 
   const totalPages = Math.ceil(sortedAulas.length / itemsPerPage);
+
+  // Hook para seleção múltipla
+  const {
+    selectedItems,
+    isSelectionMode,
+    selectedCount,
+    isSelected,
+    toggleSelection,
+    selectAll,
+    clearSelection,
+    enterSelectionMode,
+    exitSelectionMode,
+    getSelectedItems
+  } = useMultipleSelection<AulaComDetalhes>({
+    items: aulasPaginadas,
+    getItemId: (aula) => aula.id
+  });
 
   /**
    * Manipula ordenação por coluna
@@ -262,8 +283,8 @@ const ClassesList = () => {
     <div className="space-y-6">
       {/* Header com controles */}
       <div className={cn(
-        "flex gap-4 items-start justify-between",
-        isMobile ? "flex-col" : "flex-col sm:flex-row sm:items-center"
+        "flex gap-4 items-start justify-between p-4 bg-gray-50 rounded-lg border",
+        isMobile ? "flex-col" : "flex-row items-center"
       )}>
         <div className="flex items-center gap-2">
           <List className={cn("text-red-600", isMobile ? "h-4 w-4" : "h-5 w-5")} />
@@ -275,15 +296,38 @@ const ClassesList = () => {
           </Badge>
         </div>
         
-        <NewLessonDialog onSuccess={loadAulas}>
-          <Button className={cn(
-            "bg-red-600 hover:bg-red-700",
-            isMobile ? "w-full h-12 text-sm rounded-xl" : ""
-          )}>
-            <Plus className={cn("mr-2", isMobile ? "h-4 w-4" : "h-4 w-4")} />
-            Nova Aula
+        <div className={cn(
+          "flex gap-3",
+          isMobile ? "flex-col w-full" : "flex-row"
+        )}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (isSelectionMode) {
+                exitSelectionMode();
+              } else {
+                enterSelectionMode();
+              }
+            }}
+            className={cn(
+              "border-red-300 text-red-600 hover:bg-red-50 font-medium",
+              isMobile ? "w-full h-12 text-base rounded-xl" : "h-10 px-4"
+            )}
+          >
+            <Trash2 className={cn("mr-2", isMobile ? "h-5 w-5" : "h-4 w-4")} />
+            {isSelectionMode ? 'Cancelar Seleção' : 'Excluir Aulas'}
           </Button>
-        </NewLessonDialog>
+          
+          <NewLessonDialog onSuccess={recarregarAulas}>
+            <Button className={cn(
+              "bg-red-600 hover:bg-red-700 font-medium",
+              isMobile ? "w-full h-12 text-base rounded-xl" : "h-10 px-4"
+            )}>
+              <Plus className={cn("mr-2", isMobile ? "h-5 w-5" : "h-4 w-4")} />
+              Nova Aula
+            </Button>
+          </NewLessonDialog>
+        </div>
       </div>
 
       {/* Filtros avançados */}
@@ -525,12 +569,12 @@ const ClassesList = () => {
           {isMobile ? (
             // Layout mobile com cards
             <div className="space-y-3">
-              {paginatedAulas.length === 0 ? (
+              {aulasPaginadas.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   Nenhuma aula encontrada.
                 </div>
               ) : (
-                paginatedAulas.map(aula => (
+                aulasPaginadas.map(aula => (
                   <motion.div
                     key={aula.id}
                     initial={{ opacity: 0, y: 20 }}
@@ -538,13 +582,19 @@ const ClassesList = () => {
                     className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm"
                   >
                     <div className="flex justify-between items-start mb-3">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900 text-base">
-                          {aula.titulo || 'Sem título'}
-                        </h3>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {aula.turmas?.nome || 'Turma não definida'}
-                        </p>
+                      <div className="flex items-start gap-3 flex-1">
+                        <SelectionCheckbox
+                          isSelected={isSelected(aula)}
+                          onChange={() => toggleSelection(aula)}
+                        />
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-gray-900 text-base">
+                            {aula.titulo || 'Sem título'}
+                          </h3>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {aula.turmas?.nome || 'Turma não definida'}
+                          </p>
+                        </div>
                       </div>
                       <Badge className={cn("text-xs", getStatusColor(aula.status))}>
                         {aula.status === 'agendada' && 'Agendada'}
@@ -587,6 +637,14 @@ const ClassesList = () => {
                         <Users className="h-4 w-4 mr-2" />
                         Presença
                       </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-10 px-3 text-sm rounded-lg text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => handleDelete(aula)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </motion.div>
                 ))
@@ -597,6 +655,18 @@ const ClassesList = () => {
             <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12">
+                  <SelectionCheckbox
+                    isSelected={selectedCount === aulasPaginadas.length && aulasPaginadas.length > 0}
+                    onChange={() => {
+                      if (selectedCount === aulasPaginadas.length) {
+                        clearSelection();
+                      } else {
+                        selectAll();
+                      }
+                    }}
+                  />
+                </TableHead>
                 <TableHead 
                   className="cursor-pointer hover:bg-gray-50"
                   onClick={() => handleSort('data')}
@@ -654,15 +724,21 @@ const ClassesList = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedAulas.length === 0 ? (
+              {aulasPaginadas.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                     Nenhuma aula encontrada.
                   </TableCell>
                 </TableRow>
               ) : (
-                paginatedAulas.map(aula => (
+                aulasPaginadas.map(aula => (
                   <TableRow key={aula.id} className="hover:bg-gray-50">
+                    <TableCell>
+                      <SelectionCheckbox
+                        isSelected={isSelected(aula)}
+                        onChange={() => toggleSelection(aula)}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">
                       {formatDate(aula.data)}
                     </TableCell>
@@ -709,6 +785,14 @@ const ClassesList = () => {
                         </Button>
                         <Button variant="outline" size="sm">
                           <Users className="h-3 w-3" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleDelete(aula)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
                     </TableCell>
@@ -781,6 +865,35 @@ const ClassesList = () => {
           </div>
         </div>
       )}
+
+      {/* Barra de seleção múltipla */}
+      {isSelectionMode && (
+        <MultipleSelectionBar
+          isVisible={isSelectionMode}
+          selectedCount={selectedCount}
+          totalItems={aulasPaginadas.length}
+          onSelectAll={selectAll}
+          onClearSelection={clearSelection}
+          onDelete={handleConfirmMultipleDelete}
+          onCancel={() => {
+            clearSelection();
+            exitSelectionMode();
+          }}
+          itemName="aulas"
+          deleteButtonText="Excluir Selecionadas"
+          isAllSelected={selectedCount === aulasPaginadas.length && aulasPaginadas.length > 0}
+        />
+      )}
+
+      {/* Modal de confirmação de exclusão */}
+      <ConfirmDeleteModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={executeDelete}
+        itemCount={selectedCount}
+        itemName="aula"
+        isLoading={deleteLoading}
+      />
     </div>
   );
 };

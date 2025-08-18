@@ -111,6 +111,7 @@ const Classes = () => {
   const generateStandardName = () => {
     const nivel = getValues('nivel');
     const horario = getValues('horario');
+    const tipoTurma = getValues('tipo_turma');
     
     // Verificar se os campos obrigatórios estão preenchidos
     if (!nivel) {
@@ -140,19 +141,142 @@ const Classes = () => {
       return;
     }
     
-    // Gerar o nome seguindo o padrão: Book X - Dia da Semana - Horário às Horário
+    // Gerar o nome baseado no tipo de turma
     const diasTexto = selectedDays.join(' e ');
     const horarioFormatado = horario.replace(' - ', ' às ');
-    const nomeGerado = `${nivel} - ${diasTexto} - ${horarioFormatado}`;
+    
+    let nomeGerado = '';
+    
+    if (tipoTurma === 'Turma particular') {
+      // Para turmas particulares: Particular - Nome do Aluno - Dia - Horário às Horário
+      nomeGerado = `Particular - [Nome do Aluno] - ${diasTexto} - ${horarioFormatado}`;
+      
+      toast({
+        title: "Nome gerado para Turma Particular",
+        description: "Nome gerado com placeholder. Após adicionar o aluno, o nome será atualizado automaticamente.",
+      });
+    } else {
+      // Para turmas regulares: Nível - Dia - Horário às Horário
+      nomeGerado = `${nivel} - ${diasTexto} - ${horarioFormatado}`;
+      
+      toast({
+        title: "Nome gerado",
+        description: "Nome padrão da turma foi gerado com sucesso!",
+      });
+    }
     
     // Definir o nome no formulário
     setValue('nome', nomeGerado);
-    
-    toast({
-      title: "Nome gerado",
-      description: "Nome padrão da turma foi gerado com sucesso!",
-    });
   };
+
+  // Função para atualizar o nome da turma particular com o nome do aluno
+  const updateParticularClassName = async (classId: string) => {
+    try {
+      // Buscar informações da turma
+      const { data: classData, error: classError } = await supabase
+        .from('turmas')
+        .select('nome, dias_da_semana, horario, tipo_turma')
+        .eq('id', classId)
+        .single();
+        
+      if (classError || !classData || classData.tipo_turma !== 'Turma particular') {
+        return; // Não é turma particular ou erro
+      }
+      
+      // Buscar o aluno da turma particular
+      const { data: studentData, error: studentError } = await supabase
+        .from('alunos')
+        .select('nome')
+        .eq('turma_particular_id', classId)
+        .eq('status', 'Ativo')
+        .single();
+        
+      if (studentError || !studentData) {
+        return; // Nenhum aluno encontrado
+      }
+      
+      // Verificar se o nome atual contém placeholder
+      if (classData.nome.includes('[Nome do Aluno]')) {
+        // Gerar novo nome com o nome real do aluno
+        const diasArray = classData.dias_da_semana.split(',');
+        const diasTexto = diasArray.join(' e ');
+        const horarioFormatado = classData.horario.replace(' - ', ' às ');
+        const novoNome = `Particular - ${studentData.nome} - ${diasTexto} - ${horarioFormatado}`;
+        
+        // Atualizar o nome da turma
+        const { error: updateError } = await supabase
+          .from('turmas')
+          .update({ nome: novoNome })
+          .eq('id', classId);
+          
+        if (!updateError) {
+          // Atualizar a lista de turmas localmente
+          await fetchClasses();
+          
+          toast({
+            title: "Nome da Turma Atualizado",
+            description: `Nome da turma particular atualizado para: ${novoNome}`,
+          });
+        }
+      }
+    } catch (error) {
+       console.error('Erro ao atualizar nome da turma particular:', error);
+     }
+   };
+
+   // Função para resetar o nome da turma particular quando não há alunos
+   const resetParticularClassName = async (classId: string) => {
+     try {
+       // Buscar informações da turma
+       const { data: classData, error: classError } = await supabase
+         .from('turmas')
+         .select('nome, dias_da_semana, horario, tipo_turma')
+         .eq('id', classId)
+         .single();
+         
+       if (classError || !classData || classData.tipo_turma !== 'Turma particular') {
+         return; // Não é turma particular ou erro
+       }
+       
+       // Verificar se ainda há alunos na turma
+       const { data: studentsData, error: studentsError } = await supabase
+         .from('alunos')
+         .select('id')
+         .eq('turma_particular_id', classId)
+         .eq('status', 'Ativo');
+         
+       if (studentsError) {
+         console.error('Erro ao verificar alunos:', studentsError);
+         return;
+       }
+       
+       // Se não há alunos, resetar para o placeholder
+       if (!studentsData || studentsData.length === 0) {
+         const diasArray = classData.dias_da_semana.split(',');
+         const diasTexto = diasArray.join(' e ');
+         const horarioFormatado = classData.horario.replace(' - ', ' às ');
+         const nomeComPlaceholder = `Particular - [Nome do Aluno] - ${diasTexto} - ${horarioFormatado}`;
+         
+         // Atualizar o nome da turma
+         const { error: updateError } = await supabase
+           .from('turmas')
+           .update({ nome: nomeComPlaceholder })
+           .eq('id', classId);
+           
+         if (!updateError) {
+           // Atualizar a lista de turmas localmente
+           await fetchClasses();
+           
+           toast({
+             title: "Nome da Turma Resetado",
+             description: "Nome da turma particular foi resetado para aguardar novo aluno.",
+           });
+         }
+       }
+     } catch (error) {
+       console.error('Erro ao resetar nome da turma particular:', error);
+     }
+   };
 
   // Atualizar total de aulas quando plano for selecionado
   useEffect(() => {
@@ -355,7 +479,7 @@ const Classes = () => {
       }
 
       const nextLevel = currentLevel + 1;
-      const newNivel = `Book ${nextLevel}`;
+      const newNivel = `Book ${nextLevel}` as Database["public"]["Enums"]["nivel"];
 
       // Buscar material correspondente ao novo nível
       let materialName;
@@ -912,6 +1036,11 @@ const Classes = () => {
           title: "Sucesso",
           description: `${successCount} aluno(s) matriculado(s) com sucesso!`,
         });
+        
+        // Se é turma particular e houve sucesso, atualizar o nome da turma
+        if (isParticularClass) {
+          await updateParticularClassName(selectedClassForStudents.id);
+        }
       }
       
       if (warningMessages.length > 0) {
@@ -968,6 +1097,11 @@ const Classes = () => {
 
       if (selectedClassForStudents) {
         await fetchClassStudents(selectedClassForStudents.id);
+        
+        // Se é turma particular, verificar se precisa resetar o nome
+        if (isParticularClass) {
+          await resetParticularClassName(selectedClassForStudents.id);
+        }
       }
     } catch (error) {
       console.error('Erro ao remover aluno da turma:', error);

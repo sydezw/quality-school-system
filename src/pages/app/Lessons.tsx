@@ -88,13 +88,9 @@ const Lessons = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <div 
             className={cn(
-              "relative",
-              isMobile && "fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md px-4 py-2"
+              "relative mb-4",
+              isMobile && "sticky top-0 z-50 bg-white/95 backdrop-blur-md px-4 py-3 border-b border-gray-200/50"
             )}
-            style={{
-              marginTop: activeTab === 'calendar' ? '-55px' : '0px',
-              transition: 'margin-top 0.3s ease-in-out'
-            }}
           >
             <div className="flex items-center gap-2">
               <Button
@@ -103,18 +99,18 @@ const Lessons = () => {
                 onClick={goToPreviousTab}
                 disabled={tabs.indexOf(activeTab) === 0}
                 className={cn(
-                  "h-10 w-10 p-0 rounded-lg transition-all duration-200",
+                  "h-12 w-12 p-0 rounded-lg transition-all duration-200 border border-gray-200",
                   tabs.indexOf(activeTab) === 0 
                     ? "opacity-30 cursor-not-allowed" 
-                    : "hover:bg-gray-100 hover:scale-105"
+                    : "hover:bg-gray-100 hover:scale-105 hover:border-gray-300"
                 )}
               >
-                <ChevronLeft className="h-5 w-5" />
+                <ChevronLeft className="h-6 w-6" />
               </Button>
 
               <TabsList className={cn(
-                "bg-white/95 backdrop-blur-md border border-gray-200/50 p-1 shadow-sm",
-                isMobile ? "flex-1 grid grid-cols-3 h-12 rounded-xl" : "inline-flex rounded-lg"
+                "bg-white/95 backdrop-blur-md border border-gray-200/50 p-1.5 shadow-lg",
+                isMobile ? "flex-1 grid grid-cols-3 h-14 rounded-xl" : "inline-flex rounded-lg h-12"
               )}>
                 {tabs.map((tab, index) => {
                   const Icon = tab === 'calendar' ? Calendar : tab === 'list' ? List : BarChart3;
@@ -125,16 +121,16 @@ const Lessons = () => {
                       key={tab}
                       value={tab}
                       className={cn(
-                        "relative flex-1 transition-all duration-200 font-medium",
-                        isMobile ? "text-xs py-2 px-2 rounded-lg" : "px-4 py-2 rounded-md",
+                        "relative flex-1 transition-all duration-200 font-semibold",
+                        isMobile ? "text-sm py-3 px-3 rounded-lg" : "px-6 py-2.5 rounded-md text-base",
                         isActive 
-                          ? "bg-blue-600 text-white shadow-sm" 
-                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-100/50"
+                          ? "bg-red-600 text-white shadow-md" 
+                          : "text-gray-700 hover:text-gray-900 hover:bg-gray-100/70"
                       )}
                     >
                       <span className="flex items-center gap-2">
-                        <Icon className="h-4 w-4" />
-                        <span className={isMobile ? "hidden sm:inline" : ""}>
+                        <Icon className={cn(isMobile ? "h-5 w-5" : "h-4 w-4")} />
+                        <span>
                           {isMobile ? tabLabels[tab as keyof typeof tabLabels].short : tabLabels[tab as keyof typeof tabLabels].full}
                         </span>
                       </span>
@@ -149,13 +145,13 @@ const Lessons = () => {
                 onClick={goToNextTab}
                 disabled={tabs.indexOf(activeTab) === tabs.length - 1}
                 className={cn(
-                  "h-10 w-10 p-0 rounded-lg transition-all duration-200",
+                  "h-12 w-12 p-0 rounded-lg transition-all duration-200 border border-gray-200",
                   tabs.indexOf(activeTab) === tabs.length - 1
                     ? "opacity-30 cursor-not-allowed" 
-                    : "hover:bg-gray-100 hover:scale-105"
+                    : "hover:bg-gray-100 hover:scale-105 hover:border-gray-300"
                 )}
               >
-                <ChevronRight className="h-5 w-5" />
+                <ChevronRight className="h-6 w-6" />
               </Button>
             </div>
           </div>
@@ -208,7 +204,7 @@ const Lessons = () => {
                   >
                     <div className={cn(
                       "bg-white rounded-xl shadow-sm border border-gray-200",
-                      isMobile && "mx-2 p-4 mt-20"
+                      isMobile ? "mx-2 p-4" : "p-6"
                     )}>
                       <ClassesCalendar />
                     </div>
@@ -240,7 +236,7 @@ const Lessons = () => {
                   >
                     <div className={cn(
                       "bg-white rounded-xl shadow-sm border border-gray-200",
-                      isMobile && "mx-2 p-4 mt-20"
+                      isMobile ? "mx-2 p-4" : "p-6"
                     )}>
                       <ClassesList />
                     </div>
@@ -272,7 +268,7 @@ const Lessons = () => {
                   >
                     <div className={cn(
                       "bg-white rounded-xl shadow-sm border border-gray-200",
-                      isMobile && "mx-2 p-4 mt-20"
+                      isMobile ? "mx-2 p-4" : "p-6"
                     )}>
                       <ClassesStats />
                     </div>

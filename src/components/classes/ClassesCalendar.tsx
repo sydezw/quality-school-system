@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, Plus, Filter, Search, Eye, Edit, Users, ChevronDown, Clock, MapPin } from 'lucide-react';
+import { Calendar, Plus, Filter, Search, Eye, Edit, Users, ChevronDown, Clock, MapPin, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,9 @@ import { Tables } from '@/integrations/supabase/types';
 import { motion } from 'framer-motion';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import { useMultipleSelection } from '@/hooks/useMultipleSelection';
+import { MultipleSelectionBar } from '@/components/shared/MultipleSelectionBar';
+import { useAulas } from '@/hooks/useAulas';
 
 // FullCalendar imports
 import FullCalendar from '@fullcalendar/react';
@@ -31,6 +34,7 @@ interface TurmaSimplificada {
   nivel: "Book 1" | "Book 2" | "Book 3" | "Book 4" | "Book 5" | "Book 6" | "Book 7" | "Book 8" | "Book 9" | "Book 10";
   cor_calendario: string;
   professor_id: string;
+  total_aulas: number | null;
   professores: {
     id: string;
     nome: string;
@@ -83,6 +87,40 @@ const ClassesCalendar = () => {
 
   const { toast } = useToast();
 
+  // Hook para gerenciar aulas
+  const { excluirMultiplasAulas } = useAulas();
+
+  /**
+   * Filtra as aulas baseado nos critérios selecionados
+   */
+  const filteredAulas = aulas.filter(aula => {
+    const matchesSearch = !searchTerm || 
+      aula.titulo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      aula.descricao?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesTurma = !filters.turmaId || aula.turma_id === filters.turmaId;
+    const matchesIdioma = !filters.idioma || aula.turmas?.idioma === filters.idioma;
+    const matchesStatus = !filters.status || aula.status === filters.status;
+
+    return matchesSearch && matchesTurma && matchesIdioma && matchesStatus;
+  });
+
+  // Hook para seleção múltipla
+  const {
+    selectedItems,
+    isSelectionMode,
+    isSelected,
+    toggleSelection,
+    clearSelection,
+    selectAll,
+    getSelectedItems,
+    enterSelectionMode,
+    exitSelectionMode
+  } = useMultipleSelection<AulaComTurma>({
+    items: filteredAulas,
+    getItemId: (aula) => aula.id
+  });
+
   /**
    * Carrega as aulas do banco de dados
    * Inclui relacionamento com turmas para obter informações de cor
@@ -102,6 +140,7 @@ const ClassesCalendar = () => {
             nivel,
             cor_calendario,
             professor_id,
+            total_aulas,
             professores (
               id,
               nome
@@ -113,6 +152,8 @@ const ClassesCalendar = () => {
 
       if (error) throw error;
 
+      console.log('Aulas carregadas:', data?.length || 0);
+      console.log('Dados das aulas:', data);
       setAulas(data || []);
     } catch (error) {
       console.error('Erro ao carregar aulas:', error);
@@ -157,36 +198,40 @@ const ClassesCalendar = () => {
     loadTurmas();
   }, []);
 
-  /**
-   * Filtra as aulas baseado nos critérios selecionados
-   */
-  const filteredAulas = aulas.filter(aula => {
-    const matchesSearch = !searchTerm || 
-      aula.titulo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      aula.descricao?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesTurma = !filters.turmaId || aula.turma_id === filters.turmaId;
-    const matchesIdioma = !filters.idioma || aula.turmas?.idioma === filters.idioma;
-    const matchesStatus = !filters.status || aula.status === filters.status;
-
-    return matchesSearch && matchesTurma && matchesIdioma && matchesStatus;
-  });
+  console.log('Total de aulas:', aulas.length);
+  console.log('Aulas filtradas:', filteredAulas.length);
 
   /**
    * Converte aulas em eventos do FullCalendar
    */
   const convertAulasToEvents = (): EventInput[] => {
-    return filteredAulas.map(aula => {
+    const events = filteredAulas.map(aula => {
       const startTime = aula.horario_inicio ? `T${aula.horario_inicio}` : '';
       const endTime = aula.horario_fim ? `T${aula.horario_fim}` : '';
+      const isSelectedItem = isSelected(aula);
+      
+      // Usar o nome da turma como título principal (sem abreviações)
+      const nomeTurma = aula.turmas?.nome || 'Aula Particular';
+      // Processar nome para melhor exibição sem truncar
+      let nomeTurmaProcessado = nomeTurma;
+      
+      // Remove apenas palavras desnecessárias se o nome for muito longo
+      if (nomeTurma.length > 35) {
+        nomeTurmaProcessado = nomeTurma
+          .replace(/\b(turma|classe|grupo)\s+/gi, '') // Remove palavras como "turma", "classe", "grupo"
+          .replace(/\s+/g, ' ') // Remove espaços extras
+          .trim();
+      }
+      
+      const tituloCompleto = `${isSelectedItem && isSelectionMode ? '✓ ' : ''}${nomeTurmaProcessado}`;
       
       return {
         id: aula.id,
-        title: aula.titulo || `${aula.turmas?.nome || 'Aula'}`,
+        title: tituloCompleto,
         start: `${aula.data}${startTime}`,
         end: `${aula.data}${endTime}`,
-        backgroundColor: aula.turmas?.cor_calendario || '#6B7280',
-        borderColor: aula.turmas?.cor_calendario || '#6B7280',
+        backgroundColor: isSelectedItem && isSelectionMode ? '#DC2626' : (aula.turmas?.cor_calendario || '#6B7280'),
+        borderColor: isSelectedItem && isSelectionMode ? '#B91C1C' : (aula.turmas?.cor_calendario || '#6B7280'),
         textColor: '#FFFFFF',
         extendedProps: {
           aula: aula,
@@ -198,6 +243,29 @@ const ClassesCalendar = () => {
         }
       };
     });
+    
+    console.log('Eventos convertidos para o calendário:', events.length);
+    console.log('Eventos:', events);
+    return events;
+  };
+
+  /**
+   * Função para excluir aulas selecionadas
+   */
+  const handleDeleteSelected = async () => {
+    if (selectedItems.size === 0) return;
+
+    const selectedAulas = getSelectedItems();
+    await excluirMultiplasAulas(Array.from(selectedItems).map(id => String(id)));
+    
+    // Remove as aulas excluídas do estado local
+    setAulas(prev => prev.filter(aula => !selectedItems.has(aula.id)));
+    clearSelection();
+    exitSelectionMode();
+    toast({
+      title: 'Sucesso',
+      description: `${selectedAulas.length} aula(s) excluída(s) com sucesso.`,
+    });
   };
 
   /**
@@ -208,8 +276,14 @@ const ClassesCalendar = () => {
     const aula = aulas.find(a => a.id === aulaId);
     
     if (aula) {
-      setSelectedAula(aula);
-      setShowAulaModal(true);
+      if (isSelectionMode) {
+        // No modo de seleção, apenas seleciona/deseleciona a aula
+        toggleSelection(aula);
+      } else {
+        // No modo normal, abre o modal de detalhes
+        setSelectedAula(aula);
+        setShowAulaModal(true);
+      }
     }
   };
 
@@ -316,6 +390,45 @@ const ClassesCalendar = () => {
           </div>
         </div>
         
+        {/* Botões de controle */}
+        <div className={cn(
+          "flex gap-2",
+          isMobile ? "flex-col w-full" : "flex-row"
+        )}>
+          <Button
+             variant={isSelectionMode ? "destructive" : "outline"}
+             size={isMobile ? "default" : "sm"}
+             onClick={isSelectionMode ? exitSelectionMode : enterSelectionMode}
+             className={cn(
+               "transition-all duration-200",
+               isMobile ? "w-full h-12 text-base" : "h-9",
+               isSelectionMode 
+                 ? "bg-red-600 hover:bg-red-700 text-white" 
+                 : "border-red-200 text-red-600 hover:bg-red-50"
+             )}
+           >
+            <Trash2 className={cn(
+              "mr-2",
+              isMobile ? "h-5 w-5" : "h-4 w-4"
+            )} />
+            {isSelectionMode ? 'Cancelar Seleção' : 'Excluir Aulas'}
+          </Button>
+          
+          <Button
+            variant="default"
+            size={isMobile ? "default" : "sm"}
+            className={cn(
+              "bg-[#D90429] hover:bg-[#B8001F] text-white transition-all duration-200",
+              isMobile ? "w-full h-12 text-base" : "h-9"
+            )}
+          >
+            <Plus className={cn(
+              "mr-2",
+              isMobile ? "h-5 w-5" : "h-4 w-4"
+            )} />
+            Nova Aula
+          </Button>
+        </div>
 
       </div>
 
@@ -450,19 +563,44 @@ const ClassesCalendar = () => {
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5, delay: 0.2 }}
-        className={isMobile ? "mx-2" : ""}
+        className={cn(
+          "w-full",
+          isMobile ? "mx-2" : ""
+        )}
       >
         <Card className={cn(
-          "border-0 shadow-xl hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-white to-gray-50",
+          "border-0 shadow-xl hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-white to-gray-50 w-full",
           isMobile && "rounded-xl"
         )}>
           <CardContent className={cn(
+            "w-full",
             isMobile ? "p-3" : "p-0"
           )}>
             <style>{`
-              /* Customização do FullCalendar com tema */
+              /* Customização do FullCalendar com tema - Largura total */
               .fc {
                 font-family: inherit;
+                width: 100% !important;
+                max-width: 100% !important;
+              }
+              
+              .fc-view-harness {
+                width: 100% !important;
+                max-width: 100% !important;
+              }
+              
+              .fc-daygrid {
+                width: 100% !important;
+                table-layout: fixed !important;
+              }
+              
+              .fc-scrollgrid {
+                width: 100% !important;
+                max-width: 100% !important;
+              }
+              
+              .fc-scrollgrid-sync-table {
+                width: 100% !important;
               }
               
               /* Header do calendário */
@@ -683,6 +821,60 @@ const ClassesCalendar = () => {
                 0% { transform: rotate(0deg); }
                 100% { transform: rotate(360deg); }
               }
+              
+              /* Estilos customizados para eventos do calendário - Máximo aproveitamento sem abreviações */
+              .fc-event {
+                border-radius: 2px !important;
+                border: none !important;
+                padding: 1px 2px !important;
+                font-weight: 500 !important;
+                font-size: ${isMobile ? '8px' : '9px'} !important;
+                line-height: 1.1 !important;
+                min-height: ${isMobile ? '22px' : '26px'} !important;
+                max-height: ${isMobile ? '40px' : '48px'} !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+              }
+              
+              .fc-event-title {
+                text-align: center !important;
+                display: flex !important;
+                width: 100% !important;
+                height: 100% !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                white-space: normal !important;
+                overflow: hidden !important;
+                word-wrap: break-word !important;
+                hyphens: auto !important;
+                font-weight: 600 !important;
+                letter-spacing: 0.1px !important;
+                align-items: center !important;
+                justify-content: center !important;
+                text-align: center !important;
+              }
+              
+              .fc-daygrid-event {
+                margin: 1px !important;
+                border-radius: 6px !important;
+              }
+              
+              .fc-event:hover {
+                opacity: 0.9 !important;
+                transform: scale(1.01) !important;
+                transition: all 0.2s ease !important;
+                box-shadow: 0 3px 12px rgba(0, 0, 0, 0.2) !important;
+              }
+              
+              /* Melhor aproveitamento do espaço vertical */
+              .fc-daygrid-day-events {
+                margin-top: 2px !important;
+              }
+              
+              .fc-daygrid-event-harness {
+                margin-bottom: 1px !important;
+              }
             `}</style>
             
             <FullCalendar
@@ -713,17 +905,23 @@ const ClassesCalendar = () => {
               slotMaxTime="22:00:00"
               allDaySlot={false}
               eventDisplay="block"
-              eventTimeFormat={{
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false
-              }}
+              displayEventTime={false}
               dayHeaderFormat={{ weekday: 'short' }}
               eventDidMount={(info) => {
                 // Adiciona tooltip aos eventos
+                const status = info.event.extendedProps.status;
                 info.el.setAttribute('title', 
-                  `${info.event.title}\n${info.event.extendedProps.turma}\n${info.event.extendedProps.status}`
+                  `${info.event.extendedProps.turma}\nStatus: ${status}\nIdioma: ${info.event.extendedProps.idioma}\nNível: ${info.event.extendedProps.nivel}`
                 );
+                
+                // Aplica opacidade baseada no status da aula
+                if (status === 'concluida') {
+                  // Aulas concluídas: opacidade baixa (0.4)
+                  info.el.style.opacity = '0.4';
+                } else {
+                  // Aulas não concluídas (agendada, em_andamento, cancelada): opacidade total
+                  info.el.style.opacity = '1';
+                }
               }}
             />
           </CardContent>
@@ -944,6 +1142,22 @@ const ClassesCalendar = () => {
           </motion.div>
         </DialogContent>
       </Dialog>
+
+      {/* Barra de seleção múltipla */}
+       {isSelectionMode && (
+         <MultipleSelectionBar
+           isVisible={isSelectionMode}
+           selectedCount={selectedItems.size}
+           totalItems={filteredAulas.length}
+           onSelectAll={selectAll}
+           onClearSelection={clearSelection}
+           onDelete={handleDeleteSelected}
+           onCancel={exitSelectionMode}
+           itemName="aulas"
+           deleteButtonText="Excluir Aulas"
+           isAllSelected={selectedItems.size === filteredAulas.length}
+         />
+       )}
     </motion.div>
   );
 };
