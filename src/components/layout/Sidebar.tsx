@@ -56,7 +56,6 @@ const getAllMenuItems = (permissions: ReturnType<typeof usePermissions>) => {
     { icon: BookCopy, label: 'Turmas', path: '/classes', visible: permissions.canAccessClasses },
     { icon: BookOpen, label: 'Aulas', path: '/lessons', visible: permissions.canAccessLessons },
     { icon: FileText, label: 'Contratos', path: '/contracts', visible: permissions.canAccessContracts },
-    { icon: FileSignature, label: 'Gerador de Contratos', path: '/contract-generator', visible: permissions.canAccessContracts },
     { icon: CreditCard, label: 'Planos', path: '/plans', visible: permissions.canAccessPlans },
     { icon: DollarSign, label: 'Financeiro', path: '/financial', visible: permissions.canAccessFinancial },
     { icon: Calendar, label: 'Agenda', path: '/agenda', visible: permissions.canAccessAgenda },

@@ -22,8 +22,7 @@ const PROFESSOR_RESTRICTED_PATHS = [
   '/responsibles',
   '/classes',
   '/contracts',
-  '/contract-generator',
-  '/contract-generator-2',
+
   '/reports',
   '/birthdays',
   '/approve-logins'
