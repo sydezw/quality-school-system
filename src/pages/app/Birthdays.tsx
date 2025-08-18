@@ -119,7 +119,7 @@ export default function Birthdays() {
             id, nome, data_nascimento, telefone, email, turma_id
           `)
           .filter("data_nascimento", "not.is", null)
-          .eq("status", "ativo");
+          .eq("status", "Ativo");
 
         if (alunosError) {
           console.error("Erro ao buscar alunos:", alunosError);
