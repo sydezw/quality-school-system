@@ -263,7 +263,7 @@ const Reports = () => {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="presentes" fill="#22C55E" name="Presentes" />
+                    <Bar dataKey="presentes" fill="#000000" name="Presentes" />
                     <Bar dataKey="faltas" fill="#EF4444" name="Faltas" />
                   </BarChart>
                 </ResponsiveContainer>
