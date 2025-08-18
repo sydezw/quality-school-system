@@ -17,6 +17,7 @@ interface DashboardData {
   inadimplentes: number;
   professoresAtivos: number;
   contratosAtivos: number;
+  aniversariantesHoje: number;
   receitasDespesas: { name: string; Receitas: number; Despesas: number }[];
   alunosPorIdioma: { name: string; value: number }[];
 }
@@ -29,6 +30,7 @@ export const useDashboardData = () => {
     inadimplentes: 0,
     professoresAtivos: 0,
     contratosAtivos: 0,
+    aniversariantesHoje: 0,
     receitasDespesas: [],
     alunosPorIdioma: []
   });
@@ -41,7 +43,7 @@ export const useDashboardData = () => {
 
       // Buscar dados de forma segura, com tipagem simplificada
       const [alunosResult, turmasResult, professoresResult, contratosResult, parcelasResult, financeirosResult, despesasResult] = await Promise.allSettled([
-        supabase.from('alunos').select('idioma, status').eq('status', 'Ativo'),
+        supabase.from('alunos').select('nome, idioma, status, data_nascimento').eq('status', 'Ativo'),
         supabase.from('turmas').select('id'),
         supabase.from('professores').select('id'),
         supabase.from('contratos').select('id').eq('status_contrato', 'Ativo'),
@@ -59,8 +61,25 @@ export const useDashboardData = () => {
       const financeiros = financeirosResult.status === 'fulfilled' && !financeirosResult.value.error ? financeirosResult.value.data : [];
       const despesas = despesasResult.status === 'fulfilled' && !despesasResult.value.error ? despesasResult.value.data : [];
 
-      // Calcular métricas financeiras
+      // Calcular aniversariantes de hoje usando comparação de string
       const hoje = new Date();
+      const diaHoje = String(hoje.getDate()).padStart(2, '0');
+      const mesHoje = String(hoje.getMonth() + 1).padStart(2, '0');
+      
+      const aniversariantesHoje = alunos && alunos.length > 0 
+        ? alunos.filter(aluno => {
+            if (!aluno.data_nascimento) return false;
+            try {
+              // Formato esperado: YYYY-MM-DD
+              const [ano, mes, dia] = aluno.data_nascimento.split('-');
+              return dia === diaHoje && mes === mesHoje;
+            } catch {
+              return false;
+            }
+          }).length
+        : 0;
+      
+      // Calcular métricas financeiras
       const inicioMes = new Date();
       inicioMes.setDate(1);
       
@@ -168,6 +187,7 @@ export const useDashboardData = () => {
         inadimplentes: parcelasVencidasCount,
         professoresAtivos: professores?.length || 0,
         contratosAtivos: contratos?.length || 0,
+        aniversariantesHoje,
         receitasDespesas,
         alunosPorIdioma
       });
@@ -191,6 +211,7 @@ export const useDashboardData = () => {
         inadimplentes: 0,
         professoresAtivos: 0,
         contratosAtivos: 0,
+        aniversariantesHoje: 0,
         receitasDespesas,
         alunosPorIdioma: []
       });
