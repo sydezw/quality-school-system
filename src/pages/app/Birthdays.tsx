@@ -112,13 +112,14 @@ export default function Birthdays() {
     const fetchBirthdays = async () => {
       setLoading(true);
       try {
-        // Buscar alunos com data de nascimento
+        // Buscar alunos com data de nascimento e que estejam ativos
         const { data: alunosData, error: alunosError } = await supabase
           .from("alunos")
           .select(`
             id, nome, data_nascimento, telefone, email, turma_id
           `)
-          .filter("data_nascimento", "not.is", null);
+          .filter("data_nascimento", "not.is", null)
+          .eq("status", "ativo");
 
         if (alunosError) {
           console.error("Erro ao buscar alunos:", alunosError);
