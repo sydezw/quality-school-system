@@ -101,7 +101,7 @@ const ContractGenerator = () => {
     // Se 18+ e não tem responsável, retorna espaço em branco para manter estrutura
     if (!shouldShowResponsavelSection()) {
       return `
-<div style="padding: 10px; margin-bottom: 15px; height: 120px;">
+<div style="width: 1036px; height: 220px; margin-bottom: 15px;">
   <!-- Espaço reservado para seção do responsável -->
 </div>`;
     }
