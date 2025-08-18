@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import SimpleBarChart from '../../components/dashboard/SimpleBarChart';
 import { supabase } from '@/integrations/supabase/client';
 import { Users, BookCopy, GraduationCap, TrendingUp } from 'lucide-react';
 
@@ -251,24 +252,18 @@ const Reports = () => {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Frequência por Turma</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={reportData.presencaPorTurma}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="turma" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="presentes" fill="#000000" name="Presentes" />
-                    <Bar dataKey="faltas" fill="#EF4444" name="Faltas" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
+            <SimpleBarChart 
+              data={[
+                { name: 'Turma A', pv: 24, uv: 13 },
+                { name: 'Turma B', pv: 13, uv: 98 },
+                { name: 'Turma C', pv: 98, uv: 39 },
+                { name: 'Turma D', pv: 39, uv: 48 },
+                { name: 'Turma E', pv: 48, uv: 38 },
+                { name: 'Turma F', pv: 38, uv: 43 }
+              ]}
+              title="Dados por Turma"
+              description="Visualização de dados das turmas"
+            />
           </div>
         </TabsContent>
 
