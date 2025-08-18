@@ -28,6 +28,7 @@ import Plans from "./pages/app/Plans";
 import Birthdays from "./pages/app/Birthdays";
 import ApproveLogins from "./pages/app/ApproveLogins";
 import Responsibles from "./pages/app/Responsibles";
+import SimpleBarChartExample from "./pages/app/SimpleBarChartExample";
 import ErrorBoundary from '@/components/ErrorBoundary';
 
 const queryClient = new QueryClient();
@@ -108,6 +109,7 @@ const App = () => {
                                 <Route path="/birthdays" element={<Birthdays />} />
                                 <Route path="/approve-logins" element={<ApproveLogins />} />
                                 <Route path="/responsibles" element={<Responsibles />} />
+                                <Route path="/simple-bar-chart" element={<SimpleBarChartExample />} />
                             </Route>
                             
                             <Route path="*" element={<NotFound />} />
