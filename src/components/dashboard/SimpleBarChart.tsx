@@ -28,55 +28,75 @@ const SimpleBarChart = ({ data: propData, title = "Preços das Turmas", descript
       }
 
       try {
-        // Buscar turmas com seus planos financeiros
+        // Buscar dados financeiros dos alunos agrupados por turma
         const { data: financialData, error } = await supabase
           .from('financeiro_alunos')
           .select(`
+            id,
             valor_plano,
             valor_total,
-            alunos (
+            aluno_id,
+            alunos!inner (
+              id,
+              nome,
               turma_id,
               turma_particular_id,
-              turmas:turma_id (
+              turmas (
+                id,
                 nome
               ),
-              turmas_particular:turma_particular_id (
+              turmas_particular (
+                id,
                 nome
               )
-            ),
-            planos (
-              nome
             )
-          `)
-          .limit(10);
+          `);
 
         if (error) throw error;
 
+        console.log('Dados financeiros encontrados:', financialData);
+
         // Processar dados para o gráfico
-        const processedData: TurmaPrecoData[] = [];
-        const turmasMap = new Map<string, { valor_plano: number; valor_total: number; count: number }>();
+        const turmasMap = new Map<string, { valores_plano: number[]; valores_total: number[]; alunos: string[] }>();
 
         financialData?.forEach(item => {
-          const turma = item.alunos?.turmas || item.alunos?.turmas_particular;
-          if (turma?.nome) {
-            const existing = turmasMap.get(turma.nome) || { valor_plano: 0, valor_total: 0, count: 0 };
-            existing.valor_plano += item.valor_plano || 0;
-            existing.valor_total += item.valor_total || 0;
-            existing.count += 1;
-            turmasMap.set(turma.nome, existing);
+          if (item.alunos) {
+            const turma = item.alunos.turmas || item.alunos.turmas_particular;
+            if (turma?.nome) {
+              const existing = turmasMap.get(turma.nome) || { valores_plano: [], valores_total: [], alunos: [] };
+              
+              if (item.valor_plano) existing.valores_plano.push(item.valor_plano);
+              if (item.valor_total) existing.valores_total.push(item.valor_total);
+              if (item.alunos.nome && !existing.alunos.includes(item.alunos.nome)) {
+                existing.alunos.push(item.alunos.nome);
+              }
+              
+              turmasMap.set(turma.nome, existing);
+            }
           }
         });
 
-        // Converter para array e calcular médias
+        // Converter para array com médias dos valores por turma
+        const processedData: TurmaPrecoData[] = [];
         turmasMap.forEach((values, name) => {
-          processedData.push({
-            name,
-            valor_plano: Math.round(values.valor_plano / values.count),
-            valor_total: Math.round(values.valor_total / values.count)
-          });
+          const avgValorPlano = values.valores_plano.length > 0 
+            ? Math.round(values.valores_plano.reduce((a, b) => a + b, 0) / values.valores_plano.length)
+            : 0;
+          const avgValorTotal = values.valores_total.length > 0 
+            ? Math.round(values.valores_total.reduce((a, b) => a + b, 0) / values.valores_total.length)
+            : 0;
+          
+          if (avgValorPlano > 0 || avgValorTotal > 0) {
+            processedData.push({
+              name: `${name} (${values.alunos.length} alunos)`,
+              valor_plano: avgValorPlano,
+              valor_total: avgValorTotal
+            });
+          }
         });
 
-        setData(processedData.slice(0, 6)); // Limitar a 6 turmas
+        console.log('Dados processados para o gráfico:', processedData);
+        setData(processedData.slice(0, 8)); // Limitar a 8 turmas
       } catch (error) {
         console.error('Erro ao buscar preços das turmas:', error);
         // Dados de fallback
