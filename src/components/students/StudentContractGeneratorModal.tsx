@@ -195,6 +195,87 @@ const StudentContractGeneratorModal = ({ student, isOpen, onClose }: StudentCont
       : `CONTRATO DE PRESTAÇÃO DE SERVIÇOS EDUCACIONAIS – ${planData?.nome || 'PLANO PADRÃO'}`;
   };
 
+  // Função para calcular a idade do aluno
+  const calculateAge = (birthDate: string | null): number => {
+    if (!birthDate) return 0;
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    
+    return age;
+  };
+
+  // Função para determinar se deve exibir a seção do responsável
+  const shouldShowResponsavelSection = (): boolean => {
+    const age = calculateAge(student?.data_nascimento || null);
+    const hasResponsavel = student?.responsaveis && student.responsaveis.nome;
+    
+    // Se menor de 18 anos, sempre exibir
+    if (age < 18) {
+      return true;
+    }
+    
+    // Se 18+ mas tem responsável cadastrado, manter a seção
+    if (age >= 18 && hasResponsavel) {
+      return true;
+    }
+    
+    // Se 18+ e não tem responsável, ocultar
+    return false;
+  };
+
+  // Função para gerar o conteúdo da seção do responsável
+  const generateResponsavelSection = (): string => {
+    const age = calculateAge(student?.data_nascimento || null);
+    const hasResponsavel = student?.responsaveis && student.responsaveis.nome;
+    
+    if (!shouldShowResponsavelSection()) {
+      return '';
+    }
+    
+    // Se menor de 18 e não tem responsável, mostrar aviso
+    if (age < 18 && !hasResponsavel) {
+      return `
+<div style="border: 1px solid #000; padding: 10px; margin-bottom: 15px; background-color: #fff3cd;">
+  <div style="text-align: center; font-weight: bold; color: #856404; margin-bottom: 10px;">ATENÇÃO: DADOS DO RESPONSÁVEL OBRIGATÓRIOS</div>
+  <p style="color: #856404; text-align: center; margin: 5px 0;">Este aluno é menor de idade e necessita de um responsável cadastrado.</p>
+  <p style="color: #856404; text-align: center; margin: 5px 0;">Por favor, cadastre os dados do responsável antes de gerar o contrato.</p>
+</div>`;
+    }
+    
+    // Seção normal do responsável com dados
+    return `
+<div style="border: 1px solid #000; padding: 10px; margin-bottom: 15px;">
+  <table style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="width: 30%; padding: 5px; font-weight: bold;">RESPONSÁVEL ${age < 18 ? '(obrigatório para menores de idade)' : '(cadastrado)'}:</td>
+      <td style="width: 70%; padding: 5px; border-bottom: 1px solid #000;">${student?.responsaveis?.nome || '<span class="placeholder-text">Nome do responsável</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">CPF:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${student?.responsaveis?.cpf || '<span class="placeholder-text">CPF do responsável</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Telefone:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${student?.responsaveis?.telefone || '<span class="placeholder-text">Telefone do responsável</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Email:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${student?.responsaveis?.email || '<span class="placeholder-text">E-mail do responsável</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Endereço:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${student?.responsaveis?.endereco ? `${student.responsaveis.endereco}, nº ${student.responsaveis.numero_endereco || '<span class="placeholder-text">número</span>'}` : '<span class="placeholder-text">Endereço do responsável</span>'}</td>
+    </tr>
+  </table>
+</div>`;
+  };
+
   const generateContractContent = () => {
     if (!student) return '';
     
@@ -220,11 +301,10 @@ const StudentContractGeneratorModal = ({ student, isOpen, onClose }: StudentCont
       <p>Telefone: ${student?.telefone || '<span class="placeholder-text">Telefone</span>'}</p>
       <p>E-mail: ${student?.email || '<span class="placeholder-text">E-mail</span>'}</p>
 
-      <h4>02. Identificação do RESPONSÁVEL FINANCEIRO (se menor de idade):</h4>
-      <p>Nome: ${student?.responsaveis?.nome || '<span class="placeholder-text">Nome do responsável</span>'}</p>
-      <p>CPF: ${student?.responsaveis?.cpf || '<span class="placeholder-text">CPF do responsável</span>'}</p>
-      <p>Telefone: ${student?.responsaveis?.telefone || '<span class="placeholder-text">Telefone do responsável</span>'}</p>
-      <p>E-mail: ${student?.responsaveis?.email || '<span class="placeholder-text">E-mail do responsável</span>'}</p>
+      ${shouldShowResponsavelSection() ? `
+      <h4>02. Identificação do RESPONSÁVEL FINANCEIRO:</h4>
+      ${generateResponsavelSection().replace(/style="[^"]*"/g, '').replace(/<div[^>]*>|<\/div>/g, '').replace(/<table[^>]*>|<\/table>/g, '').replace(/<tr[^>]*>|<\/tr>/g, '').replace(/<td[^>]*>/g, '<p>').replace(/<\/td>/g, '</p>')}
+      ` : ''}
 
       <h4>03. DO OBJETO:</h4>
       <p>3.1. A CONTRATADA compromete-se a prestar serviços educacionais de ensino de idiomas ao CONTRATANTE, conforme as condições estabelecidas neste contrato.</p>
@@ -297,30 +377,7 @@ O contrato de prestação de serviços educacionais que entre si celebram, de um
   </table>
 </div>
 
-<div style="border: 1px solid #000; padding: 10px; margin-bottom: 15px;">
-  <table style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td style="width: 30%; padding: 5px; font-weight: bold;">RESPONSÁVEL (para menores de idade):</td>
-      <td style="width: 70%; padding: 5px; border-bottom: 1px solid #000;">${student.responsaveis?.nome || '<span class="placeholder-text">Nome do responsável</span>'}</td>
-    </tr>
-    <tr>
-      <td style="padding: 5px; font-weight: bold;">CPF:</td>
-      <td style="padding: 5px; border-bottom: 1px solid #000;">${student.responsaveis?.cpf || '<span class="placeholder-text">CPF do responsável</span>'}</td>
-    </tr>
-    <tr>
-      <td style="padding: 5px; font-weight: bold;">Telefone:</td>
-      <td style="padding: 5px; border-bottom: 1px solid #000;">${student.responsaveis?.telefone || '<span class="placeholder-text">Telefone do responsável</span>'}</td>
-    </tr>
-    <tr>
-      <td style="padding: 5px; font-weight: bold;">Email:</td>
-      <td style="padding: 5px; border-bottom: 1px solid #000;">${student.responsaveis?.email || '<span class="placeholder-text">E-mail do responsável</span>'}</td>
-    </tr>
-    <tr>
-      <td style="padding: 5px; font-weight: bold;">Endereço:</td>
-      <td style="padding: 5px; border-bottom: 1px solid #000;">${student.responsaveis?.endereco ? `${student.responsaveis.endereco}, nº ${student.responsaveis.numero_endereco || '<span class="placeholder-text">número</span>'}` : '<span class="placeholder-text">Endereço do responsável</span>'}</td>
-    </tr>
-  </table>
-</div>
+${generateResponsavelSection()}
 
 <div style="border: 1px solid #000; padding: 10px; margin-bottom: 15px;">
   <h4 style="text-align: center; margin: 10px 0; font-size: 14px; font-weight: bold;">TODOS OS PLANOS ASSOCIADOS</h4>
@@ -825,21 +882,29 @@ Ciente e de acordo,
               )}
 
               {/* Informações do Responsável */}
-              {student?.responsaveis && (
+              {shouldShowResponsavelSection() && (
                 <div className="mt-6">
                   <h4 className="font-medium mb-3 flex items-center gap-2">
                     <User className="h-4 w-4" />
-                    Informações do Responsável
+                    Informações do Responsável {calculateAge(student?.data_nascimento || null) < 18 ? '(Obrigatório)' : '(Cadastrado)'}
                   </h4>
-                  <div className="p-3 bg-purple-50 rounded-lg">
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div><span className="font-medium">Nome:</span> {student.responsaveis.nome || 'Não informado'}</div>
-                      <div><span className="font-medium">CPF:</span> {student.responsaveis.cpf || 'Não informado'}</div>
-                      <div><span className="font-medium">Telefone:</span> {student.responsaveis.telefone || 'Não informado'}</div>
-                      <div><span className="font-medium">Email:</span> {student.responsaveis.email || 'Não informado'}</div>
-                      <div className="col-span-2"><span className="font-medium">Endereço:</span> {student.responsaveis.endereco ? `${student.responsaveis.endereco}, ${student.responsaveis.numero_endereco}` : 'Não informado'}</div>
+                  {student?.responsaveis ? (
+                    <div className="p-3 bg-purple-50 rounded-lg">
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div><span className="font-medium">Nome:</span> {student.responsaveis.nome || 'Não informado'}</div>
+                        <div><span className="font-medium">CPF:</span> {student.responsaveis.cpf || 'Não informado'}</div>
+                        <div><span className="font-medium">Telefone:</span> {student.responsaveis.telefone || 'Não informado'}</div>
+                        <div><span className="font-medium">Email:</span> {student.responsaveis.email || 'Não informado'}</div>
+                        <div className="col-span-2"><span className="font-medium">Endereço:</span> {student.responsaveis.endereco ? `${student.responsaveis.endereco}, ${student.responsaveis.numero_endereco}` : 'Não informado'}</div>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <p className="text-yellow-800 text-sm">
+                        <span className="font-medium">Atenção:</span> Este aluno é menor de idade e necessita de um responsável cadastrado.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
