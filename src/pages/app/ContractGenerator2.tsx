@@ -81,10 +81,16 @@ const ContractGenerator2 = () => {
 
   // Função para gerar o conteúdo da seção do responsável
   const generateResponsavelSection = (): string => {
-    if (!shouldShowResponsavelSection()) return '';
-    
     const age = selectedStudent?.data_nascimento ? calculateAge(selectedStudent.data_nascimento) : 0;
     const hasResponsavel = selectedStudent?.responsaveis?.nome;
+    
+    // Se 18+ e não tem responsável, retorna espaço em branco para manter estrutura
+    if (!shouldShowResponsavelSection()) {
+      return `
+    <div style="padding: 20px; margin-bottom: 20px; height: 100px;">
+      <!-- Espaço reservado para seção do responsável -->
+    </div>`;
+    }
     
     let sectionTitle = '02. Identificação do RESPONSÁVEL FINANCEIRO (se menor de idade):';
     if (age >= 18 && hasResponsavel) {

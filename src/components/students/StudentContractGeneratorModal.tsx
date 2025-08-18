@@ -234,8 +234,12 @@ const StudentContractGeneratorModal = ({ student, isOpen, onClose }: StudentCont
     const age = calculateAge(student?.data_nascimento || null);
     const hasResponsavel = student?.responsaveis && student.responsaveis.nome;
     
+    // Se 18+ e não tem responsável, retorna espaço em branco para manter estrutura
     if (!shouldShowResponsavelSection()) {
-      return '';
+      return `
+<div style="padding: 10px; margin-bottom: 15px; height: 120px;">
+  <!-- Espaço reservado para seção do responsável -->
+</div>`;
     }
     
     // Se menor de 18 e não tem responsável, mostrar aviso
