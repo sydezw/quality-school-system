@@ -11,6 +11,7 @@ import { Printer, FileText, Edit, Save, X, Check, ChevronsUpDown } from 'lucide-
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { numberToWords } from '@/utils/formatters';
 import './contract-styles.css';
 import teenSpeechSignature from '@/assets/signatures/teen-speech-assinatura.png';
 import testemunha1Signature from '@/assets/signatures/testemunha1.png';
@@ -75,6 +76,7 @@ const ContractGenerator = () => {
   // Derived data from selected student
   const planData = selectedStudent?.financeiro_alunos && selectedStudent.financeiro_alunos.length > 0 ? selectedStudent.financeiro_alunos[0].planos : null;
   const financialData = selectedStudent?.financeiro_alunos && selectedStudent.financeiro_alunos.length > 0 ? selectedStudent.financeiro_alunos[0] : null;
+  const [contractData, setContractData] = useState<any>(null);
 
   useEffect(() => {
     fetchStudents();
@@ -167,6 +169,7 @@ const ContractGenerator = () => {
             plano_id,
             valor_plano,
             numero_parcelas_plano,
+            data_primeiro_vencimento,
             planos(
               nome,
               valor_total,
@@ -194,12 +197,36 @@ const ContractGenerator = () => {
     }
   };
 
+  const loadContractData = async (studentId: string) => {
+    try {
+      const { data: contractData, error: contractError } = await supabase
+        .from('contratos')
+        .select('*')
+        .eq('aluno_id', studentId)
+        .in('status_contrato', ['Ativo', 'Agendado'])
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (contractError) {
+        console.error('Erro ao carregar dados do contrato:', contractError);
+      }
+
+      if (contractData && contractData.length > 0) {
+        setContractData(contractData[0]);
+      } else {
+        setContractData(null);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados do contrato:', error);
+    }
+  };
+
   const handleStudentSelect = (studentId: string) => {
     const student = students.find(s => s.id === studentId);
     setSelectedStudent(student || null);
     if (student) {
       setSelectedContract('contrato1');
-
+      loadContractData(studentId);
     }
     setIsEditing(false);
     setEditableContent('');
@@ -304,16 +331,13 @@ O contrato de prestação de serviços educacionais que entre si celebram, de um
     </tr>
     <tr>
       <td style="padding: 5px; font-weight: bold;">Frequência:</td>
-      <td style="padding: 5px; border-bottom: 1px solid #000;">${planData?.frequencia || '<span class="placeholder-text">frequência</span>'}</td>
+<td style="padding: 5px; border-bottom: 1px solid #000;">semanal</td>
     </tr>
     <tr>
       <td style="padding: 5px; font-weight: bold;">Descrição:</td>
       <td style="padding: 5px; border-bottom: 1px solid #000;">${planData?.descricao || '<span class="placeholder-text">descrição do plano</span>'}</td>
     </tr>
-    <tr>
-      <td style="padding: 5px; font-weight: bold;">Valor Pago:</td>
-      <td style="padding: 5px; border-bottom: 1px solid #000;">R$ ${financialData?.valor_pago ? financialData.valor_pago.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor pago</span>'}</td>
-    </tr>
+
     <tr>
       <td style="padding: 5px; font-weight: bold;">Parcelas:</td>
       <td style="padding: 5px; border-bottom: 1px solid #000;">${financialData?.numero_parcelas_plano || '<span class="placeholder-text">número de parcelas</span>'}</td>
@@ -327,16 +351,25 @@ O contrato de prestação de serviços educacionais que entre si celebram, de um
   <table style="width: 100%; border-collapse: collapse;">
     <tr>
       <td style="width: 30%; padding: 5px; font-weight: bold;">Valores do Curso e Condições de Pagamento:</td>
-      <td style="width: 70%; padding: 5px; border-bottom: 1px solid #000;">Semestral: R$ ${planData?.valor_total ? planData.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor semestral</span>'} / Mensal: R$ ${financialData?.valor_plano ? financialData.valor_plano.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor mensal</span>'}</td>
+      <td style="width: 70%; padding: 5px; border-bottom: 1px solid #000;">Semestral: R$ ${planData?.valor_total ? planData.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor semestral</span>'} / Mensal: R$ ${(() => {
+  if (!selectedStudent?.financeiro_alunos || selectedStudent.financeiro_alunos.length === 0) {
+    return financialData?.valor_plano ? financialData.valor_plano.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor mensal</span>';
+  }
+  
+  const parcelasPlano = selectedStudent.financeiro_alunos
+    .flatMap(f => f.parcelas_alunos || [])
+    .filter(p => p.tipo_item === 'plano')
+    .sort((a, b) => a.numero_parcela - b.numero_parcela);
+  
+  if (parcelasPlano.length > 0) {
+    return parcelasPlano[0].valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+  }
+  
+  return financialData?.valor_plano ? financialData.valor_plano.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor mensal</span>';
+})()}</td>
     </tr>
-    <tr>
-      <td style="padding: 5px; font-weight: bold;">Benefício:</td>
-      <td style="padding: 5px; border-bottom: 1px solid #000;"><span class="placeholder-text">benefício</span></td>
-    </tr>
-    <tr>
-      <td style="padding: 5px; font-weight: bold;">Forma de pagamento e validade do período:</td>
-      <td style="padding: 5px; border-bottom: 1px solid #000;">${financialData?.numero_parcelas_plano && financialData.numero_parcelas_plano > 1 ? `${financialData.numero_parcelas_plano} parcelas de R$ ${financialData.valor_plano ? financialData.valor_plano.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor da parcela</span>'}` : `Pagamento mensal de R$ <span class="placeholder-text">valor mensal</span>`}</td>
-    </tr>
+
+
   </table>
 </div>
 
@@ -382,20 +415,42 @@ O contrato de prestação de serviços educacionais que entre si celebram, de um
 
 <h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">2. CLÁUSULA SEGUNDA - DA DURAÇÃO DO CURSO E CARGA HORÁRIA</h4>
 
-<p style="text-align: justify; margin-bottom: 10px;"><strong>2.1</strong> O curso conforme ${selectedContract === 'contrato2' ? 'Contrato 2' : planData?.nome || 'Plano Padrão'} terá duração de ${planData?.numero_aulas && planData?.frequencia_aulas ? Math.ceil(planData.numero_aulas / (planData.frequencia_aulas.toLowerCase().includes('semanal') ? 4 : planData.frequencia_aulas.toLowerCase().includes('mensal') ? 1 : 4)) : '<span class="placeholder-text">duração em meses</span>'} meses, com início em <span class="placeholder-text">data de início</span> e término previsto para <span class="placeholder-text">data de término</span>, totalizando ${planData?.numero_aulas || '<span class="placeholder-text">total de horas</span>'} horas/aula.</p>
+<p style="text-align: justify; margin-bottom: 10px;"><strong>2.1</strong> O curso conforme ${selectedContract === 'contrato2' ? 'Contrato 2' : planData?.nome || 'Plano Padrão'} terá duração de ${planData?.numero_aulas === 36 ? '6 meses' : planData?.numero_aulas === 72 ? '1 ano' : planData?.numero_aulas && planData?.frequencia_aulas ? Math.ceil(planData.numero_aulas / (planData.frequencia_aulas.toLowerCase().includes('semanal') ? 4 : planData.frequencia_aulas.toLowerCase().includes('mensal') ? 1 : 4)) + ' meses' : '<span class="placeholder-text">duração em meses</span>'}, com início em ${contractData?.data_inicio ? new Date(contractData.data_inicio).toLocaleDateString('pt-BR') : '<span class="placeholder-text">data de início</span>'} e término previsto para ${contractData?.data_fim ? new Date(contractData.data_fim).toLocaleDateString('pt-BR') : '<span class="placeholder-text">data de término</span>'}, totalizando ${planData?.numero_aulas || '<span class="placeholder-text">total de horas</span>'} horas/aula.</p>
 
-<p style="text-align: justify; margin-bottom: 10px;"><strong>2.2</strong> As aulas serão ministradas ${planData?.frequencia_aulas?.toLowerCase().includes('semanal') ? planData.frequencia_aulas.match(/\d+/)?.[0] || '1' : planData?.frequencia_aulas?.toLowerCase().includes('mensal') ? '4' : '<span class="placeholder-text">frequência semanal</span>'} vezes por semana, com duração de ${planData?.descricao?.match(/\d+/)?.[0] || '55'} minutos cada, nos dias <span class="placeholder-text">dias da semana</span> e horários <span class="placeholder-text">horários das aulas</span>.</p>
+<p style="text-align: justify; margin-bottom: 10px;"><strong>2.2</strong> As aulas serão ministradas semanalmente, com duração de ${planData?.descricao?.match(/\d+/)?.[0] || '55'} minutos cada, nos dias <span class="placeholder-text">dias da semana</span> e horários <span class="placeholder-text">horários das aulas</span>.</p>
 
 <p style="text-align: justify; margin-bottom: 15px;"><strong>2.3</strong> O cronograma das aulas poderá sofrer alterações mediante comunicação prévia de no mínimo 48 (quarenta e oito) horas.</p>
 
 <h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">3. CLÁUSULA TERCEIRA - DO VALOR E FORMA DE PAGAMENTO</h4>
 
-<p style="text-align: justify; margin-bottom: 10px;"><strong>3.1</strong> O valor total do curso é de R$ ${planData?.valor_total ? planData.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor total</span>'} (${planData?.valor_total ? 'valor por extenso' : '<span class="placeholder-text">valor por extenso</span>'} reais).</p>
+<p style="text-align: justify; margin-bottom: 10px;"><strong>3.1</strong> O valor total do curso é de R$ ${planData?.valor_total ? planData.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor total</span>'} (${planData?.valor_total ? numberToWords(planData.valor_total) : '<span class="placeholder-text">valor por extenso</span>'}) "Valor bruto sem nenhum desconto mas não é o preço a pagar".</p>
 
 <p style="text-align: justify; margin-bottom: 10px;"><strong>3.2</strong> O pagamento será efetuado da seguinte forma:</p>
-<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">${financialData?.numero_parcelas_plano && financialData.numero_parcelas_plano > 1 ? `- Parcelado em ${financialData.numero_parcelas_plano} (${financialData.numero_parcelas_plano === 2 ? 'duas' : financialData.numero_parcelas_plano === 3 ? 'três' : financialData.numero_parcelas_plano === 4 ? 'quatro' : financialData.numero_parcelas_plano === 5 ? 'cinco' : financialData.numero_parcelas_plano === 6 ? 'seis' : 'várias'}) parcelas mensais de R$ ${financialData.valor_plano ? financialData.valor_plano.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor da parcela</span>'}` : `- Pagamento mensal de R$ <span class="placeholder-text">valor mensal</span>`}</p>
-<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">- Vencimento: todo dia <span class="placeholder-text">dia do vencimento</span> de cada mês</p>
-<p style="text-align: justify; margin-left: 20px; margin-bottom: 10px;">- Primeira parcela: <span class="placeholder-text">data da primeira parcela</span></p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">${(() => {
+  // Buscar valor da primeira parcela
+  const getFirstParcelaValue = () => {
+    if (!selectedStudent?.financeiro_alunos || selectedStudent.financeiro_alunos.length === 0) {
+      return financialData?.valor_plano ? financialData.valor_plano.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor da parcela</span>';
+    }
+    
+    const parcelasPlano = selectedStudent.financeiro_alunos
+      .flatMap(f => f.parcelas_alunos || [])
+      .filter(p => p.tipo_item === 'plano')
+      .sort((a, b) => a.numero_parcela - b.numero_parcela);
+    
+    if (parcelasPlano.length > 0) {
+      return parcelasPlano[0].valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    }
+    
+    return financialData?.valor_plano ? financialData.valor_plano.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor da parcela</span>';
+  };
+  
+  return financialData?.numero_parcelas_plano && financialData.numero_parcelas_plano > 1 
+    ? `- Parcelado em ${financialData.numero_parcelas_plano} (${financialData.numero_parcelas_plano === 2 ? 'duas' : financialData.numero_parcelas_plano === 3 ? 'três' : financialData.numero_parcelas_plano === 4 ? 'quatro' : financialData.numero_parcelas_plano === 5 ? 'cinco' : financialData.numero_parcelas_plano === 6 ? 'seis' : 'várias'}) parcelas mensais de R$ ${getFirstParcelaValue()}` 
+    : `- Pagamento mensal de R$ ${getFirstParcelaValue()}`;
+})()}</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">- Vencimento: todo dia ${financialData?.data_primeiro_vencimento ? new Date(financialData.data_primeiro_vencimento).getDate() : '<span class="placeholder-text">dia do vencimento</span>'} de cada mês</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 10px;">- Primeira parcela: ${financialData?.data_primeiro_vencimento ? new Date(financialData.data_primeiro_vencimento).toLocaleDateString('pt-BR') : '<span class="placeholder-text">data da primeira parcela</span>'}</p>
 
 <p style="text-align: justify; margin-bottom: 10px;"><strong>3.3</strong> O não pagamento na data do vencimento implicará em:</p>
 <p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">a) Multa de 2% (dois por cento) sobre o valor da parcela;</p>
@@ -467,6 +522,7 @@ O contrato de prestação de serviços educacionais que entre si celebram, de um
 
 <p style="text-align: justify; margin-bottom: 15px;"><strong>10.2</strong> O tratamento de dados ocorrerá exclusivamente para as finalidades específicas para as quais foram coletados (como a prestação de serviços educacionais, gestão de matrículas, comunicação e cumprimento de obrigações legais), utilizando-se apenas os dados estritamente necessários para tais fins.</p>
 
+<div style="margin-top: 8cm;"></div>
 <h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">11. CLÁUSULA DÉCIMA PRIMEIRA - DAS DESPESAS COM A COBRANÇA E EXECUÇÃO</h4>
 
 <p style="text-align: justify; margin-bottom: 10px;">Em caso de inadimplemento contratual que enseje a necessidade de cobrança (judicial ou extrajudicial) ou a execução do presente contrato, a parte que deu causa ao inadimplemento será responsável por arcar com todas as despesas decorrentes, incluindo, mas não se limitando a:</p>
@@ -592,6 +648,24 @@ TESTEMUNHAS:
       // Aguardar um pouco para as imagens carregarem
       await new Promise(resolve => setTimeout(resolve, 1000));
       
+      // Adicionar estilos CSS para quebras de página inteligentes
+      const style = document.createElement('style');
+      style.textContent = `
+        .page-break-avoid {
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
+        p, div {
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
+        h1, h2, h3, h4, h5, h6 {
+          page-break-after: avoid !important;
+          break-after: avoid !important;
+        }
+      `;
+      tempDiv.appendChild(style);
+      
       // Converter para canvas
       const canvas = await html2canvas(tempDiv, {
         scale: 2,
@@ -599,7 +673,9 @@ TESTEMUNHAS:
         allowTaint: true,
         backgroundColor: '#ffffff',
         width: 800,
-        height: tempDiv.scrollHeight
+        height: tempDiv.scrollHeight,
+        logging: false,
+        useCORS: true
       });
       
       // Remover elemento temporário
@@ -619,17 +695,18 @@ TESTEMUNHAS:
       let heightLeft = imgHeight;
       
       let position = 0;
+      const margin = 10; // Margem para evitar corte de texto
       
       // Adicionar primeira página
       pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+      heightLeft -= (pageHeight - margin);
       
-      // Adicionar páginas adicionais se necessário
+      // Adicionar páginas adicionais com margem para evitar corte
       while (heightLeft >= 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
         pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+        heightLeft -= (pageHeight - margin);
       }
       
       // Salvar o PDF
@@ -908,9 +985,7 @@ TESTEMUNHAS:
                               <div className="col-span-2">
                                 <span className="font-medium">Descrição:</span> {financeiro.planos.descricao || 'Não informado'}
                               </div>
-                              <div>
-                                <span className="font-medium">Valor Pago:</span> R$ {financeiro.valor_plano?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || 'Não informado'}
-                              </div>
+
                               <div>
                                 <span className="font-medium">Parcelas:</span> {financeiro.numero_parcelas_plano || 'Não informado'}
                               </div>
@@ -952,7 +1027,7 @@ TESTEMUNHAS:
                   variant={selectedContract === 'contrato2' ? 'default' : 'outline'}
                   onClick={() => navigate('/contract-generator-2')}
                 >
-                  CONTRATO DE PRESTAÇÃO
+                  Contrato de pretação
                 </Button>
               </div>
             </CardContent>

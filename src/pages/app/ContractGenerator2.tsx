@@ -221,7 +221,7 @@ const ContractGenerator2 = () => {
 
     <h4>04. DO VALOR E FORMA DE PAGAMENTO:</h4>
     <p>4.1. O valor total do curso é de R$ <span class="placeholder-text">valor</span>, dividido em ${selectedStudent?.financeiro_alunos?.[0]?.planos?.numero_aulas || '<span class="placeholder-text">número de aulas</span>'} aulas.</p>
-    <p>4.2. O pagamento será efetuado conforme a periodicidade: ${selectedStudent?.financeiro_alunos?.[0]?.planos?.frequencia || '<span class="placeholder-text">frequência</span>'}.</p>
+    <p>4.2. O pagamento será efetuado conforme a periodicidade: semanal.</p>
 
 
 
@@ -320,13 +320,33 @@ const ContractGenerator2 = () => {
       
       await new Promise(resolve => setTimeout(resolve, 1000));
       
+      // Adicionar estilos CSS para quebras de página inteligentes
+      const style = document.createElement('style');
+      style.textContent = `
+        .page-break-avoid {
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
+        p, div {
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
+        h1, h2, h3, h4, h5, h6 {
+          page-break-after: avoid !important;
+          break-after: avoid !important;
+        }
+      `;
+      tempDiv.appendChild(style);
+      
       const canvas = await html2canvas(tempDiv, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
         width: 800,
-        height: tempDiv.scrollHeight
+        height: tempDiv.scrollHeight,
+        logging: false,
+        useCORS: true
       });
       
       document.body.removeChild(tempDiv);
@@ -344,15 +364,16 @@ const ContractGenerator2 = () => {
       let heightLeft = imgHeight;
       
       let position = 0;
+      const margin = 10; // Margem para evitar corte de texto
       
       pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+      heightLeft -= (pageHeight - margin);
       
       while (heightLeft >= 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
         pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+        heightLeft -= (pageHeight - margin);
       }
       
       const fileName = `Contrato2_${selectedStudent.nome.replace(/\s+/g, '_')}_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`;

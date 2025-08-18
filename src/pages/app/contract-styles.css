@@ -24,6 +24,17 @@
   transition: opacity 0.2s ease;
 }
 
+/* Estilo específico para impressão - placeholders menores */
+@media print {
+  .placeholder-text {
+    font-size: 6pt !important;
+    color: rgba(0,0,0,0.3) !important;
+    background-color: white !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+}
+
 .contract-preview table {
   width: 100%;
   border-collapse: collapse;

@@ -60,7 +60,7 @@ const Header = () => {
                     <User className="h-4 w-4" />
                   </div>
                   <div className="flex flex-col">
-                    <span className="font-medium text-gray-900">{user.email}</span>
+                    <span className="font-medium text-gray-900">Olá {user.nome}</span>
                     <span className="text-xs text-gray-500">{user.cargo}</span>
                   </div>
                 </div>
@@ -74,7 +74,7 @@ const Header = () => {
                   </div>
                   <div className="flex flex-col">
                     <span className="text-xs font-medium text-gray-900 truncate max-w-[120px]">
-                      {user.email?.split('@')[0]}
+                      Olá {user.nome}
                     </span>
                     <span className="text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">
                       {user.cargo}

@@ -47,6 +47,7 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
     { path: '/contracts', label: 'Contratos', icon: FileSignature, roles: ['admin'] },
     { path: '/responsibles', label: 'Responsáveis', icon: UserCheck, roles: ['admin'] },
     { path: '/birthdays', label: 'Aniversários', icon: Users, roles: ['admin'] },
+    { path: '/approve-logins', label: 'Gestão de Usuários', icon: UserCheck, roles: ['admin'] },
     // Para professores - apenas as duas abas combinadas
     { path: '/teacher-classes', label: 'Minhas Turmas', icon: GraduationCap, roles: ['professor'] },
     { path: '/lessons', label: 'Aulas', icon: BookOpen, roles: ['professor'] },

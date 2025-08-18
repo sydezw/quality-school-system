@@ -34,9 +34,10 @@ interface PlanFormProps {
   plan?: Plan | null;
   onSuccess: () => void;
   onCancel: () => void;
+  isViewMode?: boolean;
 }
 
-const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
+const PlanForm = ({ plan, onSuccess, onCancel, isViewMode = false }: PlanFormProps) => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     nome: '',
@@ -312,14 +313,16 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
             type="text"
             value={formData.nome}
             onChange={(e) => handleInputChange('nome', e.target.value)}
+            readOnly={isViewMode}
+            className={isViewMode ? 'bg-gray-50' : ''}
             required
           />
         </div>
 
         <div>
           <Label htmlFor="idioma">Tipo do Curso *</Label>
-          <Select value={formData.idioma} onValueChange={(value) => handleInputChange('idioma', value)} required>
-            <SelectTrigger>
+          <Select value={formData.idioma} onValueChange={(value) => handleInputChange('idioma', value)} disabled={isViewMode} required>
+            <SelectTrigger className={isViewMode ? 'bg-gray-50' : ''}>
               <SelectValue placeholder="Selecione o idioma" />
             </SelectTrigger>
             <SelectContent>
@@ -342,6 +345,8 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
             value={formData.numero_aulas}
             onChange={(e) => handleInputChange('numero_aulas', e.target.value)}
             placeholder="Digite o número de aulas"
+            readOnly={isViewMode}
+            className={isViewMode ? 'bg-gray-50' : ''}
             required
           />
         </div>
@@ -464,6 +469,8 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
           onChange={(e) => handleInputChange('descricao', e.target.value)}
           rows={3}
           placeholder="Descreva o plano de pagamento..."
+          readOnly={isViewMode}
+          className={isViewMode ? 'bg-gray-50' : ''}
           required
         />
       </div>
@@ -471,8 +478,8 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label htmlFor="frequencia_aulas">Frequência das Aulas *</Label>
-          <Select value={formData.frequencia_aulas} onValueChange={(value) => handleInputChange('frequencia_aulas', value)} required>
-            <SelectTrigger>
+          <Select value={formData.frequencia_aulas} onValueChange={(value) => handleInputChange('frequencia_aulas', value)} disabled={isViewMode} required>
+            <SelectTrigger className={isViewMode ? 'bg-gray-50' : ''}>
               <SelectValue placeholder="Selecione a frequência" />
             </SelectTrigger>
             <SelectContent>
@@ -501,12 +508,12 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
 
       <div>
         <Label>Tipo de Valor *</Label>
-        <Tabs value={formData.tipo_valor} onValueChange={(value) => handleInputChange('tipo_valor', value)} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="plano">Plano Básico</TabsTrigger>
-            <TabsTrigger value="plano_material">Plano + Material</TabsTrigger>
-            <TabsTrigger value="plano_matricula">Plano + Matrícula</TabsTrigger>
-            <TabsTrigger value="plano_completo">Plano Completo</TabsTrigger>
+        <Tabs value={formData.tipo_valor} onValueChange={isViewMode ? undefined : (value) => handleInputChange('tipo_valor', value)} className="w-full">
+          <TabsList className={`grid w-full grid-cols-4 ${isViewMode ? 'pointer-events-none bg-gray-50' : ''}`}>
+            <TabsTrigger value="plano" disabled={isViewMode}>Plano Básico</TabsTrigger>
+            <TabsTrigger value="plano_material" disabled={isViewMode}>Plano + Material</TabsTrigger>
+            <TabsTrigger value="plano_matricula" disabled={isViewMode}>Plano + Matrícula</TabsTrigger>
+            <TabsTrigger value="plano_completo" disabled={isViewMode}>Plano Completo</TabsTrigger>
           </TabsList>
           <TabsContent value="plano" className="mt-2">
             <p className="text-sm text-gray-600">Valor inclui apenas o plano de aulas</p>
@@ -534,6 +541,8 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
             value={formData.valor_total || ''}
             onChange={(e) => handleInputChange('valor_total', parseFloat(e.target.value) || null)}
             placeholder="0,00"
+            readOnly={isViewMode}
+            className={isViewMode ? 'bg-gray-50' : ''}
             required
           />
         </div>
@@ -561,6 +570,8 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
           onChange={(e) => handleInputChange('observacoes', e.target.value)}
           rows={2}
           placeholder="Observações adicionais sobre o plano..."
+          readOnly={isViewMode}
+          className={isViewMode ? 'bg-gray-50' : ''}
         />
       </div>
 
@@ -570,6 +581,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
             id="permite_cancelamento"
             checked={formData.permite_cancelamento}
             onCheckedChange={(checked) => handleInputChange('permite_cancelamento', checked)}
+            disabled={isViewMode}
           />
           <Label htmlFor="permite_cancelamento">Permite cancelamento</Label>
         </div>
@@ -579,6 +591,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
             id="permite_parcelamento"
             checked={formData.permite_parcelamento}
             onCheckedChange={(checked) => handleInputChange('permite_parcelamento', checked)}
+            disabled={isViewMode}
           />
           <Label htmlFor="permite_parcelamento">Permite parcelamento</Label>
         </div>
@@ -588,6 +601,7 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
             id="ativo"
             checked={formData.ativo}
             onCheckedChange={(checked) => handleInputChange('ativo', checked)}
+            disabled={isViewMode}
           />
           <Label htmlFor="ativo">Plano ativo</Label>
         </div>
@@ -595,12 +609,14 @@ const PlanForm = ({ plan, onSuccess, onCancel }: PlanFormProps) => {
 
       <div className="flex justify-end space-x-2 pt-4">
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancelar
+          {isViewMode ? 'Fechar' : 'Cancelar'}
         </Button>
-        <Button type="submit" disabled={loading}>
-          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {plan ? 'Atualizar' : 'Criar'} Plano
-        </Button>
+        {!isViewMode && (
+          <Button type="submit" disabled={loading}>
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {plan ? 'Atualizar' : 'Criar'} Plano
+          </Button>
+        )}
       </div>
     </form>
   );

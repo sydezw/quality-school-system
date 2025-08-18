@@ -1,7 +1,6 @@
 
 import ContractAlerts from '@/components/dashboard/ContractAlerts';
 import DashboardStats from '@/components/dashboard/DashboardStats';
-import RevenueExpenseChart from '@/components/dashboard/RevenueExpenseChart';
 import StudentsLanguageChart from '@/components/dashboard/StudentsLanguageChart';
 // import PlanRenewalAlerts from '@/components/dashboard/PlanRenewalAlerts'; // Removido
 import { useDashboardData } from '@/hooks/useDashboardData';
@@ -33,8 +32,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-5">
-        <RevenueExpenseChart data={dashboardData.receitasDespesas} />
+      <div className="grid gap-6">
         <StudentsLanguageChart data={dashboardData.alunosPorIdioma} />
       </div>
     </div>

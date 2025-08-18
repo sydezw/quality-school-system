@@ -40,12 +40,13 @@ export const useDashboardData = () => {
       setLoading(true);
 
       // Buscar dados de forma segura, com tipagem simplificada
-      const [alunosResult, turmasResult, professoresResult, contratosResult, financeirosResult, despesasResult] = await Promise.allSettled([
+      const [alunosResult, turmasResult, professoresResult, contratosResult, parcelasResult, financeirosResult, despesasResult] = await Promise.allSettled([
         supabase.from('alunos').select('idioma, status').eq('status', 'Ativo'),
         supabase.from('turmas').select('id'),
         supabase.from('professores').select('id'),
         supabase.from('contratos').select('id').eq('status_contrato', 'Ativo'),
-        supabase.from('financeiro_alunos').select('status_geral, data_primeiro_vencimento, valor_total, created_at'),
+        supabase.from('parcelas_alunos').select('status_pagamento, data_vencimento'),
+        supabase.from('financeiro_alunos').select('status_geral, valor_total, created_at'),
         supabase.from('despesas').select('valor, data').gte('data', new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0])
       ]);
 
@@ -54,6 +55,7 @@ export const useDashboardData = () => {
       const turmas = turmasResult.status === 'fulfilled' && !turmasResult.value.error ? turmasResult.value.data : [];
       const professores = professoresResult.status === 'fulfilled' && !professoresResult.value.error ? professoresResult.value.data : [];
       const contratos = contratosResult.status === 'fulfilled' && !contratosResult.value.error ? contratosResult.value.data : [];
+      const parcelas = parcelasResult.status === 'fulfilled' && !parcelasResult.value.error ? parcelasResult.value.data : [];
       const financeiros = financeirosResult.status === 'fulfilled' && !financeirosResult.value.error ? financeirosResult.value.data : [];
       const despesas = despesasResult.status === 'fulfilled' && !despesasResult.value.error ? despesasResult.value.data : [];
 
@@ -62,18 +64,30 @@ export const useDashboardData = () => {
       const inicioMes = new Date();
       inicioMes.setDate(1);
       
-      let boletosVencidosCount = 0;
+      let parcelasVencidasCount = 0;
       let receitasMesTotal = 0;
       
+      // Contar parcelas vencidas ou não pagas
+      if (parcelas && parcelas.length > 0) {
+        parcelas.forEach(parcela => {
+          try {
+            const dataVencimento = new Date(parcela.data_vencimento);
+            
+            // Contar parcelas vencidas (não pagas e com data de vencimento passada) ou pendentes vencidas
+            if ((parcela.status_pagamento === 'pendente' || parcela.status_pagamento === 'vencido') && dataVencimento < hoje) {
+              parcelasVencidasCount++;
+            }
+          } catch (error) {
+            // Ignorar registros com datas inválidas
+          }
+        });
+      }
+      
+      // Calcular receitas do mês (mantendo a lógica original)
       if (financeiros && financeiros.length > 0) {
         financeiros.forEach(registro => {
           try {
-            const dataVencimento = new Date(registro.data_primeiro_vencimento);
             const dataCriacao = new Date(registro.created_at);
-            
-            if (registro.status_geral !== 'Pago' && dataVencimento < hoje) {
-              boletosVencidosCount++;
-            }
             
             if (registro.status_geral === 'Pago' && dataCriacao >= inicioMes) {
               receitasMesTotal += Number(registro.valor_total) || 0;
@@ -151,7 +165,7 @@ export const useDashboardData = () => {
         totalAlunos: alunos?.length || 0,
         totalTurmas: turmas?.length || 0,
         faturamentoMes: receitasMesTotal,
-        inadimplentes: boletosVencidosCount,
+        inadimplentes: parcelasVencidasCount,
         professoresAtivos: professores?.length || 0,
         contratosAtivos: contratos?.length || 0,
         receitasDespesas,
@@ -191,6 +205,19 @@ export const useDashboardData = () => {
     // Configurar subscriptions apenas se não houver erro
     const setupSubscriptions = () => {
       try {
+        const parcelasChannel = supabase
+          .channel('parcelas-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'parcelas_alunos'
+            },
+            () => fetchDashboardData()
+          )
+          .subscribe();
+
         const financeirosChannel = supabase
           .channel('financeiros-changes')
           .on(
@@ -218,6 +245,7 @@ export const useDashboardData = () => {
           .subscribe();
 
         return () => {
+          supabase.removeChannel(parcelasChannel);
           supabase.removeChannel(financeirosChannel);
           supabase.removeChannel(despesasChannel);
         };

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -7,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Edit } from 'lucide-react';
+import { Edit, Settings } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Contract } from '@/hooks/useContracts';
@@ -15,28 +14,72 @@ import DatePicker from '@/components/shared/DatePicker';
 import { format, parse } from 'date-fns';
 
 interface EditContractDialogProps {
-  contract: Contract;
+  contract?: Contract;
+  student?: { id: string; nome: string };
   onContractUpdated: () => void;
 }
 
-export const EditContractDialog = ({ contract, onContractUpdated }: EditContractDialogProps) => {
+export const EditContractDialog = ({ contract, student, onContractUpdated }: EditContractDialogProps) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [currentContract, setCurrentContract] = useState<Contract | null>(contract || null);
   const [alunos, setAlunos] = useState<Array<{ id: string; nome: string }>>([]);
   const [planos, setPlanos] = useState<Array<{ id: string; nome: string; valor_total: number }>>([]);
   const [dataInicio, setDataInicio] = useState<Date | null>(null);
   const [dataFim, setDataFim] = useState<Date | null>(null);
   const [formData, setFormData] = useState({
-    aluno_id: contract.aluno_id,
-    data_inicio: contract.data_inicio,
-    data_fim: contract.data_fim,
-    valor_mensalidade: contract.valor_mensalidade.toString(),
-    status: contract.status_contrato as 'Ativo' | 'Agendado' | 'Vencendo' | 'Vencido' | 'Cancelado',
-    observacao: contract.observacao || '',
-    plano_id: contract.plano_id || '',
-    idioma_contrato: contract.idioma_contrato || ''
+    aluno_id: contract?.aluno_id || student?.id || '',
+    data_inicio: contract?.data_inicio || '',
+    data_fim: contract?.data_fim || '',
+    valor_mensalidade: contract?.valor_mensalidade?.toString() || '',
+    status: (contract?.status_contrato as 'Ativo' | 'Agendado' | 'Vencendo' | 'Vencido' | 'Cancelado') || 'Ativo',
+    observacao: contract?.observacao || '',
+    plano_id: contract?.plano_id || '',
+    idioma_contrato: contract?.idioma_contrato || ''
   });
   const { toast } = useToast();
+
+  const fetchStudentContract = async (studentId: string) => {
+    try {
+      const { data: contracts, error } = await supabase
+        .from('contratos')
+        .select(`
+          *,
+          planos(nome)
+        `)
+        .eq('aluno_id', studentId)
+        .in('status_contrato', ['Ativo', 'Agendado'])
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      if (contracts && contracts.length > 0) {
+        const contractData = contracts[0];
+        setCurrentContract(contractData);
+        setFormData({
+          aluno_id: contractData.aluno_id,
+          data_inicio: contractData.data_inicio,
+          data_fim: contractData.data_fim,
+          valor_mensalidade: contractData.valor_mensalidade.toString(),
+          status: contractData.status_contrato as 'Ativo' | 'Agendado' | 'Vencendo' | 'Vencido' | 'Cancelado',
+          observacao: contractData.observacao || '',
+          plano_id: contractData.plano_id || '',
+          idioma_contrato: contractData.idioma_contrato || ''
+        });
+        return contractData;
+      }
+      return null;
+    } catch (error) {
+      console.error('Erro ao buscar contrato:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao buscar contrato do aluno.",
+        variant: "destructive",
+      });
+      return null;
+    }
+  };
 
   const fetchAlunos = async () => {
     try {
@@ -152,31 +195,35 @@ export const EditContractDialog = ({ contract, onContractUpdated }: EditContract
     }
   };
 
-  const handleOpenChange = (newOpen: boolean) => {
-    setOpen(newOpen);
-    if (newOpen) {
-      fetchAlunos();
-      fetchPlanos();
-      
-      // Inicializar as datas
-      const inicioDate = contract.data_inicio ? parse(contract.data_inicio, 'yyyy-MM-dd', new Date()) : null;
-      const fimDate = contract.data_fim ? parse(contract.data_fim, 'yyyy-MM-dd', new Date()) : null;
-      
-      setDataInicio(inicioDate);
-      setDataFim(fimDate);
-      
-      setFormData({
-        aluno_id: contract.aluno_id,
-        data_inicio: contract.data_inicio,
-        data_fim: contract.data_fim,
-        valor_mensalidade: contract.valor_mensalidade.toString(),
-        status: contract.status_contrato as 'Ativo' | 'Agendado' | 'Vencendo' | 'Vencido' | 'Cancelado',
-        observacao: contract.observacao || '',
-        plano_id: contract.plano_id || '',
-        idioma_contrato: contract.idioma_contrato || ''
-      });
-    }
-  };
+  const handleOpenChange = async (newOpen: boolean) => {
+      setOpen(newOpen);
+      if (newOpen) {
+        fetchAlunos();
+        fetchPlanos();
+        // Se temos um student mas não um contract, buscar o contrato
+        if (student && !contract) {
+          await fetchStudentContract(student.id);
+        } else if (contract) {
+          // Inicializar as datas
+          const inicioDate = contract.data_inicio ? parse(contract.data_inicio, 'yyyy-MM-dd', new Date()) : null;
+          const fimDate = contract.data_fim ? parse(contract.data_fim, 'yyyy-MM-dd', new Date()) : null;
+          
+          setDataInicio(inicioDate);
+          setDataFim(fimDate);
+          
+          setFormData({
+            aluno_id: contract.aluno_id,
+            data_inicio: contract.data_inicio,
+            data_fim: contract.data_fim,
+            valor_mensalidade: contract.valor_mensalidade.toString(),
+            status: contract.status_contrato as 'Ativo' | 'Agendado' | 'Vencendo' | 'Vencido' | 'Cancelado',
+            observacao: contract.observacao || '',
+             plano_id: contract.plano_id || '',
+             idioma_contrato: contract.idioma_contrato || ''
+           });
+         }
+       }
+     };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -238,10 +285,14 @@ export const EditContractDialog = ({ contract, onContractUpdated }: EditContract
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline">
-          <Edit className="h-4 w-4" />
-          Editar
-        </Button>
+        <button 
+           className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 h-8 w-8 p-0 rounded-full border-2 border-orange-600 bg-white hover:bg-orange-600 text-orange-600 hover:text-white transition-all duration-200 shadow-md hover:shadow-lg"
+           tabIndex={0}
+           type="button"
+           aria-label="edit contract"
+         >
+           <Settings className="h-4 w-4" />
+         </button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
