@@ -305,7 +305,8 @@ const Classes = () => {
       const result = calculateEndDateWithHolidays(
         watchedDataInicio,
         watchedTotalAulas,
-        daysToUse
+        daysToUse,
+        watchedHorario
       );
       
       console.log('Resultado do cálculo:', result);
@@ -395,7 +396,8 @@ const Classes = () => {
       const { endDate: currentEndDate } = calculateEndDateWithHolidays(
         watchedDataInicio,
         watchedTotalAulas,
-        selectedDays
+        selectedDays,
+        watchedHorario
       );
       
       const currentEndDateObj = new Date(currentEndDate);
@@ -417,7 +419,7 @@ const Classes = () => {
       
       if (remainingHolidays.length === 0) {
         // Se não há mais feriados, a data de fim é a nova data reagendada ou a data calculada simples
-        const simpleEndDate = calculateEndDate(watchedDataInicio, watchedTotalAulas, selectedDays);
+        const simpleEndDate = calculateEndDate(watchedDataInicio, watchedTotalAulas, selectedDays, watchedHorario);
         const simpleEndDateObj = new Date(simpleEndDate);
         
         // Usar a data mais tardia entre a calculada simples e a reagendada
@@ -428,7 +430,8 @@ const Classes = () => {
         const { endDate: recalculatedEndDate } = calculateEndDateWithHolidays(
           watchedDataInicio,
           watchedTotalAulas,
-          selectedDays
+          selectedDays,
+          watchedHorario
         );
         const recalculatedEndDateObj = new Date(recalculatedEndDate);
         
@@ -1337,7 +1340,7 @@ const Classes = () => {
     
     // Calcular data de fim se houver dados suficientes
     if (classItem.data_inicio && classItem.total_aulas && daysArray.length > 0) {
-      const endDate = calculateEndDate(classItem.data_inicio, classItem.total_aulas, daysArray);
+      const endDate = calculateEndDate(classItem.data_inicio, classItem.total_aulas, daysArray, classItem.horario);
       setCalculatedEndDate(endDate);
     }
     

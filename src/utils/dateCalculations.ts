@@ -4,7 +4,8 @@
 export const calculateEndDate = (
   startDate: string,
   totalClasses: number,
-  weekDays: string[]
+  weekDays: string[],
+  horario?: string // Parâmetro opcional para verificar diferença de horário
 ): string => {
   if (!startDate || !totalClasses || weekDays.length === 0) {
     return '';
@@ -28,6 +29,33 @@ export const calculateEndDate = (
     return '';
   }
 
+  // Verificar se há diferença de 2 horas no horário
+  let isDuasHoras = false;
+  if (horario) {
+    const horarioParts = horario.split('-');
+    if (horarioParts.length === 2) {
+      const inicio = horarioParts[0].trim();
+      const fim = horarioParts[1].trim();
+      
+      // Converter horários para minutos
+      const [inicioHora, inicioMin] = inicio.split(':').map(Number);
+      const [fimHora, fimMin] = fim.split(':').map(Number);
+      
+      const inicioMinutos = inicioHora * 60 + (inicioMin || 0);
+      const fimMinutos = fimHora * 60 + (fimMin || 0);
+      
+      // Verificar se a diferença é de 2 horas (120 minutos)
+      const diferencaMinutos = fimMinutos - inicioMinutos;
+      isDuasHoras = diferencaMinutos === 120;
+    }
+  }
+
+  // Se há diferença de 2 horas e são 36 aulas, cada dia vale como 2 dias
+  let aulasParaCalcular = totalClasses;
+  if (isDuasHoras && totalClasses === 36) {
+    aulasParaCalcular = Math.ceil(totalClasses / 2); // 36 aulas / 2 = 18 dias de aula
+  }
+
   let classCount = 0;
   let currentDate = new Date(start);
   
@@ -37,7 +65,7 @@ export const calculateEndDate = (
   }
   
   // Para 1 aula total, a data de fim é a própria data de início (após ajuste para dia válido)
-  if (totalClasses === 1) {
+  if (aulasParaCalcular === 1) {
     return currentDate.toISOString().split('T')[0];
   }
   
@@ -45,7 +73,7 @@ export const calculateEndDate = (
   classCount = 1;
   
   // Calcular as aulas restantes
-  while (classCount < totalClasses) {
+  while (classCount < aulasParaCalcular) {
     currentDate.setDate(currentDate.getDate() + 1);
     
     if (classDays.includes(currentDate.getDay())) {
@@ -174,7 +202,8 @@ const doesHolidayAffectClasses = (
 export const calculateEndDateWithHolidays = (
   startDate: string,
   totalClasses: number,
-  weekDays: string[]
+  weekDays: string[],
+  horario?: string // Parâmetro opcional para verificar diferença de horário
 ): { endDate: string; holidaysFound: Date[] } => {
   if (!startDate || !totalClasses || weekDays.length === 0) {
     return { endDate: '', holidaysFound: [] };
@@ -197,6 +226,33 @@ export const calculateEndDateWithHolidays = (
     return { endDate: '', holidaysFound: [] };
   }
 
+  // Verificar se há diferença de 2 horas no horário
+  let isDuasHoras = false;
+  if (horario) {
+    const horarioParts = horario.split('-');
+    if (horarioParts.length === 2) {
+      const inicio = horarioParts[0].trim();
+      const fim = horarioParts[1].trim();
+      
+      // Converter horários para minutos
+      const [inicioHora, inicioMin] = inicio.split(':').map(Number);
+      const [fimHora, fimMin] = fim.split(':').map(Number);
+      
+      const inicioMinutos = inicioHora * 60 + (inicioMin || 0);
+      const fimMinutos = fimHora * 60 + (fimMin || 0);
+      
+      // Verificar se a diferença é de 2 horas (120 minutos)
+      const diferencaMinutos = fimMinutos - inicioMinutos;
+      isDuasHoras = diferencaMinutos === 120;
+    }
+  }
+
+  // Se há diferença de 2 horas e são 36 aulas, cada dia vale como 2 dias
+  let aulasParaCalcular = totalClasses;
+  if (isDuasHoras && totalClasses === 36) {
+    aulasParaCalcular = Math.ceil(totalClasses / 2); // 36 aulas / 2 = 18 dias de aula
+  }
+
   let classCount = 0;
   let currentDate = new Date(start);
   const holidaysFound: Date[] = [];
@@ -213,14 +269,14 @@ export const calculateEndDateWithHolidays = (
   }
   
   // Contar aulas e detectar feriados que realmente afetam as aulas programadas
-  while (classCount < totalClasses) {
+  while (classCount < aulasParaCalcular) {
     if (classDays.includes(currentDate.getDay())) {
       if (isHoliday(currentDate)) {
         // Feriado detectado em dia de aula programada
         const holidayDate = new Date(currentDate);
         
         // Verificar se este feriado realmente afeta as aulas programadas
-        if (doesHolidayAffectClasses(holidayDate, start, totalClasses, classDays)) {
+        if (doesHolidayAffectClasses(holidayDate, start, aulasParaCalcular, classDays)) {
           // Verificar se já não temos este feriado na lista (evitar duplicatas)
           const alreadyExists = holidaysFound.some(h => 
             h.getTime() === holidayDate.getTime()
@@ -236,7 +292,7 @@ export const calculateEndDateWithHolidays = (
     }
     
     // Se ainda não completamos todas as aulas, avançar para o próximo dia
-    if (classCount < totalClasses) {
+    if (classCount < aulasParaCalcular) {
       currentDate.setDate(currentDate.getDate() + 1);
     }
   }
