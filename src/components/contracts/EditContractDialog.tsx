@@ -181,14 +181,7 @@ export const EditContractDialog = ({ contract, onContractUpdated }: EditContract
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.aluno_id || !formData.data_inicio || !formData.data_fim || !formData.valor_mensalidade) {
-      toast({
-        title: "Erro",
-        description: "Preencha todos os campos obrigatórios.",
-        variant: "destructive",
-      });
-      return;
-    }
+    // Removido validação de campos obrigatórios para permitir salvamento sem restrições
 
     try {
       setLoading(true);

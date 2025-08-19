@@ -190,6 +190,9 @@ const StudentContractGeneratorModal = ({ student, isOpen, onClose }: StudentCont
   };
 
   const getContractTitle = () => {
+    if (selectedContract === 'contrato_particulares') {
+      return 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS EDUCACIONAIS – AULAS PARTICULARES';
+    }
     return selectedContract === 'contrato2' 
       ? 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS EDUCACIONAIS – CONTRATO 2'
       : `CONTRATO DE PRESTAÇÃO DE SERVIÇOS EDUCACIONAIS – ${planData?.nome || 'PLANO PADRÃO'}`;
@@ -285,6 +288,54 @@ const StudentContractGeneratorModal = ({ student, isOpen, onClose }: StudentCont
     
     // Nova logo como base64
     const logoBase64 = "data:image/svg+xml;base64,PCFET0NUWVBFIHN2ZyBQVUJMSUMgIi0vL1czQy8vRFREIFNWRyAyMDAxMDkwNC8vRU4iCiAiaHR0cDovL3d3dy53My5vcmcvVFIvMjAwMS9SRUMtU1ZHLTIwMDEwOTA0L0RURC9zdmcxMC5kdGQiPgo8c3ZnIHZlcnNpb249IjEuMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIgogd2lkdGg9IjE5My4wMDAwMDBwdCIgaGVpZ2h0PSIxMzEuMDAwMDAwcHQiIHZpZXdCb3g9IjAgMCAxOTMuMDAwMDAwIDEzMS4wMDAwMDAiCiBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJ4TWlkWU1pZCBtZWV0Ij4KCjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDAuMDAwMDAwLDEzMS4wMDAwMDApIHNjYWxlKDAuMTAwMDAwLC0wLjEwMDAwMCkiCmZpbGw9IiMwMDAwMDAiIHN0cm9rZT0ibm9uZSI+CjxwYXRoIGQ9Ik00NzggMTEyNCBjLTQwIC0yMSAtNDQgLTUzIC0xNSAtMTI2IDI5IC03MyA0MiAtMTIyIDUyIC0xOTMgNCAtMjcKMTUgLTY5IDI1IC05MiAxNyAtMzkgMjIgLTQzIDU0IC00MyAyNSAwIDM2IC00IDM2IC0xNSAwIC04IC02IC0xNSAtMTQgLTE1Ci0yMCAwIC02MSAtODcgLTQ4IC0xMDMgMTcgLTIyIDIwIC01NiA2IC02OCAtMTIgLTEwIC05IC0xNSAxNiAtMzEgMjUgLTE1IDMxCi0yNCAyOCAtNDggLTIgLTE5IDUgLTM3IDE5IC01MiAxMSAtMTMgMjQgLTMyIDI3IC00NCA3IC0yMSAtMjQgLTEyMyAtNDkgLTE2MAotMTIgLTE5IC0xMiAtMjQgMCAtMzQgMTYgLTE0IDEzIC0xOSA0MSA2OCAyMiA2OCA0MCA4OSA2MyA2OSAxNCAtMTMgNDYgLTIzCjkxIC0zMCA4IC0xIDE1IDUgMTYgMTMgMyAzNiA1IDQwIDIzIDQwIDE1IDAgMjUgMjEgNTAgMTAzIDE4IDU2IDQyIDEzNCA1NQoxNzIgbDIzIDcwIDcgLTU1IGM0IC0zMCAxMiAtNzEgMTkgLTkwIGwxMSAtMzUgNyAzMCBjNCAxNyA3IDUwIDggNzUgMiA2NyAxNwo4MyAyOCAzMCA3IC0zNiAxNCAtNDYgNDYgLTYzIDM1IC0xOCA0MCAtMTggNTQgLTQgMjMgMjIgMTIgNDAgLTUxIDgyIC03OSA1Mgo5MCA5MyAtNDkgMTgyIDI1IDU0IDEyMiA4MSAxODggNTEgMjggLTEzIDUwIC03NSA0MSAtMTE0IC02IC0yMSAtMTIgLTI0IC01MAotMjQgLTQ1IDAgLTU2IDEwIC01NiA1MSAwIDEyIC01IDE2IC0xNSAxMyAtMjIgLTkgLTE4IC00OCA4IC03MiAxMyAtMTIgMjgKLTIyIDMzIC0yMiAyNSAwIDY2IC02MCA3MSAtMTA0IDEwIC04OCAtNjAgLTE0OCAtMTU1IC0xMzIgbC0zNCA1IDcgLTQ3IGMxMAotNjggMzAgLTEwMiA2MCAtMTAyIDIyIDAgMjUgLTQgMjUgLTM1IDAgLTM0IDIwIC00OSAzNSAtMjUgMyA1IDE3IDEwIDMwIDEwCjEzIDAgMjcgNSAzMCAxMCAxMCAxNiAzMyAxMiA1NSAtMTAgMTQgLTE0IDIwIC0zMyAyMCAtNjQgMCAtMjYgNiAtNDggMTUgLTU2CjI2IC0yMSAyOSAxNCA2IDc1IC0yNyA3MyAtMjggMTM5IC0xIDE2MiAxMyAxMiAyMCAzMCAyMCA1NSAwIDI2IDYgNDEgMjEgNTIKMTUgMTAgMjAgMjEgMTYgMzYgLTMgMTIgLTEgMzUgNSA1MSA5IDI1IDYgMzQgLTE0IDYyIC0xMyAxNyAtMjkgNDQgLTM2IDYwCi0xMSAyNiAtMTAgMjcgMTcgMjcgMTYgMCAzOCA4IDUwIDE4IDI0IDE5IDcxIDEzOCA3MSAxNzggMCAxMyA5IDU5IDIxIDEwMSAxMQo0MiAxOSA5MiAxNyAxMTIgLTMgMzIgLTcgMzcgLTQwIDQ4IC0zMiAxMCAtNDYgOSAtOTUgLTcgLTMyIC0xMSAtNzQgLTI4IC05MwotMzggLTg3IC00MyAtMjMwIC0xNzkgLTI3MCAtMjU3IC0yMiAtNDIgLTQwIC01OCAtNDAgLTM1IDAgNiAtNCAxMCAtOSAxMCAtNgowIC0xMSAtMTUgLTEzIC0zMiAtMyAtMzIgLTUgLTMzIC01MCAtMzYgbC00OCAtMyAwIC02MiBjLTEgLTc5IC0xMCAtMjM4IC0xNgotMjU1IC0yIC05IC0xOSAtMTIgLTUxIC0xMCBsLTQ4IDMgNCAxNTkgMyAxNTkgLTIzIC04IGMtMzkgLTEyIC03NCAtMTEgLTczIDMKMSA2IDIgMzIgMyA1NyBsMSA0NSAxMjQgMCAxMjUgMCAtMTIgMjMgYy0yMSAzOSAtOTYgMTI4IC0xNDUgMTcxIC01OSA1MyAtMTEzCjgxIC0yMDUgMTA2IC04NCAyMyAtNzUgMjMgLTEwOSA0eiIvPgo8L2c+Cjwvc3ZnPgo=";
+
+    if (selectedContract === 'contrato_particulares') {
+      // Contrato de Aulas Particulares - baseado no arquivo fornecido
+      return `<div style="text-align: center; margin-bottom: 30px;">
+        <img src="${logoBase64}" alt="Teen Speech Logo" style="width: 60px; height: 60px; margin: 0 auto; display: block;" />
+        <h3 style="margin: 10px 0; fontSize: 16px; fontWeight: bold;">TEEN SPEECH – ESCOLA DE IDIOMAS</h3>
+      </div>
+
+      <h3 style="text-align: center; margin: 20px 0;">CONTRATO DE PRESTAÇÃO DE SERVIÇOS EDUCACIONAIS</h3>
+
+      <p style="text-align: justify; margin-bottom: 20px;">O presente Contrato de Prestação de Serviços Educacionais tem por objetivo formalizar a relação jurídica entre a TS SCHOOL (doravante denominada CONTRATADA) e o ALUNO(A) (doravante denominado CONTRATANTE), estabelecendo os termos, condições, direitos e obrigações para a prestação de serviços de aulas particulares de inglês. Este instrumento visa proporcionar segurança e clareza na aquisição e usufruto dos pacotes de aulas, conforme detalhado no Anexo I. O CONTRATANTE terá acesso a aulas ministradas por profissionais qualificados em um dia e horário fixos, previamente escolhidos e reservados no ato da matrícula, com a possibilidade de alternar entre modalidades (online ou presencial) sob certas condições, bem como o benefício do 'Passe Livre' em planos específicos, sempre em conformidade com as regras estabelecidas neste contrato.</p>
+
+      <p style="margin-bottom: 20px;">Este Contrato de Prestação de Serviços Educacionais é celebrado em ____ de ______ de ______, na Comarca de Guarulhos, Estado de São Paulo, entre:</p>
+
+      <h4>I. DAS PARTES</h4>
+      <p><strong>1.</strong> TS SCHOOL, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 41.854.243/0001-74, com sede na Avenida Armando Bei, 465, CEP: 07175-000, Guarulhos/SP, doravante denominada CONTRATADA.</p>
+      <p><strong>2.</strong> ${student?.nome || '__________'} (nome), _________ (nacionalidade), __________________ (profissão), portador(a) do CPF nº ${student?.cpf || '_____________'}, residente e domiciliado(a) na ${student?.endereco || '____________'} (rua/avenida/estrada), ________ (número da residência), na cidade de _____________/(cidade e estado) CEP: ____________________, doravante denominado(a) CONTRATANTE ou ALUNO(A).</p>
+
+      <h4>II. DO OBJETO DO CONTRATO</h4>
+      <p>O presente contrato tem como objeto a prestação de serviços educacionais na modalidade de aulas particulares de inglês, a serem ministradas pela CONTRATADA ao CONTRATANTE, de acordo com os pacotes e condições estabelecidos na tabela de valores de "Aulas Particulares 2025" (Anexo I), que faz parte integrante e indissociável deste instrumento.</p>
+
+      <h4>III. DA DURAÇÃO E RENOVAÇÃO</h4>
+      <p><strong>1.</strong> O presente contrato terá a duração de 01 (um) ano, contado a partir da data de sua assinatura, ou seja, de _____ (data de início) a ______ (data de término).</p>
+      <p><strong>2.</strong> Ao término do prazo de 01 (um) ano, o presente contrato será automaticamente rescindido, não havendo renovação tácita.</p>
+      <p><strong>3.</strong> Caso haja interesse das partes na continuidade da prestação dos serviços, um novo contrato deverá ser celebrado. Na ocasião da celebração de um novo contrato, a CONTRATADA reserva-se o direito de reajustar os valores dos serviços oferecidos, caso necessário, com base em custos operacionais, inflação e condições de mercado.</p>
+
+      <div style="margin-top: 50px; page-break-inside: avoid;">
+        <div style="text-align: center; font-weight: bold; margin-bottom: 30px; font-size: 14px;">ASSINATURAS</div>
+        
+        <div style="display: flex; justify-content: space-between; gap: 60px; margin-bottom: 40px;">
+          <div style="flex: 1; text-align: center;">
+            <div style="height: 80px; border-bottom: 1px solid #000; margin-bottom: 15px;"></div>
+            <div style="font-weight: bold; font-size: 12px; margin-bottom: 5px;">${student?.nome || 'CONTRATANTE'}</div>
+            <div style="font-size: 11px; color: #666;">CONTRATANTE</div>
+          </div>
+          
+          <div style="flex: 1; text-align: center;">
+            <div style="height: 80px; border-bottom: 1px solid #000; margin-bottom: 15px;"></div>
+            <div style="font-weight: bold; font-size: 12px; margin-bottom: 5px;">TS SCHOOL</div>
+            <div style="font-size: 11px; color: #666;">CONTRATADA</div>
+          </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px;">
+          <p>VISTO: _________________________</p>
+        </div>
+      </div>`;
+    }
 
     if (selectedContract === 'contrato2') {
       // Contrato 2 - Versão simplificada
@@ -1009,6 +1060,15 @@ Ciente e de acordo,
                 >
                   Contrato de pretação
                 </Button>
+                {/* Mostrar opção de Contrato de Aulas Particulares apenas para alunos de turmas particulares */}
+                {student?.turma_particular && (
+                  <Button
+                    variant={selectedContract === 'contrato_particulares' ? 'default' : 'outline'}
+                    onClick={() => setSelectedContract('contrato_particulares')}
+                  >
+                    Contrato de Aulas Particulares
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
