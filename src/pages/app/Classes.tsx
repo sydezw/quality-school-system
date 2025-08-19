@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, BookCopy, Calendar, Clock, Globe, Book, Users, GraduationCap, AlertTriangle, CheckCircle, X, CalendarDays, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Edit, Trash2, BookCopy, Calendar, Clock, Globe, Book, Users, GraduationCap, AlertTriangle, CheckCircle, X, CalendarDays, Search, ChevronLeft, ChevronRight, Lock, Unlock } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { getIdiomaColor } from '@/utils/idiomaColors';
 import { calculateEndDate, calculateEndDateWithHolidays, parseDaysOfWeek, formatDateForDisplay, isHoliday } from '@/utils/dateCalculations';
@@ -82,6 +82,9 @@ const Classes = () => {
   const [selectedPlan, setSelectedPlan] = useState<string>('');
   const [classDataInicio, setClassDataInicio] = useState<string>('');
   const [classDataFim, setClassDataFim] = useState<string>('');
+  
+  // Estado para controlar se a data de fim está travada
+  const [isDataFimLocked, setIsDataFimLocked] = useState<boolean>(false);
   const { toast } = useToast();
 
   const { register, handleSubmit, reset, setValue, watch, getValues, control, formState: { errors } } = useForm({
@@ -314,8 +317,8 @@ const Classes = () => {
       setCalculatedEndDate(result.endDate);
       setDetectedHolidays(result.holidaysFound);
       
-      // Atualizar o campo data_fim apenas se não foi editado manualmente
-      if (!watchedDataFim || watchedDataFim === calculatedEndDate) {
+      // Atualizar o campo data_fim apenas se não foi editado manualmente e não está travado
+      if (!isDataFimLocked && (!watchedDataFim || watchedDataFim === calculatedEndDate)) {
         setValue('data_fim', result.endDate);
       }
       
@@ -326,7 +329,7 @@ const Classes = () => {
     } else {
       setCalculatedEndDate('');
       setDetectedHolidays([]);
-      if (!watchedDataFim) {
+      if (!isDataFimLocked && !watchedDataFim) {
         setValue('data_fim', '');
       }
     }
@@ -820,6 +823,7 @@ const Classes = () => {
       setSelectedPlan('');
       setClassDataInicio('');
       setClassDataFim('');
+      setIsDataFimLocked(false); // Reset do estado de trava
       
       // Recarregar lista de turmas
       await fetchClasses();
@@ -911,6 +915,25 @@ const Classes = () => {
 
   const openStudentsDialog = async (classItem: Class) => {
     setSelectedClassForStudents(classItem);
+    
+    // Carregar dados da turma no formulário para exibição
+    reset({
+      nome: classItem.nome,
+      idioma: classItem.idioma,
+      nivel: classItem.nivel || '',
+      dias_da_semana: classItem.dias_da_semana,
+      horario: classItem.horario,
+      professor_id: classItem.professor_id || 'none',
+      tipo_turma: classItem.tipo_turma || 'Turma',
+      data_inicio: classItem.data_inicio || '',
+      total_aulas: classItem.total_aulas || 0,
+      data_fim: classItem.data_fim || ''
+    });
+    
+    // Determinar estado de trava baseado se a turma tem data_fim definida
+    const hasExistingEndDate = classItem.data_fim && classItem.data_fim.trim() !== '';
+    setIsDataFimLocked(hasExistingEndDate);
+    
     setIsStudentsDialogOpen(true);
     await fetchClassStudents(classItem.id);
   };
@@ -1344,6 +1367,11 @@ const Classes = () => {
       setCalculatedEndDate(endDate);
     }
     
+    // Determinar estado de trava baseado se a turma tem data_fim definida no banco
+    // Se a turma já tem data_fim salva, inicia como travada para preservar o valor manual
+    const hasExistingEndDate = classItem.data_fim && classItem.data_fim.trim() !== '';
+    setIsDataFimLocked(hasExistingEndDate);
+    
     setIsDialogOpen(true);
   };
 
@@ -1372,6 +1400,7 @@ const Classes = () => {
     setSelectedPlan('');
     setClassDataInicio('');
     setClassDataFim('');
+    setIsDataFimLocked(false); // Reset do estado de trava
     
     // Abrir o modal
     setIsDialogOpen(true);
@@ -1911,6 +1940,7 @@ const Classes = () => {
                     reset();
                     setSelectedMaterials([]);
                     setSelectedDays([]);
+                    setIsDataFimLocked(false); // Reset do estado de trava
                   }}
                   className="px-6 flex items-center gap-2"
                   disabled={loading}
@@ -2460,17 +2490,54 @@ const Classes = () => {
 
                  {/* Data de Fim */}
                  <div>
-                   <Label htmlFor="data_fim" className="text-sm font-medium text-gray-700">
-                     Data de Fim
-                     <span className="text-xs text-gray-500 ml-1">(Automática)</span>
-                   </Label>
+                   <div className="flex items-center justify-between mb-1">
+                     <Label htmlFor="data_fim" className="text-sm font-medium text-gray-700">
+                       Data de Fim
+                       {!isDataFimLocked && (
+                         <span className="text-xs text-gray-500 ml-1">(Automática)</span>
+                       )}
+                       {isDataFimLocked && (
+                         <span className="text-xs text-orange-600 ml-1">(Travada)</span>
+                       )}
+                     </Label>
+                     <Button
+                       type="button"
+                       variant="outline"
+                       size="sm"
+                       onClick={() => setIsDataFimLocked(!isDataFimLocked)}
+                       className={`h-7 px-2 flex items-center gap-1 ${
+                         isDataFimLocked 
+                           ? 'bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100' 
+                           : 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
+                       }`}
+                       title={isDataFimLocked ? 'Clique para destravar a data de fim' : 'Clique para travar a data de fim'}
+                     >
+                       {isDataFimLocked ? (
+                         <>
+                           <Lock className="h-3 w-3" />
+                           <span className="text-xs">Travada</span>
+                         </>
+                       ) : (
+                         <>
+                           <Unlock className="h-3 w-3" />
+                           <span className="text-xs">Automática</span>
+                         </>
+                       )}
+                     </Button>
+                   </div>
                    <Input
-                     id="data_fim"
-                     type="date"
-                     {...register('data_fim')}
-                     className="mt-1"
-                     placeholder="Será calculada automaticamente"
-                   />
+                      id="data_fim"
+                      type="date"
+                      {...register('data_fim')}
+                      className={`mt-1 ${
+                        isDataFimLocked 
+                          ? 'bg-gray-50 cursor-not-allowed' 
+                          : 'border-green-300 bg-white focus:border-green-500 focus:ring-green-500'
+                      }`}
+                      placeholder={isDataFimLocked ? "Será calculada automaticamente" : "Digite a data de fim"}
+                      disabled={isDataFimLocked}
+                      readOnly={isDataFimLocked}
+                    />
                    {calculatedEndDate && (
                      <div className="mt-1 flex items-center gap-1">
                        <CheckCircle className="h-4 w-4 text-green-500" />

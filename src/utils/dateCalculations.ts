@@ -11,7 +11,9 @@ export const calculateEndDate = (
     return '';
   }
 
-  const start = new Date(startDate);
+  // Criar data evitando problemas de fuso horário
+  const [year, month, day] = startDate.split('-').map(Number);
+  const start = new Date(year, month - 1, day); // month é 0-indexed
   const daysOfWeek = {
     'Domingo': 0,
     'Segunda': 1,
@@ -32,7 +34,12 @@ export const calculateEndDate = (
   // Verificar se há diferença de 2 horas no horário
   let isDuasHoras = false;
   if (horario) {
-    const horarioParts = horario.split('-');
+    // Aceitar tanto '-' quanto 'às' como separador
+    let horarioParts = horario.split('-');
+    if (horarioParts.length === 1) {
+      horarioParts = horario.split(' às ');
+    }
+    
     if (horarioParts.length === 2) {
       const inicio = horarioParts[0].trim();
       const fim = horarioParts[1].trim();
@@ -50,10 +57,10 @@ export const calculateEndDate = (
     }
   }
 
-  // Se há diferença de 2 horas e são 36 aulas, cada dia vale como 2 dias
+  // Se há diferença de 2 horas, cada dia vale como 2 dias (independente do número de aulas)
   let aulasParaCalcular = totalClasses;
-  if (isDuasHoras && totalClasses === 36) {
-    aulasParaCalcular = Math.ceil(totalClasses / 2); // 36 aulas / 2 = 18 dias de aula
+  if (isDuasHoras) {
+    aulasParaCalcular = Math.ceil(totalClasses / 2); // Cada dia vale como 2 aulas
   }
 
   let classCount = 0;
@@ -209,7 +216,9 @@ export const calculateEndDateWithHolidays = (
     return { endDate: '', holidaysFound: [] };
   }
 
-  const start = new Date(startDate);
+  // Criar data evitando problemas de fuso horário
+  const [year, month, day] = startDate.split('-').map(Number);
+  const start = new Date(year, month - 1, day); // month é 0-indexed
   const daysOfWeek = {
     'Domingo': 0,
     'Segunda': 1,
@@ -229,7 +238,12 @@ export const calculateEndDateWithHolidays = (
   // Verificar se há diferença de 2 horas no horário
   let isDuasHoras = false;
   if (horario) {
-    const horarioParts = horario.split('-');
+    // Aceitar tanto '-' quanto 'às' como separador
+    let horarioParts = horario.split('-');
+    if (horarioParts.length === 1) {
+      horarioParts = horario.split(' às ');
+    }
+    
     if (horarioParts.length === 2) {
       const inicio = horarioParts[0].trim();
       const fim = horarioParts[1].trim();
@@ -247,10 +261,10 @@ export const calculateEndDateWithHolidays = (
     }
   }
 
-  // Se há diferença de 2 horas e são 36 aulas, cada dia vale como 2 dias
+  // Se há diferença de 2 horas, cada dia vale como 2 dias (independente do número de aulas)
   let aulasParaCalcular = totalClasses;
-  if (isDuasHoras && totalClasses === 36) {
-    aulasParaCalcular = Math.ceil(totalClasses / 2); // 36 aulas / 2 = 18 dias de aula
+  if (isDuasHoras) {
+    aulasParaCalcular = Math.ceil(totalClasses / 2); // Cada dia vale como 2 aulas
   }
 
   let classCount = 0;
