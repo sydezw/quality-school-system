@@ -262,14 +262,27 @@ export const calculateEndDateWithHolidays = (
     currentDate.setDate(currentDate.getDate() + 1);
   }
   
+  // Para 1 aula total, a data de fim é a própria data de início (após ajuste para dia válido)
+  if (aulasParaCalcular === 1) {
+    return {
+      endDate: currentDate.toISOString().split('T')[0],
+      holidaysFound: []
+    };
+  }
+  
   // Verificar se a própria data de início é um feriado
   if (isHoliday(currentDate) && classDays.includes(currentDate.getDay())) {
     const startHoliday = new Date(currentDate);
     holidaysFound.push(startHoliday);
+  } else {
+    // Contar a primeira aula se não for feriado
+    classCount = 1;
   }
   
   // Contar aulas e detectar feriados que realmente afetam as aulas programadas
   while (classCount < aulasParaCalcular) {
+    currentDate.setDate(currentDate.getDate() + 1);
+    
     if (classDays.includes(currentDate.getDay())) {
       if (isHoliday(currentDate)) {
         // Feriado detectado em dia de aula programada
@@ -289,11 +302,6 @@ export const calculateEndDateWithHolidays = (
         // Dia normal de aula - contar
         classCount++;
       }
-    }
-    
-    // Se ainda não completamos todas as aulas, avançar para o próximo dia
-    if (classCount < aulasParaCalcular) {
-      currentDate.setDate(currentDate.getDate() + 1);
     }
   }
   
