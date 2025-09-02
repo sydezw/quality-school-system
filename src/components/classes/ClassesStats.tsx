@@ -50,7 +50,7 @@ interface PresencaStats {
   totalPresencas: number;
   presencasConfirmadas: number;
   faltas: number;
-  faltasJustificadas: number;
+  faltasRepostas: number;
   percentualPresenca: number;
 }
 
@@ -87,7 +87,7 @@ const ClassesStats = () => {
     totalPresencas: 0,
     presencasConfirmadas: 0,
     faltas: 0,
-    faltasJustificadas: 0,
+    faltasRepostas: 0,
     percentualPresenca: 0
   });
   
@@ -280,7 +280,6 @@ const ClassesStats = () => {
         .from('presencas')
         .select(`
           status,
-          justificativa,
           aulas (
             data,
             turma_id
@@ -309,14 +308,10 @@ const ClassesStats = () => {
             acc.presencasConfirmadas++;
             break;
           case 'Falta':
-            if (presenca.justificativa) {
-              acc.faltasJustificadas++;
-            } else {
-              acc.faltas++;
-            }
+            acc.faltas++;
             break;
-          case 'Justificada':
-            acc.faltasJustificadas++;
+          case 'Reposta':
+            acc.faltasRepostas++;
             break;
         }
         
@@ -325,7 +320,7 @@ const ClassesStats = () => {
         totalPresencas: 0,
         presencasConfirmadas: 0,
         faltas: 0,
-        faltasJustificadas: 0,
+        faltasRepostas: 0,
         percentualPresenca: 0
       });
 
@@ -730,9 +725,9 @@ const ClassesStats = () => {
               
               <div className="text-center">
                 <p className="text-2xl font-bold text-yellow-600">
-                  {presencaStats.faltasJustificadas}
+                  {presencaStats.faltasRepostas}
                 </p>
-                <p className="text-sm text-gray-600">Faltas Justificadas</p>
+                <p className="text-sm text-gray-600">Faltas Repostas</p>
               </div>
             </div>
 
@@ -743,7 +738,7 @@ const ClassesStats = () => {
                     data={[
                       { name: 'Presenças', value: presencaStats.presencasConfirmadas, color: '#10B981' },
                       { name: 'Faltas', value: presencaStats.faltas, color: '#EF4444' },
-                      { name: 'Faltas Justificadas', value: presencaStats.faltasJustificadas, color: '#F59E0B' }
+                      { name: 'Faltas Repostas', value: presencaStats.faltasRepostas, color: '#F59E0B' }
                     ]}
                     cx="50%"
                     cy="50%"
@@ -755,7 +750,7 @@ const ClassesStats = () => {
                     {[
                       { name: 'Presenças', value: presencaStats.presencasConfirmadas, color: '#10B981' },
                       { name: 'Faltas', value: presencaStats.faltas, color: '#EF4444' },
-                      { name: 'Faltas Justificadas', value: presencaStats.faltasJustificadas, color: '#F59E0B' }
+                      { name: 'Faltas Repostas', value: presencaStats.faltasRepostas, color: '#F59E0B' }
                     ].map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}

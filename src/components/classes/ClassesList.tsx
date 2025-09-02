@@ -12,6 +12,7 @@ import { Tables } from '@/integrations/supabase/types';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { NewLessonDialog } from './NewLessonDialog';
+import { AulaDetailsModal } from './AulaDetailsModal';
 import { useAulas } from '@/hooks/useAulas';
 import { useMultipleSelection } from '@/hooks/useMultipleSelection';
 import { MultipleSelectionBar } from '@/components/shared/MultipleSelectionBar';
@@ -31,6 +32,7 @@ interface TurmaComProfessor {
   cor_calendario: string;
   professor_id: string;
   status: string;
+  total_aulas: number | null;
   professores: {
     id: string;
     nome: string;
@@ -97,6 +99,10 @@ const ClassesList = () => {
   // Estados para modais de confirmação
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Estados para modal de detalhes da aula
+  const [showAulaModal, setShowAulaModal] = useState(false);
+  const [selectedAula, setSelectedAula] = useState<AulaComDetalhes | null>(null);
 
 
 
@@ -241,6 +247,14 @@ const ClassesList = () => {
       setSortBy(column);
       setSortOrder('asc');
     }
+  };
+
+  /**
+   * Abre o modal de detalhes da aula
+   */
+  const handleOpenAulaDetails = (aula: AulaComDetalhes) => {
+    setSelectedAula(aula);
+    setShowAulaModal(true);
   };
 
   /**
@@ -629,14 +643,16 @@ const ClassesList = () => {
                     )}
                     
                     <div className="flex gap-2 mt-4">
-                      <Button size="sm" variant="outline" className="flex-1 h-10 text-sm rounded-lg">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="flex-1 h-10 text-sm rounded-lg"
+                        onClick={() => handleOpenAulaDetails(aula)}
+                      >
                         <Edit className="h-4 w-4 mr-2" />
-                        Editar
+                        Detalhes
                       </Button>
-                      <Button size="sm" variant="outline" className="flex-1 h-10 text-sm rounded-lg">
-                        <Users className="h-4 w-4 mr-2" />
-                        Presença
-                      </Button>
+                      <h1>Tab de presenças</h1>
                       <Button 
                         size="sm" 
                         variant="outline" 
@@ -780,11 +796,13 @@ const ClassesList = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleOpenAulaDetails(aula)}
+                          title="Ver detalhes e controlar presença"
+                        >
                           <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          <Users className="h-3 w-3" />
                         </Button>
                         <Button 
                           variant="outline" 
@@ -893,6 +911,17 @@ const ClassesList = () => {
         itemCount={selectedCount}
         itemName="aula"
         isLoading={deleteLoading}
+      />
+
+      {/* Modal unificado de detalhes da aula */}
+      <AulaDetailsModal
+        aula={selectedAula}
+        isOpen={showAulaModal}
+        onClose={() => setShowAulaModal(false)}
+        onEdit={(aula) => {
+          // TODO: Implementar edição da aula
+          console.log('Editar aula:', aula);
+        }}
       />
     </div>
   );

@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -15,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { useMultipleSelection } from '@/hooks/useMultipleSelection';
 import { MultipleSelectionBar } from '@/components/shared/MultipleSelectionBar';
 import { useAulas } from '@/hooks/useAulas';
+import { AulaDetailsModal } from './AulaDetailsModal';
 
 // FullCalendar imports
 import FullCalendar from '@fullcalendar/react';
@@ -225,13 +225,31 @@ const ClassesCalendar = () => {
       
       const tituloCompleto = `${isSelectedItem && isSelectionMode ? '✓ ' : ''}${nomeTurmaProcessado}`;
       
+      // Determinar cor baseada no tipo de aula
+      let backgroundColor = aula.turmas?.cor_calendario || '#6B7280';
+      let borderColor = aula.turmas?.cor_calendario || '#6B7280';
+      
+      if (aula.tipo_aula === 'avaliativa') {
+        backgroundColor = '#16A34A'; // Verde
+        borderColor = '#15803D';
+      } else if (aula.tipo_aula === 'prova_final') {
+        backgroundColor = '#2563EB'; // Azul
+        borderColor = '#1D4ED8';
+      }
+      
+      // Se estiver selecionada no modo de seleção, usar cor vermelha
+      if (isSelectedItem && isSelectionMode) {
+        backgroundColor = '#DC2626';
+        borderColor = '#B91C1C';
+      }
+      
       return {
         id: aula.id,
         title: tituloCompleto,
         start: `${aula.data}${startTime}`,
         end: `${aula.data}${endTime}`,
-        backgroundColor: isSelectedItem && isSelectionMode ? '#DC2626' : (aula.turmas?.cor_calendario || '#6B7280'),
-        borderColor: isSelectedItem && isSelectionMode ? '#B91C1C' : (aula.turmas?.cor_calendario || '#6B7280'),
+        backgroundColor,
+        borderColor,
         textColor: '#FFFFFF',
         extendedProps: {
           aula: aula,
@@ -239,7 +257,8 @@ const ClassesCalendar = () => {
           idioma: aula.turmas?.idioma,
           nivel: aula.turmas?.nivel,
           status: aula.status,
-          descricao: aula.descricao
+          descricao: aula.descricao,
+          tipo_aula: aula.tipo_aula
         }
       };
     });
@@ -928,220 +947,16 @@ const ClassesCalendar = () => {
         </Card>
       </motion.div>
 
-      {/* Modal de detalhes da aula */}
-      <Dialog open={showAulaModal} onOpenChange={setShowAulaModal}>
-        <DialogContent className="max-w-2xl border-0 shadow-2xl bg-gradient-to-br from-white to-gray-50">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
-          >
-            <DialogHeader className="pb-6">
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.4, delay: 0.1 }}
-              >
-                <DialogTitle className="flex items-center gap-3 text-xl">
-                  <div className="p-2 bg-gradient-to-br from-[#D90429] to-[#B8001F] rounded-lg shadow-lg">
-                    <Calendar className="h-5 w-5 text-white" />
-                  </div>
-                  <span className="bg-gradient-to-r from-[#D90429] to-[#B8001F] bg-clip-text text-transparent font-bold">
-                    Detalhes da Aula
-                  </span>
-                </DialogTitle>
-              </motion.div>
-            </DialogHeader>
-            
-            {selectedAula && (
-              <motion.div 
-                className="space-y-6"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.4, delay: 0.2 }}
-              >
-                {/* Informações principais */}
-                <motion.div 
-                  className="grid grid-cols-1 md:grid-cols-2 gap-6"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.3 }}
-                >
-                  <motion.div 
-                    className="space-y-2"
-                    whileHover={{ scale: 1.02 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <label className="text-sm font-semibold text-[#D90429] uppercase tracking-wide">Título</label>
-                    <div className="p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
-                      <p className="text-gray-900 font-medium">{selectedAula.titulo || 'Sem título'}</p>
-                    </div>
-                  </motion.div>
-                  
-                  <motion.div 
-                    className="space-y-2"
-                    whileHover={{ scale: 1.02 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <label className="text-sm font-semibold text-[#D90429] uppercase tracking-wide">Status</label>
-                    <div className="p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
-                      <Badge 
-                        variant={selectedAula.status === 'concluida' ? 'default' : 'secondary'}
-                        className={`${
-                          selectedAula.status === 'concluida' 
-                            ? 'bg-gradient-to-r from-green-500 to-green-600 text-white' 
-                            : selectedAula.status === 'cancelada'
-                            ? 'bg-gradient-to-r from-red-500 to-red-600 text-white'
-                            : 'bg-gradient-to-r from-[#D90429] to-[#B8001F] text-white'
-                        } font-medium px-3 py-1`}
-                      >
-                        {selectedAula.status}
-                      </Badge>
-                    </div>
-                  </motion.div>
-                  
-                  <motion.div 
-                    className="space-y-2"
-                    whileHover={{ scale: 1.02 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <label className="text-sm font-semibold text-[#D90429] uppercase tracking-wide flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      Data
-                    </label>
-                    <div className="p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
-                      <p className="text-gray-900 font-medium">{formatDate(selectedAula.data)}</p>
-                    </div>
-                  </motion.div>
-                  
-                  <motion.div 
-                    className="space-y-2"
-                    whileHover={{ scale: 1.02 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <label className="text-sm font-semibold text-[#D90429] uppercase tracking-wide flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      Horário
-                    </label>
-                    <div className="p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
-                      <p className="text-gray-900 font-medium">
-                        {formatTime(selectedAula.horario_inicio)} - {formatTime(selectedAula.horario_fim)}
-                      </p>
-                    </div>
-                  </motion.div>
-                  
-                  <motion.div 
-                    className="space-y-2"
-                    whileHover={{ scale: 1.02 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <label className="text-sm font-semibold text-[#D90429] uppercase tracking-wide flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      Turma
-                    </label>
-                    <div className="p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
-                      <p className="text-gray-900 font-medium">{selectedAula.turmas?.nome}</p>
-                    </div>
-                  </motion.div>
-                  
-                  <motion.div 
-                    className="space-y-2"
-                    whileHover={{ scale: 1.02 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <label className="text-sm font-semibold text-[#D90429] uppercase tracking-wide">Idioma/Nível</label>
-                    <div className="p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
-                      <p className="text-gray-900 font-medium">
-                        {selectedAula.turmas?.idioma} - {selectedAula.turmas?.nivel}
-                      </p>
-                    </div>
-                  </motion.div>
-                </motion.div>
-
-                {/* Descrição */}
-                {selectedAula.descricao && (
-                  <motion.div 
-                    className="space-y-2"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: 0.4 }}
-                    whileHover={{ scale: 1.01 }}
-                  >
-                    <label className="text-sm font-semibold text-[#D90429] uppercase tracking-wide">Descrição</label>
-                    <div className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
-                      <p className="text-gray-900 leading-relaxed">{selectedAula.descricao}</p>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* Material necessário */}
-                {selectedAula.material_necessario && (
-                  <motion.div 
-                    className="space-y-2"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: 0.5 }}
-                    whileHover={{ scale: 1.01 }}
-                  >
-                    <label className="text-sm font-semibold text-[#D90429] uppercase tracking-wide">Material Necessário</label>
-                    <div className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
-                      <p className="text-gray-900 leading-relaxed">{selectedAula.material_necessario}</p>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* Observações */}
-                {selectedAula.observacoes && (
-                  <motion.div 
-                    className="space-y-2"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: 0.6 }}
-                    whileHover={{ scale: 1.01 }}
-                  >
-                    <label className="text-sm font-semibold text-[#D90429] uppercase tracking-wide">Observações</label>
-                    <div className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
-                      <p className="text-gray-900 leading-relaxed">{selectedAula.observacoes}</p>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* Ações */}
-                <motion.div 
-                  className="flex justify-end gap-3 pt-6 border-t border-gray-200"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.7 }}
-                >
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <Button 
-                      variant="outline" 
-                      className="flex items-center gap-2 border-[#D90429] text-[#D90429] hover:bg-[#D90429] hover:text-white transition-all duration-300 shadow-lg hover:shadow-xl"
-                    >
-                      <Edit className="h-4 w-4" />
-                      Editar Aula
-                    </Button>
-                  </motion.div>
-                  
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <Button className="flex items-center gap-2 bg-gradient-to-r from-[#D90429] to-[#B8001F] hover:from-[#B8001F] hover:to-[#A0001A] text-white shadow-lg hover:shadow-xl transition-all duration-300">
-                      <Users className="h-4 w-4" />
-                      Controlar Presença
-                    </Button>
-                  </motion.div>
-                </motion.div>
-              </motion.div>
-            )}
-          </motion.div>
-        </DialogContent>
-      </Dialog>
+      {/* Modal unificado de detalhes da aula */}
+      <AulaDetailsModal
+        aula={selectedAula}
+        isOpen={showAulaModal}
+        onClose={() => setShowAulaModal(false)}
+        onEdit={(aula) => {
+          // TODO: Implementar edição da aula
+          console.log('Editar aula:', aula);
+        }}
+      />
 
       {/* Barra de seleção múltipla */}
        {isSelectionMode && (

@@ -330,11 +330,11 @@ export type Database = {
           horario_fim: string | null
           horario_inicio: string | null
           id: string
-          material_necessario: string | null
           observacoes: string | null
           professor_id: string | null
           semestre: string | null
           status: string | null
+          tipo_aula: Database["public"]["Enums"]["tipo_aula_enum"]
           titulo: string | null
           turma_id: string
           updated_at: string
@@ -347,11 +347,11 @@ export type Database = {
           horario_fim?: string | null
           horario_inicio?: string | null
           id?: string
-          material_necessario?: string | null
           observacoes?: string | null
           professor_id?: string | null
           semestre?: string | null
           status?: string | null
+          tipo_aula?: Database["public"]["Enums"]["tipo_aula_enum"]
           titulo?: string | null
           turma_id: string
           updated_at?: string
@@ -364,11 +364,11 @@ export type Database = {
           horario_fim?: string | null
           horario_inicio?: string | null
           id?: string
-          material_necessario?: string | null
           observacoes?: string | null
           professor_id?: string | null
           semestre?: string | null
           status?: string | null
+          tipo_aula?: Database["public"]["Enums"]["tipo_aula_enum"]
           titulo?: string | null
           turma_id?: string
           updated_at?: string
@@ -1002,6 +1002,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      documentos_contratos: {
+        Row: {
+          created_at: string | null
+          data: string | null
+          descricao: string | null
+          id: string
+          link_arquivo: string
+          nome_documento: string
+          status: string | null
+          tipo_documento: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          data?: string | null
+          descricao?: string | null
+          id?: string
+          link_arquivo: string
+          nome_documento: string
+          status?: string | null
+          tipo_documento: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          data?: string | null
+          descricao?: string | null
+          id?: string
+          link_arquivo?: string
+          nome_documento?: string
+          status?: string | null
+          tipo_documento?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       financeiro_alunos: {
         Row: {
@@ -1919,8 +1955,6 @@ export type Database = {
           aula_id: string
           created_at: string
           id: string
-          justificativa: string | null
-          observacoes: string | null
           status: Database["public"]["Enums"]["status_presenca"]
           updated_at: string
         }
@@ -1930,8 +1964,6 @@ export type Database = {
           aula_id: string
           created_at?: string
           id?: string
-          justificativa?: string | null
-          observacoes?: string | null
           status?: Database["public"]["Enums"]["status_presenca"]
           updated_at?: string
         }
@@ -1941,8 +1973,6 @@ export type Database = {
           aula_id?: string
           created_at?: string
           id?: string
-          justificativa?: string | null
-          observacoes?: string | null
           status?: Database["public"]["Enums"]["status_presenca"]
           updated_at?: string
         }
@@ -2489,7 +2519,7 @@ export type Database = {
           aluno_id: string | null
           aluno_nome: string | null
           faltas: number | null
-          faltas_justificadas: number | null
+          faltas_repostas: number | null
           percentual_presenca: number | null
           presencas: number | null
           total_aulas: number | null
@@ -2622,8 +2652,9 @@ export type Database = {
       status_material: "disponivel" | "indisponivel"
       status_notificacao: "enviada" | "pendente" | "erro"
       status_pagamento: "pago" | "pendente" | "vencido" | "cancelado"
-      status_presenca: "Presente" | "Falta" | "Justificada"
+      status_presenca: "Presente" | "Falta" | "Reposta"
       tipo_arquivamento: "renovacao" | "cancelamento" | "conclusao"
+      tipo_aula_enum: "normal" | "avaliativa" | "prova_final"
       tipo_documento:
         | "contrato"
         | "declaracao_matricula"
@@ -2800,8 +2831,9 @@ export const Constants = {
       status_material: ["disponivel", "indisponivel"],
       status_notificacao: ["enviada", "pendente", "erro"],
       status_pagamento: ["pago", "pendente", "vencido", "cancelado"],
-      status_presenca: ["Presente", "Falta", "Justificada"],
+      status_presenca: ["Presente", "Falta", "Reposta"],
       tipo_arquivamento: ["renovacao", "cancelamento", "conclusao"],
+      tipo_aula_enum: ["normal", "avaliativa", "prova_final"],
       tipo_documento: [
         "contrato",
         "declaracao_matricula",

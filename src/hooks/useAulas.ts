@@ -15,6 +15,7 @@ interface TurmaComProfessor {
   cor_calendario: string | null;
   professor_id: string | null;
   status: string | null;
+  total_aulas: number | null;
   professores: {
     id: string;
     nome: string;
@@ -80,6 +81,7 @@ export const useAulas = (): UseAulasReturn => {
             cor_calendario,
             professor_id,
             status,
+            total_aulas,
             professores (
               id,
               nome,

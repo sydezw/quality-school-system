@@ -82,6 +82,7 @@ interface GeneratedLesson {
   diaSemana: string;
   numero: number;
   isEditing?: boolean;
+  tipo_aula: 'normal' | 'avaliativa' | 'prova_final';
 }
 
 type CreationMode = 'single' | 'all';
@@ -321,6 +322,7 @@ export function NewLessonDialog({
           data: new Date(currentDate),
           diaSemana: currentDate.toLocaleDateString('pt-BR', { weekday: 'long' }),
           numero: lessonCount + 1,
+          tipo_aula: 'normal',
         });
         lessonCount++;
       }
@@ -388,6 +390,7 @@ export function NewLessonDialog({
           horario_inicio: selectedTurma?.horario.split('-')[0]?.trim() || '08:00:00',
           horario_fim: selectedTurma?.horario.split('-')[1]?.trim() || '09:00:00',
           semestre: values.semestre,
+          tipo_aula: 'normal',
         });
 
       if (error) throw error;
@@ -437,6 +440,7 @@ export function NewLessonDialog({
         horario_inicio: selectedTurma?.horario.split('-')[0]?.trim() || '08:00:00',
         horario_fim: selectedTurma?.horario.split('-')[1]?.trim() || '09:00:00',
         semestre: values.semestre,
+        tipo_aula: lesson.tipo_aula,
       }));
 
       const { error } = await supabase
@@ -823,10 +827,27 @@ export function NewLessonDialog({
                           <CardContent>
                             <div className="max-h-64 overflow-y-auto">
                               <div className="space-y-2">
-                                {generatedLessons.map((lesson) => (
-                                  <div key={lesson.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 transition-colors">
+                                {generatedLessons.map((lesson) => {
+                                  const getBgColor = () => {
+                                    switch (lesson.tipo_aula) {
+                                      case 'avaliativa': return 'bg-green-50 border-green-200 hover:bg-green-100';
+                                      case 'prova_final': return 'bg-blue-50 border-blue-200 hover:bg-blue-100';
+                                      default: return 'bg-white border-gray-200 hover:bg-gray-50';
+                                    }
+                                  };
+                                  
+                                  const getBadgeColor = () => {
+                                    switch (lesson.tipo_aula) {
+                                      case 'avaliativa': return 'bg-green-100 text-green-800 border-green-300';
+                                      case 'prova_final': return 'bg-blue-100 text-blue-800 border-blue-300';
+                                      default: return 'bg-gray-100 text-gray-800 border-gray-300';
+                                    }
+                                  };
+                                  
+                                  return (
+                                  <div key={lesson.id} className={`flex items-center justify-between p-3 rounded-lg transition-colors ${getBgColor()}`}>
                                     <div className="flex items-center space-x-3">
-                                      <Badge variant="outline" className="w-12 justify-center text-xs">
+                                      <Badge variant="outline" className={`w-12 justify-center text-xs ${getBadgeColor()}`}>
                                         {lesson.numero}
                                       </Badge>
                                       <div>
@@ -836,21 +857,78 @@ export function NewLessonDialog({
                                         <div className="text-xs text-gray-500 capitalize">
                                           {lesson.diaSemana}
                                         </div>
+                                        <div className="text-xs font-medium mt-1">
+                                          <span className={`px-2 py-1 rounded-full text-xs ${
+                                            lesson.tipo_aula === 'avaliativa' ? 'bg-green-100 text-green-700' :
+                                            lesson.tipo_aula === 'prova_final' ? 'bg-blue-100 text-blue-700' :
+                                            'bg-gray-100 text-gray-700'
+                                          }`}>
+                                            {lesson.tipo_aula === 'normal' ? 'Normal' :
+                                             lesson.tipo_aula === 'avaliativa' ? 'Avaliativa' :
+                                             'Prova Final'}
+                                          </span>
+                                        </div>
                                       </div>
                                     </div>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-8 w-8 p-0"
-                                      onClick={() => {
-                                        setGeneratedLessons(prev => prev.map(l => 
-                                          l.id === lesson.id ? { ...l, isEditing: true } : l
-                                        ));
-                                      }}
-                                    >
-                                      <Edit2 className="h-4 w-4" />
-                                    </Button>
+                                    <div className="flex items-center space-x-2">
+                                      <div className="flex space-x-1">
+                                        <Button
+                                          type="button"
+                                          variant={lesson.tipo_aula === 'normal' ? 'default' : 'outline'}
+                                          size="sm"
+                                          className="h-7 px-2 text-xs"
+                                          onClick={() => {
+                                            setGeneratedLessons(prev => prev.map(l => 
+                                              l.id === lesson.id ? { ...l, tipo_aula: 'normal' } : l
+                                            ));
+                                          }}
+                                        >
+                                          Normal
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant={lesson.tipo_aula === 'avaliativa' ? 'default' : 'outline'}
+                                          size="sm"
+                                          className={`h-7 px-2 text-xs ${
+                                            lesson.tipo_aula === 'avaliativa' ? 'bg-green-600 hover:bg-green-700' : 'hover:bg-green-50'
+                                          }`}
+                                          onClick={() => {
+                                            setGeneratedLessons(prev => prev.map(l => 
+                                              l.id === lesson.id ? { ...l, tipo_aula: 'avaliativa' } : l
+                                            ));
+                                          }}
+                                        >
+                                          Avaliativa
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant={lesson.tipo_aula === 'prova_final' ? 'default' : 'outline'}
+                                          size="sm"
+                                          className={`h-7 px-2 text-xs ${
+                                            lesson.tipo_aula === 'prova_final' ? 'bg-blue-600 hover:bg-blue-700' : 'hover:bg-blue-50'
+                                          }`}
+                                          onClick={() => {
+                                            setGeneratedLessons(prev => prev.map(l => 
+                                              l.id === lesson.id ? { ...l, tipo_aula: 'prova_final' } : l
+                                            ));
+                                          }}>
+                                          Prova Final
+                                        </Button>
+                                      </div>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 w-8 p-0"
+                                        onClick={() => {
+                                          setGeneratedLessons(prev => prev.map(l => 
+                                            l.id === lesson.id ? { ...l, isEditing: true } : l
+                                          ));
+                                        }}
+                                      >
+                                        <Edit2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
                                     
                                     {lesson.isEditing && (
                                       <div className="absolute inset-0 bg-white border rounded-lg p-2 flex items-center space-x-2 z-10">
@@ -878,7 +956,8 @@ export function NewLessonDialog({
                                       </div>
                                     )}
                                   </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </div>
                           </CardContent>
