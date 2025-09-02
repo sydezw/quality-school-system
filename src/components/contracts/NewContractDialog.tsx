@@ -160,69 +160,12 @@ export const NewContractDialog = ({ onContractCreated }: NewContractDialogProps)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.aluno_id || !formData.data_inicio || !formData.data_fim || !formData.plano_id) {
-      toast({
-        title: "Erro",
-        description: "Por favor, preencha todos os campos obrigatórios (Aluno, Datas e Plano).",
-        variant: "destructive",
-      });
-      return;
-    }
+    // Removido validações de campos obrigatórios, financeiro e contratos duplicados
+    // para permitir salvamento sem restrições
   
     setLoading(true);
     
     try {
-      // VALIDAÇÃO: Verificar se existe registro financeiro ativo para o idioma
-      if (formData.idioma_contrato) {
-        const { data: registroFinanceiro, error: financeiroError } = await supabase
-          .from('financeiro_alunos')
-          .select(`
-            id,
-            ativo_ou_encerrado,
-            planos!inner(idioma)
-          `)
-          .eq('aluno_id', formData.aluno_id)
-          .eq('ativo_ou_encerrado', 'ativo')
-          .eq('planos.idioma', formData.idioma_contrato);
-  
-        if (financeiroError) {
-          console.error('Erro ao verificar registro financeiro:', financeiroError);
-          throw new Error('Erro ao validar registro financeiro');
-        }
-  
-        if (!registroFinanceiro || registroFinanceiro.length === 0) {
-          toast({
-            title: "Registro Financeiro Necessário",
-            description: "É preciso ter primeiro o registro financeiro desse aluno com o idioma e plano selecionado antes de cadastrar o contrato.",
-            variant: "destructive",
-          });
-          setLoading(false);
-          return;
-        }
-      }
-  
-      // VALIDAÇÃO: Evitar contratos duplicados - SEMPRE EXECUTA AGORA
-      const { data: existingContracts, error: checkError } = await supabase
-        .from('contratos')
-        .select('id, status_contrato')
-        .eq('aluno_id', formData.aluno_id)
-        .eq('plano_id', formData.plano_id)
-        .in('status_contrato', ['Ativo', 'Agendado', 'Vencendo']);
-  
-      if (checkError) {
-        console.error('Erro ao verificar contratos existentes:', checkError);
-        throw new Error('Erro ao validar contrato');
-      }
-  
-      if (existingContracts && existingContracts.length > 0) {
-        toast({
-          title: "Contrato Duplicado",
-          description: "Este aluno já possui um contrato ativo com este plano. Não é possível criar contratos duplicados.",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
   
       const { error } = await supabase
         .from('contratos')

@@ -48,6 +48,75 @@ const ContractGenerator2 = () => {
   const [savedContent, setSavedContent] = useState('');
   const editableRef = useRef<HTMLDivElement>(null);
 
+  // Função para calcular a idade do aluno
+  const calculateAge = (birthDate: string): number => {
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    
+    return age;
+  };
+
+  // Função para determinar se deve mostrar a seção do responsável
+  const shouldShowResponsavelSection = (): boolean => {
+    if (!selectedStudent?.data_nascimento) return true; // Se não tem data de nascimento, mostra por segurança
+    
+    const age = calculateAge(selectedStudent.data_nascimento);
+    const hasResponsavel = selectedStudent.responsaveis?.nome;
+    
+    // Se menor de 18, sempre mostra
+    if (age < 18) return true;
+    
+    // Se 18+ mas tem responsável cadastrado, mostra
+    if (age >= 18 && hasResponsavel) return true;
+    
+    // Se 18+ e não tem responsável, não mostra
+    return false;
+  };
+
+  // Função para gerar o conteúdo da seção do responsável
+  const generateResponsavelSection = (): string => {
+    const age = selectedStudent?.data_nascimento ? calculateAge(selectedStudent.data_nascimento) : 0;
+    const hasResponsavel = selectedStudent?.responsaveis?.nome;
+    
+    // Se 18+ e não tem responsável, retorna espaço em branco para manter estrutura
+    if (!shouldShowResponsavelSection()) {
+      return `
+<div style="width: 1036px; height: 220px; margin-bottom: 15px;">
+  <!-- Espaço reservado para seção do responsável -->
+</div>`;
+    }
+    
+    let sectionTitle = '02. Identificação do RESPONSÁVEL FINANCEIRO (se menor de idade):';
+    if (age >= 18 && hasResponsavel) {
+      sectionTitle = '02. Identificação do RESPONSÁVEL FINANCEIRO (cadastrado):';
+    }
+    
+    // Se é menor de idade e não tem responsável, mostra aviso
+    if (age < 18 && !hasResponsavel) {
+      return `
+    <h4 style="color: #856404; background-color: #fff3cd; padding: 10px; border: 1px solid #ffeaa7; border-radius: 4px;">${sectionTitle}</h4>
+    <p style="color: #856404; font-weight: bold;">⚠️ DADOS DO RESPONSÁVEL OBRIGATÓRIOS PARA MENORES DE 18 ANOS</p>
+    <p>Nome: <span class="placeholder-text">Nome do responsável</span></p>
+    <p>CPF: <span class="placeholder-text">CPF do responsável</span></p>
+    <p>Telefone: <span class="placeholder-text">Telefone do responsável</span></p>
+    <p>E-mail: <span class="placeholder-text">E-mail do responsável</span></p>`;
+    }
+    
+    // Seção normal com dados do responsável
+    return `
+    <h4>${sectionTitle}</h4>
+    <p>Nome: ${selectedStudent?.responsaveis?.nome || '<span class="placeholder-text">Nome do responsável</span>'}</p>
+    <p>CPF: ${selectedStudent?.responsaveis?.cpf || '<span class="placeholder-text">CPF do responsável</span>'}</p>
+    <p>Telefone: ${selectedStudent?.responsaveis?.telefone || '<span class="placeholder-text">Telefone do responsável</span>'}</p>
+    <p>E-mail: ${selectedStudent?.responsaveis?.email || '<span class="placeholder-text">E-mail do responsável</span>'}</p>`;
+  };
+
   // Derived data from selected student
   const planData = selectedStudent?.financeiro_alunos;
   const financialData = selectedStudent?.financeiro_alunos;
@@ -210,11 +279,7 @@ const ContractGenerator2 = () => {
     <p>Telefone: ${selectedStudent?.telefone || '<span class="placeholder-text">Telefone</span>'}</p>
     <p>E-mail: ${selectedStudent?.email || '<span class="placeholder-text">E-mail</span>'}</p>
 
-    <h4>02. Identificação do RESPONSÁVEL FINANCEIRO (se menor de idade):</h4>
-    <p>Nome: ${selectedStudent?.responsaveis?.nome || '<span class="placeholder-text">Nome do responsável</span>'}</p>
-    <p>CPF: ${selectedStudent?.responsaveis?.cpf || '<span class="placeholder-text">CPF do responsável</span>'}</p>
-    <p>Telefone: ${selectedStudent?.responsaveis?.telefone || '<span class="placeholder-text">Telefone do responsável</span>'}</p>
-    <p>E-mail: ${selectedStudent?.responsaveis?.email || '<span class="placeholder-text">E-mail do responsável</span>'}</p>
+    ${generateResponsavelSection()}
 
     <h4>03. DO OBJETO:</h4>
     <p>3.1. A CONTRATADA compromete-se a prestar serviços educacionais de ensino de idiomas ao CONTRATANTE, conforme as condições estabelecidas neste contrato.</p>

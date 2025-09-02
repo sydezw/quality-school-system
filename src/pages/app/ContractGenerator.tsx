@@ -62,6 +62,112 @@ const ContractGenerator = () => {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [selectedContract, setSelectedContract] = useState<string>('');
 
+  // Função para calcular a idade do aluno
+  const calculateAge = (birthDate: string): number => {
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    
+    return age;
+  };
+
+  // Função para determinar se deve mostrar a seção do responsável
+  const shouldShowResponsavelSection = (): boolean => {
+    if (!selectedStudent?.data_nascimento) return true; // Se não tem data de nascimento, mostra por segurança
+    
+    const age = calculateAge(selectedStudent.data_nascimento);
+    const hasResponsavel = selectedStudent.responsaveis?.nome;
+    
+    // Se menor de 18, sempre mostra
+    if (age < 18) return true;
+    
+    // Se 18+ mas tem responsável cadastrado, mostra
+    if (age >= 18 && hasResponsavel) return true;
+    
+    // Se 18+ e não tem responsável, não mostra
+    return false;
+  };
+
+  // Função para gerar o conteúdo da seção do responsável
+  const generateResponsavelSection = (): string => {
+    const age = selectedStudent?.data_nascimento ? calculateAge(selectedStudent.data_nascimento) : 0;
+    const hasResponsavel = selectedStudent?.responsaveis?.nome;
+    
+    // Se 18+ e não tem responsável, retorna espaço em branco para manter estrutura
+    if (!shouldShowResponsavelSection()) {
+      return `
+<div style="width: 1036px; height: 220px; margin-bottom: 15px;">
+  <!-- Espaço reservado para seção do responsável -->
+</div>`;
+    }
+    
+    let sectionTitle = 'RESPONSÁVEL (para menores de idade):';
+    if (age >= 18 && hasResponsavel) {
+      sectionTitle = 'RESPONSÁVEL (cadastrado):';
+    }
+    
+    // Se é menor de idade e não tem responsável, mostra aviso
+    if (age < 18 && !hasResponsavel) {
+      return `
+<div style="border: 1px solid #000; padding: 10px; margin-bottom: 15px; background-color: #fff3cd;">
+  <table style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="width: 30%; padding: 5px; font-weight: bold; color: #856404;">${sectionTitle}</td>
+      <td style="width: 70%; padding: 5px; color: #856404; font-weight: bold;">⚠️ DADOS DO RESPONSÁVEL OBRIGATÓRIOS PARA MENORES DE 18 ANOS</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">CPF:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;"><span class="placeholder-text">CPF do responsável</span></td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Telefone:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;"><span class="placeholder-text">Telefone do responsável</span></td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Email:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;"><span class="placeholder-text">E-mail do responsável</span></td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Endereço:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;"><span class="placeholder-text">Endereço do responsável</span></td>
+    </tr>
+  </table>
+</div>`;
+    }
+    
+    // Seção normal com dados do responsável
+    return `
+<div style="border: 1px solid #000; padding: 10px; margin-bottom: 15px;">
+  <table style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="width: 30%; padding: 5px; font-weight: bold;">${sectionTitle}</td>
+      <td style="width: 70%; padding: 5px; border-bottom: 1px solid #000;">${selectedStudent?.responsaveis?.nome || '<span class="placeholder-text">Nome do responsável</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">CPF:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${selectedStudent?.responsaveis?.cpf || '<span class="placeholder-text">CPF do responsável</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Telefone:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${selectedStudent?.responsaveis?.telefone || '<span class="placeholder-text">Telefone do responsável</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Email:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${selectedStudent?.responsaveis?.email || '<span class="placeholder-text">E-mail do responsável</span>'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px; font-weight: bold;">Endereço:</td>
+      <td style="padding: 5px; border-bottom: 1px solid #000;">${selectedStudent?.responsaveis?.endereco ? `${selectedStudent.responsaveis.endereco}, nº ${selectedStudent.responsaveis.numero_endereco || '<span class="placeholder-text">número</span>'}` : '<span class="placeholder-text">Endereço do responsável</span>'}</td>
+    </tr>
+  </table>
+</div>`;
+  };
+
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editableContent, setEditableContent] = useState('');
@@ -286,31 +392,7 @@ O contrato de prestação de serviços educacionais que entre si celebram, de um
   </table>
 </div>
 
-<div style="border: 1px solid #000; padding: 10px; margin-bottom: 15px;">
-  <table style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td style="width: 30%; padding: 5px; font-weight: bold;">RESPONSÁVEL (para menores de idade):</td>
-      <td style="width: 70%; padding: 5px; border-bottom: 1px solid #000;">${selectedStudent.responsaveis?.nome || '<span class="placeholder-text">Nome do responsável</span>'}</td>
-    </tr>
-
-    <tr>
-      <td style="padding: 5px; font-weight: bold;">CPF:</td>
-      <td style="padding: 5px; border-bottom: 1px solid #000;">${selectedStudent.responsaveis?.cpf || '<span class="placeholder-text">CPF do responsável</span>'}</td>
-    </tr>
-    <tr>
-      <td style="padding: 5px; font-weight: bold;">Telefone:</td>
-      <td style="padding: 5px; border-bottom: 1px solid #000;">${selectedStudent.responsaveis?.telefone || '<span class="placeholder-text">Telefone do responsável</span>'}</td>
-    </tr>
-    <tr>
-      <td style="padding: 5px; font-weight: bold;">Email:</td>
-      <td style="padding: 5px; border-bottom: 1px solid #000;">${selectedStudent.responsaveis?.email || '<span class="placeholder-text">E-mail do responsável</span>'}</td>
-    </tr>
-    <tr>
-      <td style="padding: 5px; font-weight: bold;">Endereço:</td>
-      <td style="padding: 5px; border-bottom: 1px solid #000;">${selectedStudent.responsaveis?.endereco ? `${selectedStudent.responsaveis.endereco}, nº ${selectedStudent.responsaveis.numero_endereco || '<span class="placeholder-text">número</span>'}` : '<span class="placeholder-text">Endereço do responsável</span>'}</td>
-    </tr>
-  </table>
-</div>
+${generateResponsavelSection()}
 
 
 
