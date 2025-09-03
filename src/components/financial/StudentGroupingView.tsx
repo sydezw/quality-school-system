@@ -52,6 +52,8 @@ import { ExcluirRegistroModal } from './modals/ExcluirRegistroModal';
 import { TornarAtivoModal } from './modals/TornarAtivoModal';
 import { MultipleParcelasModal } from './MultipleParcelasModal';
 import FinancialPlanDialog from './FinancialPlanDialog';
+import { HistoricoParcelasModal } from './modals/HistoricoParcelasModal';
+import { MoverParaHistoricoModal } from './modals/MoverParaHistoricoModal';
 import { useMultipleSelection } from '@/hooks/useMultipleSelection';
 import { MultipleSelectionBar } from '@/components/shared/MultipleSelectionBar';
 import { SelectionCheckbox } from '@/components/shared/SelectionCheckbox';
@@ -87,7 +89,7 @@ interface Aluno {
 
 interface Parcela {
   id: number;
-  tipo_item: string;
+  tipo_item: 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'outros';
   numero_parcela: number;
   valor: number;
   data_vencimento: string;
@@ -157,6 +159,11 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
   const [alunoPlanoDetalhes, setAlunoPlanoDetalhes] = useState<Aluno | null>(null);
   const [parcelaPreview, setParcelaPreview] = useState<any>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  
+  // Estados para modais de histórico
+  const [isHistoricoModalOpen, setIsHistoricoModalOpen] = useState(false);
+  const [isMoverParaHistoricoModalOpen, setIsMoverParaHistoricoModalOpen] = useState(false);
+  const [alunoParaHistorico, setAlunoParaHistorico] = useState<Aluno | null>(null);
   
   // Estados para o modal de confirmação de exclusão múltipla
   const [isConfirmMultipleDeleteModalOpen, setIsConfirmMultipleDeleteModalOpen] = useState(false);
@@ -283,6 +290,10 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
     try {
       const migradoValue = tipoRegistro === 'migrados' ? 'sim' : 'nao';
       
+      console.log('🔍 CARREGANDO DADOS StudentGroupingView:');
+      console.log('📋 Tipo de registro:', tipoRegistro);
+      console.log('🔄 Valor migrado:', migradoValue);
+      
       const { data: alunosData, error } = await supabase
         .from('financeiro_alunos')
         .select(`
@@ -329,6 +340,8 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
           )
         `)
         .eq('migrado', migradoValue);
+        
+      console.log('📊 Registros financeiros encontrados:', alunosData?.length || 0);
 
       if (error) {
         console.error('Erro ao carregar dados:', error);
@@ -367,6 +380,9 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
         };
       }) || [];
 
+      console.log('👥 Alunos formatados para exibição:', alunosFormatados.length);
+      console.log('📝 Nomes dos alunos:', alunosFormatados.map(a => a.nome));
+      
       setAlunos(alunosFormatados);
       
       const totalParcelas = alunosFormatados.reduce((total, aluno) => 
@@ -439,24 +455,27 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
     return alunos.filter(aluno => {
       const nomeMatch = aluno.nome.toLowerCase().includes(searchTerm.toLowerCase());
       
-      const statusMatch = aluno.parcelas.some(parcela => 
+      // Para alunos sem parcelas, considerar que passam nos filtros de parcelas
+      const temParcelas = aluno.parcelas.length > 0;
+      
+      const statusMatch = !temParcelas || aluno.parcelas.some(parcela => 
         statusFilters.includes(parcela.status_pagamento)
       );
       
-      const tipoMatch = aluno.parcelas.some(parcela => 
+      const tipoMatch = !temParcelas || aluno.parcelas.some(parcela => 
         tipoFilters.includes(parcela.tipo_item)
       );
       
-      const idiomaMatch = idiomaFilter === 'todos' || 
+      const idiomaMatch = idiomaFilter === 'todos' || !temParcelas || 
         aluno.parcelas.some(parcela => parcela.idioma_registro === idiomaFilter);
       
-      const formaPagamentoMatch = formaPagamentoFilter === 'todos' || 
+      const formaPagamentoMatch = formaPagamentoFilter === 'todos' || !temParcelas || 
         aluno.parcelas.some(parcela => {
           const formaPagamento = getFormaPagamentoParcela(parcela, aluno);
           return formaPagamento === formaPagamentoFilter;
         });
       
-      const dataMatch = (!dataVencimentoInicio && !dataVencimentoFim) || 
+      const dataMatch = (!dataVencimentoInicio && !dataVencimentoFim) || !temParcelas || 
         aluno.parcelas.some(parcela => {
           const dataVencimento = new Date(parcela.data_vencimento);
           const inicio = dataVencimentoInicio ? new Date(dataVencimentoInicio) : null;
@@ -794,14 +813,20 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
 
   // Função para abrir modal de ver histórico
   const abrirModalVerHistorico = (alunoId: string, alunoNome: string) => {
-    // Implementar lógica do histórico
-    console.log('Ver histórico para:', alunoNome);
+    const aluno = alunos.find(a => a.id === alunoId);
+    if (aluno) {
+      setAlunoParaHistorico(aluno);
+      setIsHistoricoModalOpen(true);
+    }
   };
 
   // Função para abrir modal de mover para histórico
   const abrirModalMoverParaHistorico = (alunoId: string, alunoNome: string, parcelas: Parcela[]) => {
-    // Implementar lógica de mover para histórico
-    console.log('Mover para histórico:', alunoNome);
+    const aluno = alunos.find(a => a.id === alunoId);
+    if (aluno) {
+      setAlunoParaHistorico(aluno);
+      setIsMoverParaHistoricoModalOpen(true);
+    }
   };
 
   if (loading) {
@@ -2021,6 +2046,20 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
            onOpenChange={setIsFinancialPlanDialogOpen}
            selectedStudent={selectedStudentForPlan}
            onSuccess={handlePlanSuccess}
+         />
+
+         {/* Modais de Histórico */}
+         <HistoricoParcelasModal
+           isOpen={isHistoricoModalOpen}
+           onClose={() => setIsHistoricoModalOpen(false)}
+           aluno={alunoParaHistorico}
+         />
+
+         <MoverParaHistoricoModal
+           isOpen={isMoverParaHistoricoModalOpen}
+           onClose={() => setIsMoverParaHistoricoModalOpen(false)}
+           aluno={alunoParaHistorico}
+           onSuccess={carregarDados}
          />
 
          {/* Barra de Seleção Múltipla */}

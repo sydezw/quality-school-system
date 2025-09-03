@@ -13,7 +13,7 @@ import { motion } from 'framer-motion';
 import { useFinancial } from '@/hooks/useFinancial';
 import FinancialDialogs from '@/components/financial/FinancialDialogs';
 import FinancialPlanDialog from '@/components/financial/FinancialPlanDialog';
-import RenewalAlertsTable from '@/components/financial/RenewalAlertsTable';
+
 import ParcelasTable from '@/components/financial/ParcelasTable';
 import StudentGroupingView from '@/components/financial/StudentGroupingView';
 import DespesasTable from '@/components/financial/DespesasTable';

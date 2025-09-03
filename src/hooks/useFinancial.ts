@@ -12,7 +12,8 @@ import {
   ProgressoParcelas,
   StatusAluno,
   FinancialState,
-  DialogState
+  DialogState,
+  RegistroFinanceiro
 } from '@/types/financial';
 
 export const useFinancial = () => {
@@ -27,6 +28,7 @@ export const useFinancial = () => {
     historicoPagamentos: [],
     planosGenericos: [],
     contratos: [],
+    registrosFinanceiros: [],
     loading: true,
     filtroStatus: 'todos',
     viewMode: 'agrupado', // Corrigido de 'ggrupauoado'
@@ -165,7 +167,7 @@ export const useFinancial = () => {
     try {
       const { data, error } = await supabase
         .from('planos')
-        .select('id, nome, valor_total, valor_por_aula, descricao')
+        .select('id, nome, valor_total, valor_por_aula, numero_aulas, descricao')
         .eq('ativo', true)
         .order('nome');
 
@@ -177,8 +179,31 @@ export const useFinancial = () => {
     }
   };
 
+  const fetchRegistrosFinanceiros = async () => {
+    try {
+      console.log('🔍 BUSCANDO REGISTROS FINANCEIROS...');
+      const { data, error } = await supabase
+        .from('financeiro_alunos')
+        .select('id, aluno_id, plano_id, valor_total, created_at')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      console.log('📋 Registros financeiros encontrados:', data?.length || 0);
+      console.log('📋 Dados dos registros:', data);
+      setState(prev => ({ ...prev, registrosFinanceiros: data || [] }));
+    } catch (error) {
+      console.error('Erro ao buscar registros financeiros:', error);
+    }
+  };
+
   // Função para processar alunos financeiros
   const processarAlunosFinanceiros = () => {
+    console.log('🔍 PROCESSANDO ALUNOS FINANCEIROS:');
+    console.log('📊 Total de students:', state.students.length);
+    console.log('💰 Total de boletos:', state.boletos.length);
+    console.log('📋 Total de registrosFinanceiros:', state.registrosFinanceiros.length);
+    console.log('📈 Total de historicoPagamentos:', state.historicoPagamentos.length);
+    
     const alunosMap = new Map<string, AlunoFinanceiro>();
     
     state.students.forEach(student => {
@@ -221,9 +246,13 @@ export const useFinancial = () => {
       }
     });
 
+    // Exibir todos os alunos na tabela financeira
     const alunosComDados = Array.from(alunosMap.values())
-      .filter(aluno => aluno.boletos.length > 0 || aluno.historicoPagamentos.length > 0)
       .sort((a, b) => a.nome.localeCompare(b.nome));
+
+    console.log('✅ RESULTADO FINAL:');
+    console.log('👥 Total de alunos processados para tabela:', alunosComDados.length);
+    console.log('📝 Alunos na tabela:', alunosComDados.map(a => a.nome));
 
     setState(prev => ({ ...prev, alunosFinanceiros: alunosComDados }));
   };
@@ -356,7 +385,8 @@ export const useFinancial = () => {
       fetchStudents(),
       fetchHistoricoPagamentos(),
       fetchContratos(),
-      fetchPlanos()
+      fetchPlanos(),
+      fetchRegistrosFinanceiros()
     ]);
   };
 
@@ -366,10 +396,10 @@ export const useFinancial = () => {
   }, []);
 
   useEffect(() => {
-    if (state.boletos.length > 0 && state.students.length > 0) {
+    if (state.students.length > 0) {
       processarAlunosFinanceiros();
     }
-  }, [state.boletos, state.students, state.historicoPagamentos]);
+  }, [state.boletos, state.students, state.historicoPagamentos, state.registrosFinanceiros]);
 
   return {
     // Estados
@@ -387,6 +417,7 @@ export const useFinancial = () => {
     fetchHistoricoPagamentos,
     fetchContratos,
     fetchPlanos,
+    fetchRegistrosFinanceiros,
     refreshData,
     
     // Funções auxiliares
@@ -401,19 +432,4 @@ export const useFinancial = () => {
     // Toast
     toast
   };
-};
-
-const fetchStudents = async () => {
-  try {
-    const { data, error } = await supabase
-      .from('alunos')
-      .select('id, nome, status')  // Incluir status para referência
-      // .eq('status', 'Ativo')  // ← Remover este filtro
-      .order('nome');
-
-    if (error) throw error;
-    setState(prev => ({ ...prev, students: data || [] }));
-  } catch (error) {
-    console.error('Erro ao buscar alunos:', error);
-  }
 };

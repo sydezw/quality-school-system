@@ -402,10 +402,7 @@ export const MoverParaHistoricoModal: React.FC<MoverParaHistoricoModalProps> = (
                   <span className="mt-1" style={{color: '#D90429'}}>•</span>
                   <span>Esta operação não pode ser revertida automaticamente</span>
                 </li>
-                <li className="flex items-start space-x-2">
-                  <span className="mt-1" style={{color: '#D90429'}}>•</span>
-                  <span>O status do aluno será alterado para "Inativo"</span>
-                </li>
+
                 <li className="flex items-start space-x-2">
                   <span className="mt-1" style={{color: '#D90429'}}>•</span>
                   <span>Recomendamos mover apenas parcelas pagas para evitar problemas futuros</span>

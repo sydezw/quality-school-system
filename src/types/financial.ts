@@ -87,6 +87,14 @@ export interface ProgressoParcelas {
 
 export type StatusAluno = 'Em dia' | 'Atrasado' | 'Inadimplente';
 
+export interface RegistroFinanceiro {
+  id: string;
+  aluno_id: string;
+  plano_id: string;
+  valor_total: number;
+  created_at: string;
+}
+
 export interface FinancialState {
   boletos: Boleto[];
   despesas: Despesa[];
@@ -95,6 +103,7 @@ export interface FinancialState {
   historicoPagamentos: HistoricoPagamento[];
   planosGenericos: PlanoGenerico[];
   contratos: ContratoAluno[];
+  registrosFinanceiros: RegistroFinanceiro[];
   loading: boolean;
   filtroStatus: string;
   viewMode: 'lista' | 'agrupado';

@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { Checkbox } from '@/components/ui/checkbox';
 
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -57,6 +58,8 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
   const [dataVencimentoPrimeira, setDataVencimentoPrimeira] = useState<Date | null>(null);
   const [openStudentSearch, setOpenStudentSearch] = useState(false);
   const [openCombobox, setOpenCombobox] = useState(false); // Adicionado estado faltante
+  const [existingPlan, setExistingPlan] = useState<any>(null);
+  const [confirmOverwrite, setConfirmOverwrite] = useState(false);
   
   // Adicionar esta linha que está faltando:
   const { toast } = useToast();
@@ -87,8 +90,47 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
     // Se há um aluno pré-selecionado, define no formulário
     if (preSelectedStudent) {
       setValue('aluno_id', preSelectedStudent.id);
+      checkExistingPlan(preSelectedStudent.id);
     }
   }, [preSelectedStudent]);
+
+  // Verificar se aluno já possui plano financeiro
+  const checkExistingPlan = async (alunoId: string) => {
+    if (!alunoId) {
+      setExistingPlan(null);
+      setConfirmOverwrite(false);
+      return;
+    }
+
+    try {
+      const { data: existingPlan, error } = await supabase
+        .from('financeiro_alunos')
+        .select('id, created_at')
+        .eq('aluno_id', alunoId)
+        .single();
+        
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+      
+      setExistingPlan(existingPlan);
+      setConfirmOverwrite(false);
+    } catch (error) {
+      console.error('Erro ao verificar plano existente:', error);
+      setExistingPlan(null);
+      setConfirmOverwrite(false);
+    }
+  };
+
+  // Adicionar useEffect para monitorar mudanças no aluno selecionado
+  useEffect(() => {
+    if (watchedValues.aluno_id) {
+      checkExistingPlan(watchedValues.aluno_id);
+    } else {
+      setExistingPlan(null);
+      setConfirmOverwrite(false);
+    }
+  }, [watchedValues.aluno_id]);
 
   // Novo useEffect para resetar valores quando o plano é alterado
   useEffect(() => {
@@ -259,32 +301,12 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
       return;
     }
     
-    // Verificar se o aluno já possui um plano
-    try {
-      const { data: existingPlan, error: checkError } = await supabase
-        .from('financeiro_alunos')
-        .select('id')
-        .eq('aluno_id', data.aluno_id)
-        .single();
-        
-      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
-        throw checkError;
-      }
-      
-      if (existingPlan) {
-        const studentName = students.find(s => s.id === data.aluno_id)?.nome || 'Aluno';
-        toast({
-          title: "Plano já existe",
-          description: `${studentName} já possui um plano de pagamento. Não é possível criar um novo plano para este aluno.`,
-          variant: "destructive",
-        });
-        return;
-      }
-    } catch (error) {
-      console.error('Erro ao verificar plano existente:', error);
+    // Verificar se o aluno já possui um plano e se há confirmação para sobrescrever
+    if (existingPlan && !confirmOverwrite) {
+      const studentName = students.find(s => s.id === data.aluno_id)?.nome || 'Aluno';
       toast({
-        title: "Erro",
-        description: "Não foi possível verificar se o aluno já possui um plano.",
+        title: "Confirmação necessária",
+        description: `${studentName} já possui um plano de pagamento. Marque a opção de confirmação para sobrescrever o plano existente.`,
         variant: "destructive",
       });
       return;
@@ -371,28 +393,26 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
         return total;
       };
 
-      // Criar registro financeiro na nova tabela
+      // Preparar dados do registro financeiro
       const valorTotalCalculado = calcularValorTotalCorreto(valorAPagar, valorMaterial, valorMatricula, descontoCalculado, planoSelecionado?.tipo_valor);
       
-      console.log('=== ANTES DE CRIAR OBJETO PARA INSERÇÃO ===');
+      console.log('=== ANTES DE CRIAR/ATUALIZAR REGISTRO ===');
       console.log('valorAPagar:', valorAPagar);
       console.log('valorMaterial:', valorMaterial);
       console.log('valorMatricula:', valorMatricula);
       console.log('descontoCalculado:', descontoCalculado);
       console.log('valorTotalCalculado:', valorTotalCalculado);
       
-      const novoFinanceiroAluno = {
+      const dadosFinanceiros = {
         aluno_id: data.aluno_id,
         plano_id: data.plano_id,
         valor_plano: valorAPagar,
         valor_material: valorMaterial,
         valor_matricula: valorMatricula,
         desconto_total: descontoCalculado,
-        // Calcular valor_total corretamente baseado no tipo_valor do plano
         valor_total: valorTotalCalculado,
         status_geral: 'Pendente',
         data_primeiro_vencimento: data.data_vencimento_primeira,
-        // Métodos de pagamento e parcelas
         forma_pagamento_plano: data.forma_pagamento_plano,
         numero_parcelas_plano: parseInt(data.numero_parcelas_plano),
         forma_pagamento_material: data.forma_pagamento_material,
@@ -401,30 +421,72 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
         numero_parcelas_matricula: parseInt(data.numero_parcelas_matricula)
       };
       
-      console.log('=== OBJETO COMPLETO PARA INSERÇÃO ===');
-      console.log('novoFinanceiroAluno:', JSON.stringify(novoFinanceiroAluno, null, 2));
+      console.log('=== DADOS FINANCEIROS PREPARADOS ===');
+      console.log('dadosFinanceiros:', JSON.stringify(dadosFinanceiros, null, 2));
       
-      const { data: financeiroData, error: financeiroError } = await supabase
-        .schema('public')
-        .from('financeiro_alunos')
-        .insert(novoFinanceiroAluno)
-        .select()
-        .single();
+      let financeiroData;
       
-      console.log('=== RESULTADO DA INSERÇÃO NO BANCO ===');
-      console.log('financeiroData:', JSON.stringify(financeiroData, null, 2));
-      console.log('financeiroError:', financeiroError);
+      // Se há confirmação para sobrescrever, atualizar o registro existente
+      if (existingPlan && confirmOverwrite) {
+        console.log('=== ATUALIZANDO REGISTRO EXISTENTE ===');
+        console.log('ID do registro a ser atualizado:', existingPlan.id);
+        
+        // 1. Excluir apenas as parcelas antigas
+        const { error: deleteParcelasError } = await supabase
+          .from('parcelas_alunos')
+          .delete()
+          .eq('registro_financeiro_id', existingPlan.id);
+        
+        if (deleteParcelasError) {
+          console.error('Erro ao excluir parcelas antigas:', deleteParcelasError);
+          throw new Error('Erro ao excluir parcelas antigas: ' + deleteParcelasError.message);
+        }
+        
+        console.log('Parcelas antigas excluídas com sucesso');
+        
+        // 2. Atualizar o registro financeiro com os novos dados
+        const { data: updatedData, error: updateError } = await supabase
+          .from('financeiro_alunos')
+          .update(dadosFinanceiros)
+          .eq('id', existingPlan.id)
+          .select()
+          .single();
+        
+        if (updateError) {
+          console.error('Erro ao atualizar registro:', updateError);
+          throw updateError;
+        }
+        
+        financeiroData = updatedData;
+        console.log('=== REGISTRO ATUALIZADO COM SUCESSO ===');
+        console.log('financeiroData:', JSON.stringify(financeiroData, null, 2));
+        
+      } else {
+        // Criar novo registro normalmente
+        console.log('=== CRIANDO NOVO REGISTRO ===');
+        
+        const { data: insertedData, error: financeiroError } = await supabase
+          .schema('public')
+          .from('financeiro_alunos')
+          .insert(dadosFinanceiros)
+          .select()
+          .single();
+        
+        if (financeiroError) {
+          console.error('Erro do Supabase:', financeiroError);
+          throw financeiroError;
+        }
+        
+        financeiroData = insertedData;
+        console.log('=== NOVO REGISTRO CRIADO COM SUCESSO ===');
+        console.log('financeiroData:', JSON.stringify(financeiroData, null, 2));
+      }
       
       if (financeiroData) {
         console.log('=== COMPARAÇÃO DE VALORES ===');
         console.log('Valor total enviado:', valorTotalCalculado);
         console.log('Valor total salvo no banco:', financeiroData.valor_total);
         console.log('Diferença:', financeiroData.valor_total - valorTotalCalculado);
-      }
-      
-      if (financeiroError) {
-        console.error('Erro do Supabase:', financeiroError);
-        throw financeiroError;
       }
       
       console.log('Plano criado com sucesso! Criando parcelas...');
@@ -1222,6 +1284,28 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
             placeholder="Selecione a data do primeiro vencimento"
           />
         </div>
+
+        {/* Aviso e confirmação para sobrescrever plano existente */}
+        {existingPlan && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 space-y-3">
+            <div className="flex items-start space-x-2">
+              <div className="text-yellow-600 text-sm">
+                ⚠️ <strong>Atenção:</strong> Este aluno já possui um plano financeiro criado em {new Date(existingPlan.created_at).toLocaleDateString('pt-BR')}.
+                Criar um novo plano irá sobrescrever o plano existente.
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="confirm-overwrite"
+                checked={confirmOverwrite}
+                onCheckedChange={(checked) => setConfirmOverwrite(checked as boolean)}
+              />
+              <Label htmlFor="confirm-overwrite" className="text-sm font-medium">
+                Confirmo que desejo sobrescrever o plano financeiro existente
+              </Label>
+            </div>
+          </div>
+        )}
 
         {/* Botões */}
         <div className="flex gap-2 pt-4 justify-end">
