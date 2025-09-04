@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { adicionarMesesSeguro } from '@/utils/dateUtils';
 
 export interface Boleto {
   id: string;
@@ -61,8 +62,7 @@ export const useBoletos = () => {
         // Gerar boletos para plano (se valor > 0)
         if (registro.valor_plano > 0) {
           for (let i = 0; i < registro.numero_parcelas_plano; i++) {
-            const dataVencimentoParcela = new Date(dataVencimento);
-            dataVencimentoParcela.setMonth(dataVencimentoParcela.getMonth() + i);
+            const dataVencimentoParcela = adicionarMesesSeguro(dataVencimento, i);
             
             let status: 'Pendente' | 'Pago' | 'Vencido' = 'Pendente';
             if (registro.status_geral === 'Pago') {
@@ -91,8 +91,7 @@ export const useBoletos = () => {
         // Gerar boletos para material (se valor > 0)
         if (registro.valor_material > 0) {
           for (let i = 0; i < registro.numero_parcelas_material; i++) {
-            const dataVencimentoParcela = new Date(dataVencimento);
-            dataVencimentoParcela.setMonth(dataVencimentoParcela.getMonth() + i);
+            const dataVencimentoParcela = adicionarMesesSeguro(dataVencimento, i);
             
             let status: 'Pendente' | 'Pago' | 'Vencido' = 'Pendente';
             if (registro.status_geral === 'Pago') {
@@ -121,8 +120,7 @@ export const useBoletos = () => {
         // Gerar boletos para matrícula (se valor > 0)
         if (registro.valor_matricula > 0) {
           for (let i = 0; i < registro.numero_parcelas_matricula; i++) {
-            const dataVencimentoParcela = new Date(dataVencimento);
-            dataVencimentoParcela.setMonth(dataVencimentoParcela.getMonth() + i);
+            const dataVencimentoParcela = adicionarMesesSeguro(dataVencimento, i);
             
             let status: 'Pendente' | 'Pago' | 'Vencido' = 'Pendente';
             if (registro.status_geral === 'Pago') {

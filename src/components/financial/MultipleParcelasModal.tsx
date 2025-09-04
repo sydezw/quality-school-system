@@ -10,6 +10,7 @@ import { Plus, Calendar, Hash } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { getProximoNumeroParcela } from '@/utils/parcelaNumbering';
+import { adicionarMesesSeguro } from '@/utils/dateUtils';
 
 interface NovaParcelaForm {
   registro_financeiro_id: string;
@@ -98,13 +99,15 @@ export const MultipleParcelasModal: React.FC<MultipleParcelasModalProps> = ({
     const dataInicial = new Date(multipleParcelas.data_inicial);
     
     for (let i = 0; i < multipleParcelas.quantidade; i++) {
-      const novaData = new Date(dataInicial);
-      novaData.setMonth(novaData.getMonth() + i);
+      // Usar função segura para adicionar meses
+      const novaData = adicionarMesesSeguro(dataInicial, i);
       
-      // Ajustar para o dia padrão, tratando meses com menos dias
-      const ultimoDiaDoMes = new Date(novaData.getFullYear(), novaData.getMonth() + 1, 0).getDate();
-      const diaFinal = Math.min(multipleParcelas.dia_padrao, ultimoDiaDoMes);
-      novaData.setDate(diaFinal);
+      // Ajustar para o dia padrão se especificado
+      if (multipleParcelas.dia_padrao !== dataInicial.getDate()) {
+        const ultimoDiaDoMes = new Date(novaData.getFullYear(), novaData.getMonth() + 1, 0).getDate();
+        const diaFinal = Math.min(multipleParcelas.dia_padrao, ultimoDiaDoMes);
+        novaData.setDate(diaFinal);
+      }
       
       datas.push(novaData.toISOString().split('T')[0]);
     }

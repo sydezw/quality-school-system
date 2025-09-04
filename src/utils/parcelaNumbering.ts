@@ -1,7 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
+import { adicionarMesesSeguro } from '@/utils/dateUtils';
 
-// Usar o tipo correto do Supabase
+type ParcelaInsert = Database['public']['Tables']['parcelas_alunos']['Insert'];
 export type TipoItem = Database['public']['Enums']['tipo_item'];
 
 export interface ParcelaData {
@@ -94,8 +95,8 @@ export const criarParcelasComNumeracaoCorreta = async (
     const valorParcela = dados.valor / dados.numParcelas;
 
     for (let i = 0; i < dados.numParcelas; i++) {
-      const dataVencimento = new Date(dados.dataBase);
-      dataVencimento.setMonth(dataVencimento.getMonth() + i);
+      // Função segura para adicionar meses mantendo o dia correto
+      const dataVencimento = adicionarMesesSeguro(dados.dataBase, i);
 
       parcelas.push({
         registro_financeiro_id: registroFinanceiroId,

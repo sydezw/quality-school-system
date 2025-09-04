@@ -1,34 +1,16 @@
+import { adicionarMesesSeguro, calcularDiferencaEmMeses } from '@/utils/dateUtils';
+
 /**
  * Calcula a próxima data de vencimento baseada na primeira parcela
  * Mantém o mesmo dia da primeira parcela, ajustando para dias inexistentes no mês
  */
 export const calcularProximaDataVencimento = (primeiraParcela: Date, parcelaAtual: Date): string => {
-  const diaPrimeiraParcela = primeiraParcela.getDate();
-  const mesAtual = parcelaAtual.getMonth();
-  const anoAtual = parcelaAtual.getFullYear();
+  // Calcular quantos meses se passaram desde a primeira parcela
+  const mesesDiferenca = calcularDiferencaEmMeses(primeiraParcela, parcelaAtual);
   
-  // Próximo mês
-  let proximoMes = mesAtual + 1;
-  let proximoAno = anoAtual;
+  // Adicionar um mês à diferença atual
+  const proximaData = adicionarMesesSeguro(primeiraParcela, mesesDiferenca + 1);
   
-  // Se passou de dezembro, vai para janeiro do próximo ano
-  if (proximoMes > 11) {
-    proximoMes = 0;
-    proximoAno++;
-  }
-  
-  // Tentar usar o dia da primeira parcela
-  let diaVencimento = diaPrimeiraParcela;
-  
-  // Verificar se o dia existe no próximo mês
-  const ultimoDiaDoMes = new Date(proximoAno, proximoMes + 1, 0).getDate();
-  
-  // Se o dia não existe no mês (ex: 31 em fevereiro), usar o último dia do mês
-  if (diaVencimento > ultimoDiaDoMes) {
-    diaVencimento = ultimoDiaDoMes;
-  }
-  
-  const proximaData = new Date(proximoAno, proximoMes, diaVencimento);
   return proximaData.toISOString().split('T')[0];
 };
 

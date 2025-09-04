@@ -13,6 +13,7 @@ import { ContractFormData } from '@/hooks/useContracts';
 import { PlanoGenerico } from '@/types/financial';
 import DatePicker from '@/components/shared/DatePicker';
 import { format } from 'date-fns';
+import { adicionarMesesSeguro } from '@/utils/dateUtils';
 
 interface Student {
   id: string;
@@ -69,7 +70,7 @@ export const NewContractDialog = ({ onContractCreated, student }: NewContractDia
     try {
       const { data, error } = await supabase
         .from('planos')
-        .select('id, nome, valor_total, valor_por_aula, descricao')
+        .select('id, nome, valor_total, valor_por_aula, descricao, numero_aulas')
         .eq('ativo', true)
         .order('nome');
 
@@ -136,14 +137,14 @@ export const NewContractDialog = ({ onContractCreated, student }: NewContractDia
     
     // 36 aulas = 6 meses, 72 aulas = 1 ano
     if (numeroAulas === 36) {
-      endDate.setMonth(endDate.getMonth() + 6);
+      endDate = adicionarMesesSeguro(endDate, 6);
     } else if (numeroAulas === 72) {
       endDate.setFullYear(endDate.getFullYear() + 1);
     } else {
       // Para outros números de aulas, calcular proporcionalmente
       // Assumindo que 36 aulas = 6 meses como base
       const meses = Math.round((numeroAulas / 36) * 6);
-      endDate.setMonth(endDate.getMonth() + meses);
+      endDate = adicionarMesesSeguro(endDate, meses);
     }
     
     return endDate.toISOString().split('T')[0];

@@ -29,7 +29,7 @@ export interface ContractFormData {
   valor_mensalidade?: number; // Tornado opcional
   observacao?: string;
   plano_id?: string;
-  idioma_contrato?: 'Inglês' | 'Japonês' | 'Inglês/Japonês'; // Tipo correto do enum
+  idioma_contrato?: 'Inglês' | 'Japonês' | 'Inglês/Japonês' | 'particular'; // Incluindo 'particular'
 }
 
 export interface ContractStats {
