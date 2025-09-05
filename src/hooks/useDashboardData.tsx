@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Database } from '@/integrations/supabase/types';
+import { calcularMetricasParcelas } from '@/utils/parcelaCalculations';
 
 type Aluno = Database['public']['Tables']['alunos']['Row'];
 type Turma = Database['public']['Tables']['turmas']['Row'];
@@ -79,30 +80,25 @@ export const useDashboardData = () => {
           }).length
         : 0;
       
-      // Calcular métricas financeiras
+      // Calcular métricas financeiras usando função centralizada
       const inicioMes = new Date();
       inicioMes.setDate(1);
       
-      let parcelasVencidasCount = 0;
-      let receitasMesTotal = 0;
+      // Converter parcelas para o formato esperado pela função
+      const parcelasFormatadas = (parcelas || []).map((p, index) => ({
+        id: `parcela-${index}`,
+        data_vencimento: p.data_vencimento,
+        status_pagamento: p.status_pagamento,
+        tipo_item: 'mensalidade' as const,
+        registro_financeiro_id: `reg-${index}`,
+        valor: 0 // Valor não é usado no cálculo de métricas
+      }));
       
-      // Contar parcelas vencidas ou não pagas
-      if (parcelas && parcelas.length > 0) {
-        parcelas.forEach(parcela => {
-          try {
-            const dataVencimento = new Date(parcela.data_vencimento);
-            
-            // Contar parcelas vencidas (não pagas e com data de vencimento passada) ou pendentes vencidas
-            if ((parcela.status_pagamento === 'pendente' || parcela.status_pagamento === 'vencido') && dataVencimento < hoje) {
-              parcelasVencidasCount++;
-            }
-          } catch (error) {
-            // Ignorar registros com datas inválidas
-          }
-        });
-      }
+      const metricas = calcularMetricasParcelas(parcelasFormatadas);
+      const parcelasVencidasCount = metricas.parcelasVencidas;
       
       // Calcular receitas do mês (mantendo a lógica original)
+      let receitasMesTotal = 0;
       if (financeiros && financeiros.length > 0) {
         financeiros.forEach(registro => {
           try {

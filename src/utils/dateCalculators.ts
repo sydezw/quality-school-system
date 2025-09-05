@@ -1,4 +1,4 @@
-import { adicionarMesesSeguro, calcularDiferencaEmMeses } from '@/utils/dateUtils';
+import { adicionarMesesSeguro, calcularDiferencaEmMeses, criarDataDeString, formatarDataParaISO } from '@/utils/dateUtils';
 
 /**
  * Calcula a próxima data de vencimento baseada na primeira parcela
@@ -11,7 +11,7 @@ export const calcularProximaDataVencimento = (primeiraParcela: Date, parcelaAtua
   // Adicionar um mês à diferença atual
   const proximaData = adicionarMesesSeguro(primeiraParcela, mesesDiferenca + 1);
   
-  return proximaData.toISOString().split('T')[0];
+  return formatarDataParaISO(proximaData);
 };
 
 /**
@@ -22,8 +22,8 @@ export const encontrarPrimeiraParcela = (parcelas: any[]): Date | null => {
   
   // Ordenar por data de vencimento (mais antiga primeiro)
   const parcelasOrdenadas = [...parcelas].sort((a, b) => 
-    new Date(a.data_vencimento).getTime() - new Date(b.data_vencimento).getTime()
+    criarDataDeString(a.data_vencimento).getTime() - criarDataDeString(b.data_vencimento).getTime()
   );
   
-  return new Date(parcelasOrdenadas[0].data_vencimento);
+  return criarDataDeString(parcelasOrdenadas[0].data_vencimento);
 };

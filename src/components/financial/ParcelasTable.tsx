@@ -27,6 +27,7 @@ import {
   FilterX
 } from 'lucide-react';
 import { useParcelas, ParcelaComDetalhes } from '@/hooks/useParcelas';
+import { criarDataDeString } from '@/utils/dateUtils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import FinancialPlanForm from './FinancialPlanForm';
@@ -42,7 +43,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { motion, AnimatePresence } from 'framer-motion';
 import FinancialPlanDialog from './FinancialPlanDialog';
 import { Student } from '@/types/shared';
-import { formatarFormaPagamento } from '@/utils/formatters';
+import { formatarFormaPagamento, formatDate } from '@/utils/formatters';
+import { calcularNumeroPorTipo, type ParcelaBasica } from '@/utils/parcelaCalculations';
 import { useMultipleSelection } from '@/hooks/useMultipleSelection';
 import { MultipleSelectionBar } from '@/components/shared/MultipleSelectionBar';
 import { SelectionCheckbox } from '@/components/shared/SelectionCheckbox';
@@ -230,28 +232,7 @@ const ParcelasTable: React.FC<ParcelasTableProps> = ({ onRefresh }) => {
     }
   };
 
-  // Função para calcular o número da parcela por tipo de item
-  const calcularNumeroPorTipo = (parcelaAtual: any, todasParcelas: any[]) => {
-    // Filtrar parcelas do mesmo tipo de item e mesmo registro financeiro
-    const parcelasMesmoTipo = todasParcelas.filter(p => 
-      p.tipo_item === parcelaAtual.tipo_item && 
-      p.registro_financeiro_id === parcelaAtual.registro_financeiro_id
-    );
-    
-    // Ordenar por data de vencimento e depois por ID
-    const parcelasOrdenadas = parcelasMesmoTipo.sort((a, b) => {
-      const dataA = new Date(a.data_vencimento);
-      const dataB = new Date(b.data_vencimento);
-      if (dataA.getTime() !== dataB.getTime()) {
-        return dataA.getTime() - dataB.getTime();
-      }
-      return a.id - b.id;
-    });
-    
-    // Encontrar a posição da parcela atual na lista ordenada
-    const posicao = parcelasOrdenadas.findIndex(p => p.id === parcelaAtual.id);
-    return posicao + 1; // +1 porque queremos começar de 1, não de 0
-  };
+
 
   // Filtragem local atualizada para múltipla seleção + filtro de data automático
   const parcelasFiltradas = useMemo(() => {
@@ -274,11 +255,10 @@ const ParcelasTable: React.FC<ParcelasTableProps> = ({ onRefresh }) => {
       const filtroIdioma = idiomaFilter === 'todos' || parcela.idioma_registro === idiomaFilter;
       
       // Filtro por data de vencimento
-      const dataVencimento = new Date(parcela.data_vencimento);
-      dataVencimento.setHours(0, 0, 0, 0);
+      const dataVencimento = criarDataDeString(parcela.data_vencimento);
       
-      const filtroDataInicio = !dataInicio || dataVencimento >= new Date(dataInicio);
-      const filtroDataFim = !dataFim || dataVencimento <= new Date(dataFim);
+      const filtroDataInicio = !dataInicio || dataVencimento >= criarDataDeString(dataInicio);
+      const filtroDataFim = !dataFim || dataVencimento <= criarDataDeString(dataFim);
       
       // Filtro automático: apenas parcelas até hoje (quando filtro inicial está ativo)
       const isFilteringCurrentDate = !dataInicio && 
@@ -958,7 +938,7 @@ const ParcelasTable: React.FC<ParcelasTableProps> = ({ onRefresh }) => {
                               </TableCell>
                               <TableCell>
                                 <div className="text-base">
-                                  {new Date(parcela.data_vencimento).toLocaleDateString('pt-BR')}
+                                  {formatDate(parcela.data_vencimento)}
                                 </div>
                               </TableCell>
                               <TableCell className="text-base" style={{color: '#6B7280'}}>

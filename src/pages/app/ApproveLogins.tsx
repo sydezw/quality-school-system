@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 import { Trash2, AlertTriangle, Users, Check, X, Mail, Briefcase, Calendar, Clock, UserCheck, Inbox, Eye, Home, GraduationCap, BookOpen, BookCopy, Package, DollarSign, BarChart3, FileSignature, Shield, EyeOff, Key } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import type { Database, Tables } from '@/integrations/supabase/types';
@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { formatDate } from '@/utils/formatters';
 import {
   Dialog,
   DialogContent,
@@ -51,6 +52,7 @@ export default function ApproveLogins() {
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState<{[key: string]: boolean}>({});
   const { user: currentUser } = useAuth();
+  const { toast } = useToast();
   
   // Verificar se o usuário atual é Admin
   const isAdmin = currentUser?.cargo === 'Admin';
@@ -136,7 +138,10 @@ export default function ApproveLogins() {
         ...(usuarios || []),
         ...(professores || []).map(prof => ({
           ...prof,
-          permissoes: 'professor' // Adicionar permissões padrão para professores
+          permissoes: 'professor', // Adicionar permissões padrão para professores
+          funcao: prof.cargo || '', // Mapear cargo para funcao
+          senha: '', // Professores não têm senha visível
+          status: 'ativo' // Status padrão para professores
         }))
       ];
 
@@ -172,9 +177,10 @@ export default function ApproveLogins() {
 
         if (insertError) {
           console.error('Erro ao aprovar usuário:', insertError);
-          toast.error('Erro ao aprovar usuário', {
+          toast({
+            title: 'Erro ao aprovar usuário',
             description: 'Tente novamente em alguns instantes',
-            duration: 4000,
+            variant: 'destructive',
           });
           return;
         }
@@ -189,9 +195,9 @@ export default function ApproveLogins() {
           console.error('Erro ao remover usuário pendente:', deleteError);
         }
 
-        toast.success(`✅ ${user.nome} foi aprovado com sucesso!`, {
+        toast({
+          title: `✅ ${user.nome} foi aprovado com sucesso!`,
           description: 'O usuário agora tem acesso ao sistema',
-          duration: 4000,
         });
       } else {
         // Deletar da tabela usuarios_pendentes
@@ -202,16 +208,17 @@ export default function ApproveLogins() {
 
         if (deleteError) {
           console.error('Erro ao rejeitar usuário:', deleteError);
-          toast.error('Erro ao rejeitar usuário', {
+          toast({
+            title: 'Erro ao rejeitar usuário',
             description: 'Tente novamente em alguns instantes',
-            duration: 4000,
+            variant: 'destructive',
           });
           return;
         }
 
-        toast.success(`❌ Solicitação de ${user.nome} foi rejeitada`, {
+        toast({
+          title: `❌ Solicitação de ${user.nome} foi rejeitada`,
           description: 'O usuário foi removido da lista de pendências',
-          duration: 4000,
         });
       }
 
@@ -223,26 +230,30 @@ export default function ApproveLogins() {
       
     } catch (error) {
       console.error('Erro ao processar ação do usuário:', error);
-      toast.error('Erro ao processar solicitação', {
+      toast({
+        title: 'Erro ao processar solicitação',
         description: 'Tente novamente em alguns instantes',
-        duration: 4000,
+        variant: 'destructive',
       });
     }
   };
 
-  const handleDeleteUser = async (userId: string, userName: string, userTable: string) => {
+  const handleDeleteUser = async (userId: string, userName: string, userCargo: string) => {
     if (!isAdmin) {
-      toast.error('Apenas administradores podem excluir usuários');
+      toast({
+        title: 'Acesso negado',
+        description: 'Apenas administradores podem excluir usuários',
+        variant: 'destructive',
+      });
       return;
     }
 
     setDeletingUserId(userId);
 
     try {
-      const { error } = await supabase
-        .from(userTable)
-        .delete()
-        .eq('id', userId);
+      const { error } = userCargo === 'Professor' 
+        ? await supabase.from('professores').delete().eq('id', userId)
+        : await supabase.from('usuarios').delete().eq('id', userId);
 
       if (error) {
         throw error;
@@ -251,10 +262,17 @@ export default function ApproveLogins() {
       // Atualizar a lista de usuários aprovados
       setApprovedUsers(prev => prev.filter(user => user.id !== userId));
       
-      toast.success(`Usuário ${userName} foi excluído com sucesso`);
+      toast({
+        title: 'Usuário excluído',
+        description: `Usuário ${userName} foi excluído com sucesso`,
+      });
     } catch (error) {
       console.error('Erro ao excluir usuário:', error);
-      toast.error('Erro ao excluir usuário. Tente novamente.');
+      toast({
+        title: 'Erro ao excluir usuário',
+        description: 'Tente novamente.',
+        variant: 'destructive',
+      });
     } finally {
       setDeletingUserId(null);
     }
@@ -512,7 +530,7 @@ export default function ApproveLogins() {
                                 </div>
                                 <div className="flex items-center justify-center sm:justify-start gap-2 text-xs md:text-sm text-gray-600">
                                   <Calendar className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
-                                  <span>Solicitado em {new Date(user.created_at).toLocaleDateString('pt-BR')}</span>
+                                  <span>Solicitado em {formatDate(user.created_at)}</span>
                                 </div>
                               </div>
                               
@@ -572,10 +590,8 @@ export default function ApproveLogins() {
               ) : (
                 <div className="space-y-3 md:space-y-4">
                   {approvedUsers.map((user) => {
-                    // Determinar se é da tabela usuarios ou professores
-                    const userTable = user.cargo === 'Professor' ? 'professores' : 'usuarios';
                     const canDelete = isAdmin && user.id !== currentUser?.id; // Admin não pode excluir a si mesmo
-                    const initials = user.nome.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    const initials = user.nome.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
                     
                     return (
                       <Card key={user.id} className="hover:shadow-md transition-shadow duration-200">
@@ -781,7 +797,7 @@ export default function ApproveLogins() {
                                     <AlertDialogFooter>
                                       <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                       <AlertDialogAction
-                                        onClick={() => handleDeleteUser(user.id, user.nome, userTable)}
+                                        onClick={() => handleDeleteUser(user.id, user.nome, user.cargo)}
                                         className="bg-red-600 hover:bg-red-700 text-white"
                                       >
                                         Excluir Usuário

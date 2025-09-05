@@ -367,7 +367,7 @@ export const StudentDetailsModal: React.FC<StudentDetailsModalProps> = ({
   };
 
   const formatarData = (data: string) => {
-    return new Date(data).toLocaleDateString('pt-BR');
+    return formatDate(data);
   };
 
   const getStatusColor = (status: string) => {

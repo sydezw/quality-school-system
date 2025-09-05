@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { calcularProximaDataVencimento, encontrarPrimeiraParcela } from '@/utils/dateCalculators';
+import { calcularProximaDataVencimento, encontrarPrimeiraParcela } from '@/utils/parcelaCalculations';
 import { getProximoNumeroParcela } from '@/utils/parcelaNumbering';
 
 // Modificar a interface para incluir qual parcela foi marcada

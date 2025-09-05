@@ -30,6 +30,8 @@ import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useGroqPDF } from '@/hooks/useGroqPDF';
+import { formatDate } from '@/utils/formatters';
+import { calcularNumeroPorTipo, calcularProximosVencimentos, type ParcelaBasica } from '@/utils/parcelaCalculations';
 import {
   Table,
   TableBody,
@@ -126,28 +128,7 @@ const FinancialReportsTable = () => {
   const [variacaoSaldo, setVariacaoSaldo] = useState<VariacaoSaldo[]>([]);
   const [receitaPorIdioma, setReceitaPorIdioma] = useState<ReceitaPorIdioma[]>([]);
 
-  // Função para calcular o número da parcela por tipo de item
-  const calcularNumeroPorTipo = (parcelaAtual: ParcelaDetalhada, todasParcelas: ParcelaDetalhada[]) => {
-    // Filtrar parcelas do mesmo tipo de item e mesmo registro financeiro
-    const parcelasMesmoTipo = todasParcelas.filter(p => 
-      p.tipo_item === parcelaAtual.tipo_item && 
-      p.registro_financeiro_id === parcelaAtual.registro_financeiro_id
-    );
-    
-    // Ordenar por data de vencimento e depois por ID
-    const parcelasOrdenadas = parcelasMesmoTipo.sort((a, b) => {
-      const dataA = new Date(a.data_vencimento);
-      const dataB = new Date(b.data_vencimento);
-      if (dataA.getTime() !== dataB.getTime()) {
-        return dataA.getTime() - dataB.getTime();
-      }
-      return a.id - b.id;
-    });
-    
-    // Encontrar a posição da parcela atual na lista ordenada
-    const posicao = parcelasOrdenadas.findIndex(p => p.id === parcelaAtual.id);
-    return posicao + 1; // +1 porque queremos começar de 1, não de 0
-  };
+
 
   // Função para buscar dados de parcelas das duas tabelas
   const buscarDadosRegistros = async (tipoParcela: 'todas' | 'ativas' | 'migradas_ativas' | 'migradas' = tipoParcelaFiltro) => {
@@ -265,7 +246,7 @@ const FinancialReportsTable = () => {
       setParcelas(dadosCombinados);
       
       // Calcular próximos vencimentos
-      calcularProximosVencimentos(dadosCombinados);
+      calcularProximosVencimentosLocal(dadosCombinados);
       
       return dadosCombinados;
     } catch (error) {
@@ -298,40 +279,26 @@ const FinancialReportsTable = () => {
     }
   };
 
-  // Função para calcular próximos vencimentos
-  const calcularProximosVencimentos = (todasParcelas: ParcelaDetalhada[]) => {
-    const hoje = new Date();
-    const proximosDias = 30; // Próximos 30 dias
-    const dataLimite = new Date();
-    dataLimite.setDate(hoje.getDate() + proximosDias);
-
-    const proximosVencimentos = todasParcelas
-      .filter(parcela => {
-        const dataVencimento = new Date(parcela.data_vencimento);
-        return (
-          parcela.status_pagamento !== 'pago' &&
-          dataVencimento >= hoje &&
-          dataVencimento <= dataLimite
-        );
-      })
+  // Função para calcular próximos vencimentos usando a função centralizada
+  const calcularProximosVencimentosLocal = (todasParcelas: ParcelaDetalhada[]) => {
+    const proximosVencimentos = calcularProximosVencimentos(todasParcelas, 30)
       .map(parcela => {
         const dataVencimento = new Date(parcela.data_vencimento);
+        const hoje = new Date();
         const diasRestantes = Math.ceil((dataVencimento.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
         
         return {
           id: parcela.id,
-          alunoNome: parcela.aluno_nome || 'N/A',
+          alunoNome: (parcela as any).aluno_nome || 'N/A',
           valor: parcela.valor,
           dataVencimento: parcela.data_vencimento,
           diasRestantes,
-          tipoItem: parcela.tipo_item,
-          numeroParcela: parcela.numero_parcela,
-          planoNome: parcela.plano_nome || 'N/A',
-          status: parcela.status_pagamento
+          tipoItem: (parcela as any).tipo_item,
+          numeroParcela: (parcela as any).numero_parcela,
+          planoNome: (parcela as any).plano_nome || 'N/A',
+          status: (parcela as any).status_pagamento
         };
-      })
-      .sort((a, b) => a.diasRestantes - b.diasRestantes)
-      .slice(0, 10); // Limitar a 10 registros
+      });
 
     setProximosVencimentosRegistros(proximosVencimentos);
   };
@@ -452,7 +419,7 @@ const FinancialReportsTable = () => {
           .map(v => ({
             aluno: v.alunoNome,
             valor: v.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
-            dataVencimento: new Date(v.dataVencimento).toLocaleDateString('pt-BR'),
+            dataVencimento: formatDate(v.dataVencimento),
             diasRestantes: v.diasRestantes,
             tipo: v.tipoItem,
             parcela: v.numeroParcela,
@@ -463,7 +430,7 @@ const FinancialReportsTable = () => {
           descricao: d.descricao,
           valor: d.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
           categoria: d.categoria,
-          data: new Date(d.data).toLocaleDateString('pt-BR'),
+          data: formatDate(d.data),
           status: d.status
         })),
         alertasImportantes: [
@@ -493,8 +460,8 @@ const FinancialReportsTable = () => {
           plano: p.plano_nome || 'Plano não informado',
           parcela: p.numero_parcela,
           valor: (p.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
-          vencimento: new Date(p.data_vencimento).toLocaleDateString('pt-BR'),
-          pagamento: p.data_pagamento ? new Date(p.data_pagamento).toLocaleDateString('pt-BR') : '-',
+          vencimento: formatDate(p.data_vencimento),
+          pagamento: p.data_pagamento ? formatDate(p.data_pagamento) : '-',
           status: p.status_pagamento,
           tipo: p.tipo_item,
           idioma: p.idioma_registro,
@@ -1096,7 +1063,7 @@ const FinancialReportsTable = () => {
                       <div className="flex-1">
                         <p className="font-medium">{despesa.descricao}</p>
                         <p className="text-sm" style={{color: '#6B7280'}}>
-                          {despesa.categoria} • {new Date(despesa.data).toLocaleDateString('pt-BR')}
+                          {despesa.categoria} • {formatDate(despesa.data)}
                         </p>
                       </div>
                     </div>
@@ -1399,7 +1366,7 @@ const FinancialReportsTable = () => {
                           R$ {parcela.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </TableCell>
                         <TableCell>
-                          {new Date(parcela.data_vencimento).toLocaleDateString('pt-BR')}
+                          {formatDate(parcela.data_vencimento)}
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">{parcela.tipo_item}</Badge>
@@ -1410,7 +1377,7 @@ const FinancialReportsTable = () => {
                             <TableCell>{parcela.idioma_registro}</TableCell>
                             <TableCell>{parcela.forma_pagamento || '-'}</TableCell>
                             <TableCell>
-                              {parcela.data_pagamento ? new Date(parcela.data_pagamento).toLocaleDateString('pt-BR') : '-'}
+                              {parcela.data_pagamento ? formatDate(parcela.data_pagamento) : '-'}
                             </TableCell>
                             <TableCell>{parcela.observacoes || '-'}</TableCell>
                             <TableCell>

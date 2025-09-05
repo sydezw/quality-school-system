@@ -18,6 +18,7 @@ import { useMultipleSelection } from '@/hooks/useMultipleSelection';
 import { MultipleSelectionBar } from '@/components/shared/MultipleSelectionBar';
 import { SelectionCheckbox } from '@/components/shared/SelectionCheckbox';
 import { ConfirmDeleteModal } from '@/components/shared/ConfirmDeleteModal';
+import { formatDate } from '@/utils/formatters';
 
 // Tipos para melhor organização e reutilização
 type Turma = Tables<'turmas'>;
@@ -257,12 +258,7 @@ const ClassesList = () => {
     setShowAulaModal(true);
   };
 
-  /**
-   * Formata data para exibição
-   */
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR');
-  };
+
 
   /**
    * Formata horário para exibição

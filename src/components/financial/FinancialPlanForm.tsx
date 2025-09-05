@@ -17,7 +17,9 @@ import { cn } from '@/lib/utils';
 import DatePicker from '@/components/shared/DatePicker';
 import { format } from 'date-fns';
 import { criarParcelasComNumeracaoCorreta } from '@/utils/parcelaNumbering';
+import { criarDataDeString } from '@/utils/dateUtils';
 import { PlanoGenerico } from '@/types/financial';
+import { formatDate } from '@/utils/formatters';
 
 // HELPER FUNCTION: Formatação de valores decimais para padrão brasileiro
 const formatarDecimalBR = (valor: number): string => {
@@ -493,7 +495,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
       
       // Criar parcelas automaticamente usando a mesma lógica do TornarAtivoModal
       if (financeiroData?.id) {
-        const dataBase = new Date(data.data_vencimento_primeira);
+        const dataBase = criarDataDeString(data.data_vencimento_primeira);
         
         // Preparar dados das parcelas seguindo a mesma estrutura do TornarAtivoModal
         const parcelasData: any = {};
@@ -1290,7 +1292,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 space-y-3">
             <div className="flex items-start space-x-2">
               <div className="text-yellow-600 text-sm">
-                ⚠️ <strong>Atenção:</strong> Este aluno já possui um plano financeiro criado em {new Date(existingPlan.created_at).toLocaleDateString('pt-BR')}.
+                ⚠️ <strong>Atenção:</strong> Este aluno já possui um plano financeiro criado em {formatDate(existingPlan.created_at)}.
                 Criar um novo plano irá sobrescrever o plano existente.
               </div>
             </div>

@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, FileText, Download, Eye } from 'lucide-react';
 import { useForm } from 'react-hook-form';
+import { formatDate } from '@/utils/formatters';
 
 
 
@@ -230,9 +231,7 @@ const Documents = () => {
 
 
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr + 'T00:00:00').toLocaleDateString('pt-BR');
-  };
+
 
   if (loading) {
     return (

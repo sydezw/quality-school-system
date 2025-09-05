@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import { criarDataDeString } from '@/utils/dateUtils';
 
 // Tipo base da parcela
 type ParcelaBase = Tables<'parcelas_alunos'>;
@@ -53,7 +54,7 @@ export const useParcelas = () => {
     
     // Verificar se está vencido
     const hoje = new Date();
-    const dataVencimento = new Date(parcela.data_vencimento);
+    const dataVencimento = criarDataDeString(parcela.data_vencimento);
     
     if (dataVencimento < hoje) {
       return 'vencido';

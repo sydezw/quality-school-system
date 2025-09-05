@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { formatDate } from '@/utils/formatters';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -402,13 +403,9 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
     carregarDados();
   }, [tipoRegistro]);
 
-  // Função para formatar data
-  const formatDate = (dateString: string) => {
-    try {
-      return format(new Date(dateString), 'dd/MM/yyyy', { locale: ptBR });
-    } catch {
-      return dateString;
-    }
+  // Função para formatar data - usando a função utilitária correta
+  const formatDateLocal = (dateString: string) => {
+    return formatDate(dateString);
   };
 
   // Função para formatar moeda
@@ -1452,7 +1449,7 @@ const StudentGroupingView: React.FC<StudentGroupingViewProps> = ({ onRefresh }) 
                                            </TableCell>
                                            <TableCell className="py-3">
                                              <span className="text-[#6B7280] text-base">
-                                               {formatDate(parcela.data_vencimento)}
+                                               {formatDateLocal(parcela.data_vencimento)}
                                              </span>
                                            </TableCell>
                                            <TableCell className="py-3">

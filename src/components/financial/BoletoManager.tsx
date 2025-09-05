@@ -15,7 +15,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useEffect } from 'react';
 import DatePicker from '@/components/shared/DatePicker';
 import { format } from 'date-fns';
-import { formatarFormaPagamento } from '@/utils/formatters';
+import { ptBR } from 'date-fns/locale';
+import { formatarFormaPagamento, formatDate } from '@/utils/formatters';
 
 interface Student {
   id: string;
@@ -74,8 +75,8 @@ const BoletoManager = ({ filtroStatus = 'todos', alunoSelecionado }: BoletoManag
     }).format(value);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR');
+  const formatDateLocal = (dateString: string) => {
+    return formatDate(dateString);
   };
 
   const onSubmit = async (data: CriarBoletoData) => {
@@ -359,7 +360,7 @@ const BoletoManager = ({ filtroStatus = 'todos', alunoSelecionado }: BoletoManag
                     </TableCell>
                     <TableCell className="text-base">{boleto.descricao}</TableCell>
                     <TableCell className="text-base">{formatCurrency(boleto.valor)}</TableCell>
-                    <TableCell className="text-base">{formatDate(boleto.data_vencimento)}</TableCell>
+                    <TableCell className="text-base">{formatDateLocal(boleto.data_vencimento)}</TableCell>
                     <TableCell>
                       <Badge className={getStatusColor(boleto.status)}>
                         {boleto.status}

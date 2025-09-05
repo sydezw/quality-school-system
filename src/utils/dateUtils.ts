@@ -22,9 +22,10 @@
  * const novaData = adicionarMesesSeguro(data, 1); // 1 de outubro de 2024
  */
 export const adicionarMesesSeguro = (dataBase: Date, mesesParaAdicionar: number): Date => {
-  const diaOriginal = dataBase.getDate();
-  const mesOriginal = dataBase.getMonth();
-  const anoOriginal = dataBase.getFullYear();
+  // Usar UTC para evitar problemas de timezone
+  const diaOriginal = dataBase.getUTCDate();
+  const mesOriginal = dataBase.getUTCMonth();
+  const anoOriginal = dataBase.getUTCFullYear();
   
   // Calcular o novo mês e ano
   let novoMes = mesOriginal + mesesParaAdicionar;
@@ -40,11 +41,12 @@ export const adicionarMesesSeguro = (dataBase: Date, mesesParaAdicionar: number)
     novoAno--;
   }
   
-  // Verificar se o dia original existe no novo mês
-  const ultimoDiaDoNovoMes = new Date(novoAno, novoMes + 1, 0).getDate();
+  // Verificar se o dia original existe no novo mês usando UTC
+  const ultimoDiaDoNovoMes = new Date(Date.UTC(novoAno, novoMes + 1, 0)).getUTCDate();
   const diaFinal = Math.min(diaOriginal, ultimoDiaDoNovoMes);
   
-  return new Date(novoAno, novoMes, diaFinal);
+  // Retornar data em UTC
+  return new Date(Date.UTC(novoAno, novoMes, diaFinal));
 };
 
 /**
@@ -71,6 +73,7 @@ export const isDataValida = (data: Date): boolean => {
 
 /**
  * Formata uma data para string no formato YYYY-MM-DD
+ * Usa UTC para evitar problemas de timezone
  * 
  * @param data - Data para formatar
  * @returns String no formato YYYY-MM-DD
@@ -79,17 +82,35 @@ export const formatarDataParaISO = (data: Date): string => {
   if (!isDataValida(data)) {
     throw new Error('Data inválida fornecida');
   }
-  return data.toISOString().split('T')[0];
+  
+  // Usar UTC para evitar problemas de timezone
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, '0');
+  const dia = String(data.getDate()).padStart(2, '0');
+  
+  return `${ano}-${mes}-${dia}`;
+};
+
+/**
+ * Cria uma data em UTC para evitar problemas de timezone
+ * 
+ * @param ano - Ano
+ * @param mes - Mês (1-12)
+ * @param dia - Dia
+ * @returns Nova instância de Date em UTC
+ */
+export const criarDataUTC = (ano: number, mes: number, dia: number): Date => {
+  return new Date(Date.UTC(ano, mes - 1, dia));
 };
 
 /**
  * Cria uma data a partir de uma string no formato YYYY-MM-DD
- * Evita problemas de timezone
+ * Evita problemas de timezone usando UTC
  * 
  * @param dataString - String no formato YYYY-MM-DD
- * @returns Nova instância de Date
+ * @returns Nova instância de Date em UTC
  */
 export const criarDataDeString = (dataString: string): Date => {
   const [ano, mes, dia] = dataString.split('-').map(Number);
-  return new Date(ano, mes - 1, dia); // mes - 1 porque Date usa 0-11 para meses
+  return new Date(Date.UTC(ano, mes - 1, dia)); // mes - 1 porque Date usa 0-11 para meses
 };

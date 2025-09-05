@@ -13,7 +13,11 @@ import { Plus, Edit, Users, Trash2, Eye, EyeOff, Key } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
-import { Teacher } from '@/integrations/supabase/types';
+import { Database } from '@/integrations/supabase/types';
+
+type Teacher = Database['public']['Tables']['professores']['Row'];
+type TeacherInsert = Database['public']['Tables']['professores']['Insert'];
+type TeacherUpdate = Database['public']['Tables']['professores']['Update'];
 import { teacherFormSchema, type TeacherFormData } from '@/lib/validators/teacher';
 import { formatCPF, formatPhone } from '@/utils/formatters';
 
@@ -102,7 +106,7 @@ const Teachers = () => {
         idiomas: data.idiomas || '',
         salario: data.salario && data.salario !== '0,00' ? parseFloat(data.salario.replace(/\./g, '').replace(',', '.')) : null,
         senha: data.senha || null,
-        cargo: editingTeacher ? undefined : 'Professor', // Adiciona cargo automaticamente apenas para novos professores
+        cargo: editingTeacher ? undefined : 'Professor' as Database['public']['Enums']['cargo_usuario'], // Adiciona cargo automaticamente apenas para novos professores
       };
 
       if (editingTeacher) {

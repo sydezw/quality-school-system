@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ParcelaHistorico, FiltrosHistorico } from '../types/historico';
 import { EditarParcelaHistoricoModal } from './EditarParcelaHistoricoModal.tsx';
+import { formatDate } from '@/utils/formatters';
 
 interface HistoricoParcelasModalProps {
   isOpen: boolean;
@@ -48,8 +49,8 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
   }, []);
 
   // Função para formatar data
-  const formatDate = useCallback((dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR');
+  const formatDateLocal = useCallback((dateString: string) => {
+    return formatDate(dateString);
   }, []);
 
   // Função para ícones de tipo
@@ -432,9 +433,9 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                                     <TableCell className="font-bold py-4 text-base" style={{color: '#15803D'}}>
                                       {formatCurrency(parcela.valor)}
                                     </TableCell>
-                                    <TableCell className="py-4 text-base">{formatDate(parcela.data_vencimento)}</TableCell>
+                                    <TableCell className="py-4 text-base">{formatDateLocal(parcela.data_vencimento)}</TableCell>
                                     <TableCell className="py-4 text-base">
-                                      {parcela.data_pagamento ? formatDate(parcela.data_pagamento) : '-'}
+                                      {parcela.data_pagamento ? formatDateLocal(parcela.data_pagamento) : '-'}
                                     </TableCell>
                                     <TableCell className="py-4">
                                       <motion.div whileHover={{ scale: 1.05 }}>
@@ -461,7 +462,7 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                                       </Badge>
                                     </TableCell>
                                     <TableCell className="py-4 text-base">
-                                      {parcela.criado_em ? formatDate(parcela.criado_em) : '-'}
+                                      {parcela.criado_em ? formatDateLocal(parcela.criado_em) : '-'}
                                     </TableCell>
                                     <TableCell className="py-4 max-w-xs">
                                       <div className="text-sm" style={{color: '#6B7280'}}>

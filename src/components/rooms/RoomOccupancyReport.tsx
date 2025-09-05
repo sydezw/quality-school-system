@@ -8,6 +8,7 @@ import { Building2, ChevronDown, CalendarDays, PlusCircle } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
 import { NewLessonDialog } from '../classes/NewLessonDialog';
+import { formatDate } from '@/utils/formatters';
 
 interface Aula {
   id: string;
@@ -186,7 +187,7 @@ const RoomOccupancyReport = () => {
                                   <TableCell className="w-[150px] text-base">
                                     <div className="flex items-center gap-2">
                                       <CalendarDays className="h-4 w-4 text-gray-500" />
-                                      {new Date(aula.data + 'T00:00:00').toLocaleDateString('pt-BR')}
+                                      {formatDate(aula.data)}
                                     </div>
                                   </TableCell>
                                   <TableCell className="text-base">{aula.conteudo || <span className="text-gray-400">Conteúdo não informado</span>}</TableCell>

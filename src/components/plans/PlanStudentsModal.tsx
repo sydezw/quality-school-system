@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Search, Users, Phone, Mail, Calendar } from 'lucide-react';
-import { formatPhone } from '@/utils/formatters';
+import { formatPhone, formatDate } from '@/utils/formatters';
 
 interface Student {
   id: string;
@@ -115,9 +115,9 @@ const PlanStudentsModal = ({ planId, planName, isOpen, onClose }: PlanStudentsMo
     );
   };
 
-  const formatDate = (dateString: string | null) => {
+  const formatDateSafe = (dateString: string | null) => {
     if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString('pt-BR');
+    return formatDate(dateString);
   };
 
   return (
@@ -202,14 +202,14 @@ const PlanStudentsModal = ({ planId, planName, isOpen, onClose }: PlanStudentsMo
                         <TableCell className="text-base">
                           <div className="flex items-center gap-1">
                             <Calendar className="w-3 h-3 text-gray-400" />
-                            {formatDate(student.data_nascimento)}
+                            {formatDateSafe(student.data_nascimento)}
                           </div>
                         </TableCell>
                         <TableCell>
                           {getStatusBadge(student.status)}
                         </TableCell>
                         <TableCell className="text-base">
-                          {formatDate(student.created_at)}
+                          {formatDateSafe(student.created_at)}
                         </TableCell>
                       </TableRow>
                     ))}

@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { getProximoNumeroParcela } from '@/utils/parcelaNumbering';
 import { adicionarMesesSeguro } from '@/utils/dateUtils';
+import { formatDate } from '@/utils/formatters';
 
 interface NovaParcelaForm {
   registro_financeiro_id: string;
@@ -521,7 +522,7 @@ export const MultipleParcelasModal: React.FC<MultipleParcelasModalProps> = ({
                       <div className="text-xs text-gray-500 max-h-20 overflow-y-auto">
                         {calcularDatasMultiplas().map((data, index) => (
                           <div key={index}>
-                            Parcela {index + 1}: {new Date(data).toLocaleDateString('pt-BR')}
+                            Parcela {index + 1}: {formatDate(data)}
                           </div>
                         ))}
                       </div>

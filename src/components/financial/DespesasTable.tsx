@@ -17,9 +17,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useFinancial } from '@/hooks/useFinancial';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { formatDate } from '@/utils/formatters';
+import { Despesa } from '@/types/financial';
 
-interface Despesa {
-  id?: number;
+interface DespesaLocal {
+  id?: string;
   descricao: string;
   valor: number;
   categoria: 'salário' | 'aluguel' | 'material' | 'manutenção';
@@ -72,9 +74,9 @@ const DespesasTable = () => {
   
   // Estados para o modal
   const [modalDespesaAberto, setModalDespesaAberto] = useState(false);
-  const [editandoDespesa, setEditandoDespesa] = useState<Despesa | null>(null);
   const [salvandoDespesa, setSalvandoDespesa] = useState(false);
-  const [novaDespesa, setNovaDespesa] = useState<Partial<Despesa>>({
+  const [editandoDespesa, setEditandoDespesa] = useState<DespesaLocal | null>(null);
+  const [novaDespesa, setNovaDespesa] = useState<DespesaLocal>({
     descricao: '',
     valor: 0,
     categoria: 'material', // Valor válido do ENUM
@@ -82,17 +84,17 @@ const DespesasTable = () => {
     status: 'Pendente' // Corrigido: 'Pendente' em vez de 'pendente'
   });
 
-  // Função para buscar categorias
+  // Função para buscar categorias (usando enum fixo já que não há tabela específica)
   const fetchCategorias = async () => {
     try {
-      const { data, error } = await supabase
-        .from('categorias_contrato')
-        .select('*')
-        .eq('ativo', true)
-        .order('nome');
-      
-      if (error) throw error;
-      setCategorias(data || []);
+      // Como não há tabela de categorias específica, usar valores fixos do enum
+      const categoriasFixas = [
+        { id: 'salário', nome: 'Salário' },
+        { id: 'aluguel', nome: 'Aluguel' },
+        { id: 'material', nome: 'Material' },
+        { id: 'manutenção', nome: 'Manutenção' }
+      ];
+      setCategorias(categoriasFixas);
     } catch (error) {
       console.error('Erro ao buscar categorias:', error);
     }
@@ -116,13 +118,21 @@ const DespesasTable = () => {
   };
 
   const abrirModalEdicao = (despesa: Despesa) => {
-    setEditandoDespesa(despesa);
+    const despesaLocal: DespesaLocal = {
+      id: despesa.id,
+      descricao: despesa.descricao,
+      valor: despesa.valor,
+      categoria: despesa.categoria as 'salário' | 'aluguel' | 'material' | 'manutenção',
+      data: despesa.data,
+      status: despesa.status as 'Pago' | 'Pendente'
+    };
+    setEditandoDespesa(despesaLocal);
     setNovaDespesa({
       descricao: despesa.descricao,
       valor: despesa.valor,
-      categoria: despesa.categoria,
+      categoria: despesa.categoria as 'salário' | 'aluguel' | 'material' | 'manutenção',
       data: despesa.data,
-      status: despesa.status
+      status: despesa.status as 'Pago' | 'Pendente'
     });
     setModalDespesaAberto(true);
   };
@@ -170,7 +180,7 @@ const DespesasTable = () => {
         const { error: updateError } = await supabase
           .from('despesas')
           .update(despesaData)
-          .eq('id', editandoDespesa.id);
+          .eq('id', editandoDespesa.id!);
         
         error = updateError;
       } else {
@@ -210,7 +220,7 @@ const DespesasTable = () => {
     }
   };
 
-  const excluirDespesa = async (despesaId: number) => {
+  const excluirDespesa = async (despesaId: string) => {
     try {
       if (!confirm('Tem certeza que deseja excluir esta despesa?')) {
         return;
@@ -219,7 +229,7 @@ const DespesasTable = () => {
       const { error } = await supabase
         .from('despesas')
         .delete()
-        .eq('id', despesaId);
+        .eq('id', despesaId.toString());
 
       if (error) {
         throw error;
@@ -361,7 +371,7 @@ const DespesasTable = () => {
                               R$ {despesa.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                             </TableCell>
                             <TableCell>
-                              {new Date(despesa.data).toLocaleDateString('pt-BR')}
+                              {formatDate(despesa.data)}
                             </TableCell>
                             <TableCell>
                               <motion.div
@@ -395,7 +405,7 @@ const DespesasTable = () => {
                                   <Button 
                                     variant="outline" 
                                     size="sm"
-                                    onClick={() => excluirDespesa(despesa.id!)}
+                                    onClick={() => excluirDespesa(despesa.id)}
                                     className="hover:bg-red-50 hover:border-red-300 transition-colors duration-200"
                                   >
                                     <Trash2 className="h-4 w-4" />
