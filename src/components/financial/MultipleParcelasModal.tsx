@@ -15,7 +15,7 @@ import { formatDate } from '@/utils/formatters';
 
 interface NovaParcelaForm {
   registro_financeiro_id: string;
-  tipo_item: 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'outros';
+  tipo_item: 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'avulso' | 'outros';
   numero_parcela: number;
   valor: number;
   data_vencimento: string;
@@ -75,7 +75,7 @@ export const MultipleParcelasModal: React.FC<MultipleParcelasModalProps> = ({
 
   // Estados para múltiplas parcelas
   const [multipleParcelas, setMultipleParcelas] = useState({
-    tipo_item: 'plano' as 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'outros',
+    tipo_item: 'plano' as 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'avulso' | 'outros',
     quantidade: 2,
     valor_total: 0,
     data_inicial: '',
@@ -141,7 +141,8 @@ export const MultipleParcelasModal: React.FC<MultipleParcelasModalProps> = ({
         .from('parcelas_alunos')
         .insert({
           ...singleParcela,
-          numero_parcela: proximoNumero
+          numero_parcela: proximoNumero,
+          nome_aluno: aluno.nome
         });
 
       if (error) throw error;
@@ -204,7 +205,8 @@ export const MultipleParcelasModal: React.FC<MultipleParcelasModalProps> = ({
         idioma_registro: 'Inglês' as const,
         descricao_item: multipleParcelas.descricao_item || null,
         observacoes: multipleParcelas.observacoes || null,
-        forma_pagamento: multipleParcelas.forma_pagamento
+        forma_pagamento: multipleParcelas.forma_pagamento,
+        nome_aluno: aluno.nome
       }));
 
       const { error } = await supabase
@@ -306,6 +308,7 @@ export const MultipleParcelasModal: React.FC<MultipleParcelasModalProps> = ({
                     <SelectItem value="material">Material</SelectItem>
                     <SelectItem value="matrícula">Matrícula</SelectItem>
                     <SelectItem value="cancelamento">Cancelamento</SelectItem>
+                    <SelectItem value="avulso">Avulso</SelectItem>
                     <SelectItem value="outros">Outros</SelectItem>
                   </SelectContent>
                 </Select>
@@ -414,6 +417,7 @@ export const MultipleParcelasModal: React.FC<MultipleParcelasModalProps> = ({
                     <SelectItem value="material">Material</SelectItem>
                     <SelectItem value="matrícula">Matrícula</SelectItem>
                     <SelectItem value="cancelamento">Cancelamento</SelectItem>
+                    <SelectItem value="avulso">Avulso</SelectItem>
                     <SelectItem value="outros">Outros</SelectItem>
                   </SelectContent>
                 </Select>

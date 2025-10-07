@@ -368,7 +368,7 @@ const DespesasTable = () => {
                               </div>
                             </TableCell>
                             <TableCell className="font-semibold text-green-600">
-                              R$ {despesa.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              R$ {despesa.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </TableCell>
                             <TableCell>
                               {formatDate(despesa.data)}

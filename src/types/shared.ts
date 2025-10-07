@@ -18,5 +18,7 @@ export interface StudentWithRelations extends Student {
   responsaveis?: {
     nome: string;
     telefone: string;
+    email?: string;
+    cpf?: string;
   };
 }

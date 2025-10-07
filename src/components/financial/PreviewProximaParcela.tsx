@@ -9,7 +9,7 @@ interface ParcelaPreview {
   numero_parcela: number;
   valor: number;
   data_vencimento: string;
-  tipo_item: 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'outros';
+  tipo_item: 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'avulso' | 'outros';
   descricao_item?: string;
   idioma_registro: 'Inglês' | 'Japonês';
 }

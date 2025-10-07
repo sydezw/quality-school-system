@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +24,7 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   CalendarDays
 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -32,6 +33,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useGroqPDF } from '@/hooks/useGroqPDF';
 import { formatDate } from '@/utils/formatters';
 import { calcularNumeroPorTipo, calcularProximosVencimentos, type ParcelaBasica } from '@/utils/parcelaCalculations';
+import { buscarAlunosSemCiclos } from '@/utils/alunosSemCiclos';
+import { CycleManager } from './CycleManager';
 import {
   Table,
   TableBody,
@@ -47,24 +50,24 @@ import Chart from 'react-apexcharts';
 // Interfaces
 interface ParcelaDetalhada {
   id: number;
-  registro_financeiro_id: string | null;
+  alunos_financeiro_id: string | null;
   numero_parcela: number;
   valor: number;
   data_vencimento: string;
   data_pagamento: string | null;
   status_pagamento: string;
-  tipo_item: 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'outros';
+  tipo_item: 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'avulso' | 'outros';
   descricao_item?: string | null;
   idioma_registro: 'Inglês' | 'Japonês';
   aluno_nome?: string;
   plano_nome?: string;
   forma_pagamento?: string;
   observacoes?: string | null;
-  financeiro_alunos?: {
+  alunos_financeiro?: {
     alunos?: { nome: string };
     planos?: { nome: string };
   };
-  fonte?: 'parcelas_alunos' | 'parcelas_migracao_raw';
+  fonte?: 'alunos_parcelas' | 'parcelas_migracao_raw';
 }
 
 interface ProximoVencimentoRegistro {
@@ -86,6 +89,17 @@ interface Despesa {
   categoria: 'salário' | 'aluguel' | 'material' | 'manutenção';
   data: string;
   status: 'Pago' | 'Pendente';
+}
+
+interface Ciclo {
+  aluno_id: string;
+  aluno_nome: string;
+  inicio_ciclo: string;
+  final_ciclo: string;
+  total_parcelas: number;
+  parcelas_pagas: number;
+  valor_total_ciclo: number;
+  status_ciclo: 'ativo' | 'vencido';
 }
 
 // Novas interfaces para os gráficos
@@ -113,11 +127,29 @@ const FinancialReportsTable = () => {
   const [exportandoPDF, setExportandoPDF] = useState(false);
   const [detalhesAbertos, setDetalhesAbertos] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+
+  // Callback otimizado para o onChange do input
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  }, []);
   const [anoFiltro, setAnoFiltro] = useState<string>('todos');
   const [tipoParcelaFiltro, setTipoParcelaFiltro] = useState<'todas' | 'ativas' | 'migradas' | 'migradas_ativas'>('todas');
   const [despesas, setDespesas] = useState<Despesa[]>([]);
+  const [ciclos, setCiclosAtivos] = useState<Ciclo[]>([]);
+  const [filtroCiclo, setFiltroCiclo] = useState<'ativos' | 'quase_encerrados' | 'encerrados' | ''>('');
+  const [searchCiclosTerm, setSearchCiclosTerm] = useState('');
+  const [debouncedSearchCiclosTerm, setDebouncedSearchCiclosTerm] = useState('');
+  const [alunosSemCiclos, setAlunosSemCiclos] = useState<{id: string, nome: string}[]>([]);
+  const [mostrandoAlunosSemCiclos, setMostrandoAlunosSemCiclos] = useState(false);
+  const [paginaAlunosSemCiclos, setPaginaAlunosSemCiclos] = useState(1);
+
+  const alunosPorPagina = 15;
   const [parcelas, setParcelas] = useState<ParcelaDetalhada[]>([]);
   const [proximosVencimentosRegistros, setProximosVencimentosRegistros] = useState<ProximoVencimentoRegistro[]>([]);
+  const [paginaAtualVencimentos, setPaginaAtualVencimentos] = useState(1);
+  const [searchVencimentosTerm, setSearchVencimentosTerm] = useState('');
+  const itensVencimentosPorPagina = 10;
   
   // Estados para paginação da tabela de registros
   const [currentPageRegistros, setCurrentPageRegistros] = useState(1);
@@ -127,6 +159,8 @@ const FinancialReportsTable = () => {
   const [receitaMensal, setReceitaMensal] = useState<ReceitaMensal[]>([]);
   const [variacaoSaldo, setVariacaoSaldo] = useState<VariacaoSaldo[]>([]);
   const [receitaPorIdioma, setReceitaPorIdioma] = useState<ReceitaPorIdioma[]>([]);
+  
+
 
 
 
@@ -134,25 +168,28 @@ const FinancialReportsTable = () => {
   const buscarDadosRegistros = async (tipoParcela: 'todas' | 'ativas' | 'migradas_ativas' | 'migradas' = tipoParcelaFiltro) => {
     try {
       let dadosCombinados: ParcelaDetalhada[] = [];
+      let allParcelasMigracao: any[] = [];
       
       // Buscar dados de parcelas ativas se necessário (apenas registros não migrados)
       if (tipoParcela === 'todas' || tipoParcela === 'ativas') {
         const { data: parcelasAlunosData, error: errorParcelas } = await supabase
-          .from('parcelas_alunos')
+          .from('alunos_parcelas')
           .select(`
-            id, registro_financeiro_id, numero_parcela, valor,
+            id, alunos_financeiro_id, numero_parcela, valor,
             data_vencimento, data_pagamento, status_pagamento,
             tipo_item, forma_pagamento, idioma_registro,
-            descricao_item, observacoes,
-            financeiro_alunos!inner (
+            descricao_item, observacoes, nome_aluno,
+            alunos_financeiro!inner (
               aluno_id, ativo_ou_encerrado, migrado,
               alunos (nome, status),
               planos (nome)
             )
           `)
-          .eq('financeiro_alunos.ativo_ou_encerrado', 'ativo')
-          .eq('financeiro_alunos.migrado', 'nao')
-          .eq('financeiro_alunos.alunos.status', 'Ativo');
+          .eq('alunos_financeiro.ativo_ou_encerrado', true)
+          .eq('alunos_financeiro.migrado', false)
+          .eq('alunos_financeiro.alunos.status', 'Ativo')
+          .eq('historico', false)
+          .limit(10000); // Aumentar limite para garantir que todas as parcelas sejam carregadas
 
         if (errorParcelas) {
           console.error('Erro ao buscar parcelas ativas:', errorParcelas);
@@ -160,70 +197,56 @@ const FinancialReportsTable = () => {
           // Normalizar dados das parcelas ativas
           const parcelasNormalizadas = parcelasAlunosData.map(parcela => ({
             ...parcela,
-            aluno_nome: parcela.financeiro_alunos?.alunos?.nome || 'N/A',
-            plano_nome: parcela.financeiro_alunos?.planos?.nome || 'N/A',
-            fonte: 'parcelas_alunos' as const
+            aluno_nome: parcela.nome_aluno || parcela.alunos_financeiro?.alunos?.nome || 'N/A',
+            plano_nome: parcela.alunos_financeiro?.planos?.nome || 'N/A',
+            fonte: 'alunos_parcelas' as const
           }));
           dadosCombinados = [...dadosCombinados, ...parcelasNormalizadas];
         }
       }
 
-      // Buscar dados de parcelas migradas ativas se necessário
-      if (tipoParcela === 'todas' || tipoParcela === 'migradas_ativas') {
-        const { data: parcelasMigradasAtivasData, error: errorMigradasAtivas } = await supabase
-          .from('parcelas_alunos')
-          .select(`
-            id, registro_financeiro_id, numero_parcela, valor,
-            data_vencimento, data_pagamento, status_pagamento,
-            tipo_item, forma_pagamento, idioma_registro,
-            descricao_item, observacoes,
-            financeiro_alunos!inner (
-              aluno_id, ativo_ou_encerrado, migrado,
-              alunos (nome, status),
-              planos (nome)
-            )
-          `)
-          .eq('financeiro_alunos.ativo_ou_encerrado', 'ativo')
-          .eq('financeiro_alunos.migrado', 'sim')
-          .eq('financeiro_alunos.alunos.status', 'Ativo');
-
-        if (errorMigradasAtivas) {
-          console.error('Erro ao buscar parcelas migradas ativas:', errorMigradasAtivas);
-        } else if (parcelasMigradasAtivasData) {
-          // Normalizar dados das parcelas migradas ativas
-          const parcelasNormalizadas = parcelasMigradasAtivasData.map(parcela => ({
-            ...parcela,
-            aluno_nome: parcela.financeiro_alunos?.alunos?.nome || 'N/A',
-            plano_nome: parcela.financeiro_alunos?.planos?.nome || 'N/A',
-            fonte: 'parcelas_alunos' as const
-          }));
-          dadosCombinados = [...dadosCombinados, ...parcelasNormalizadas];
+      // Buscar dados de parcelas migradas se necessário
+      if (tipoParcela === 'todas' || tipoParcela === 'migradas_ativas' || tipoParcela === 'migradas') {
+        // Carregar todas as parcelas migradas usando paginação em lotes
+        let from = 0;
+        const batchSize = 1000;
+        
+        while (true) {
+          const { data: parcelasMigracaoData, error: errorMigracao } = await supabase
+            .from('parcelas_migracao_raw')
+            .select(`
+              id, aluno_nome, valor, data_vencimento,
+              data_pagamento, status_pagamento, tipo_item,
+              idioma, forma_pagamento, observacoes
+            `)
+            .range(from, from + batchSize - 1)
+            .order('data_vencimento', { ascending: false });
+          
+          if (errorMigracao) {
+            console.error('Erro ao buscar parcelas migradas:', errorMigracao);
+            break;
+          }
+          
+          if (!parcelasMigracaoData || parcelasMigracaoData.length === 0) break;
+          
+          allParcelasMigracao = [...allParcelasMigracao, ...parcelasMigracaoData];
+          
+          if (parcelasMigracaoData.length < batchSize) break; // Última página
+          
+          from += batchSize;
         }
-      }
 
-      // Buscar dados de parcelas migradas (histórico) se necessário
-      if (tipoParcela === 'todas' || tipoParcela === 'migradas') {
-        const { data: parcelasMigracaoData, error: errorMigracao } = await supabase
-          .from('parcelas_migracao_raw')
-          .select(`
-            id, aluno_nome, valor, data_vencimento,
-            data_pagamento, status_pagamento, tipo_item,
-            idioma, forma_pagamento, observacoes
-          `);
-
-        if (errorMigracao) {
-          console.error('Erro ao buscar parcelas migradas:', errorMigracao);
-        } else if (parcelasMigracaoData) {
+        if (allParcelasMigracao.length > 0) {
           // Normalizar dados das parcelas migradas
-          const parcelasNormalizadas = parcelasMigracaoData.map(parcela => ({
+          const parcelasNormalizadas = allParcelasMigracao.map(parcela => ({
             id: parcela.id,
-            registro_financeiro_id: null,
+            alunos_financeiro_id: null,
             numero_parcela: 1, // Parcelas migradas não têm numeração específica
             valor: parcela.valor,
             data_vencimento: parcela.data_vencimento,
             data_pagamento: parcela.data_pagamento,
             status_pagamento: parcela.status_pagamento,
-            tipo_item: parcela.tipo_item as 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'outros',
+            tipo_item: parcela.tipo_item as 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'avulso' | 'outros',
             descricao_item: null,
             idioma_registro: parcela.idioma as 'Inglês' | 'Japonês',
             aluno_nome: parcela.aluno_nome || 'N/A',
@@ -236,11 +259,15 @@ const FinancialReportsTable = () => {
         }
       }
 
-      // Ordenar por data de vencimento (mais recentes primeiro)
+      // Ordenar por data de vencimento (mais recentes primeiro) e depois por nome do aluno (alfabética)
       dadosCombinados.sort((a, b) => {
         const dataA = new Date(a.data_vencimento);
         const dataB = new Date(b.data_vencimento);
-        return dataB.getTime() - dataA.getTime();
+        if (dataA.getTime() !== dataB.getTime()) {
+          return dataB.getTime() - dataA.getTime();
+        }
+        // Ordenação secundária por nome do aluno
+        return (a.aluno_nome || '').localeCompare(b.aluno_nome || '', 'pt-BR');
       });
 
       setParcelas(dadosCombinados);
@@ -279,6 +306,81 @@ const FinancialReportsTable = () => {
     }
   };
 
+  const buscarCiclosAtivos = async () => {
+    try {
+      // Buscar ciclos que estão ativos ou terminaram nos últimos 90 dias
+      const hoje = new Date();
+      const noventaDiasAtras = new Date(hoje.getTime() - (90 * 24 * 60 * 60 * 1000));
+      
+      const { data, error } = await supabase
+        .from('alunos_parcelas')
+        .select(`
+          inicio_ciclo, final_ciclo, valor, status_pagamento,
+          alunos_financeiro!inner (
+            aluno_id,
+            alunos (nome)
+          )
+        `)
+        .not('inicio_ciclo', 'is', null)
+        .not('final_ciclo', 'is', null)
+        .eq('historico', false)
+        .gte('final_ciclo', noventaDiasAtras.toISOString().split('T')[0]);
+      
+      if (error) {
+        console.error('Erro ao buscar ciclos ativos:', error);
+        setCiclosAtivos([]);
+        return;
+      }
+      
+      // Agrupar por aluno e ciclo
+      const ciclosAgrupados = new Map<string, Ciclo>();
+      
+      data?.forEach(parcela => {
+        const chave = `${parcela.alunos_financeiro?.aluno_id}-${parcela.inicio_ciclo}-${parcela.final_ciclo}`;
+        const alunoNome = parcela.alunos_financeiro?.alunos?.nome || 'N/A';
+        
+        if (!ciclosAgrupados.has(chave)) {
+          const hoje = new Date();
+          const inicioCiclo = new Date(parcela.inicio_ciclo);
+          const finalCiclo = new Date(parcela.final_ciclo);
+          
+          let statusCiclo: 'ativo' | 'vencido';
+          if (hoje >= inicioCiclo && hoje <= finalCiclo) {
+            statusCiclo = 'ativo';
+          } else {
+            statusCiclo = 'vencido';
+          }
+          
+          ciclosAgrupados.set(chave, {
+            aluno_id: parcela.alunos_financeiro?.aluno_id || '',
+            aluno_nome: alunoNome,
+            inicio_ciclo: parcela.inicio_ciclo,
+            final_ciclo: parcela.final_ciclo,
+            total_parcelas: 0,
+            parcelas_pagas: 0,
+            valor_total_ciclo: 0,
+            status_ciclo: statusCiclo
+          });
+        }
+        
+        const ciclo = ciclosAgrupados.get(chave)!;
+        ciclo.total_parcelas += 1;
+        ciclo.valor_total_ciclo += Number(parcela.valor);
+        
+        if (parcela.status_pagamento === 'pago') {
+          ciclo.parcelas_pagas += 1;
+        }
+      });
+      
+      setCiclosAtivos(Array.from(ciclosAgrupados.values()));
+    } catch (error) {
+      console.error('Erro ao buscar ciclos ativos:', error);
+      setCiclosAtivos([]);
+    }
+  };
+
+
+
   // Função para calcular próximos vencimentos usando a função centralizada
   const calcularProximosVencimentosLocal = (todasParcelas: ParcelaDetalhada[]) => {
     const proximosVencimentos = calcularProximosVencimentos(todasParcelas, 30)
@@ -301,6 +403,8 @@ const FinancialReportsTable = () => {
       });
 
     setProximosVencimentosRegistros(proximosVencimentos);
+    // Resetar página dos vencimentos quando os dados mudarem
+    setPaginaAtualVencimentos(1);
   };
 
   // Função para lidar com mudança do filtro de tipo de parcela
@@ -315,6 +419,9 @@ const FinancialReportsTable = () => {
     try {
       await buscarDadosRegistros(tipoParcela);
       await buscarDespesas();
+      await buscarCiclosAtivos();
+      const alunosSemCiclosData = await buscarAlunosSemCiclos();
+      setAlunosSemCiclos(alunosSemCiclosData);
       await buscarDadosGraficos();
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -327,6 +434,8 @@ const FinancialReportsTable = () => {
       setLoading(false);
     }
   };
+
+
 
   // Função para exportar dados em PDF
   const exportarDados = async () => {
@@ -493,33 +602,45 @@ const FinancialReportsTable = () => {
     try {
       console.log('Iniciando busca de dados dos gráficos...');
       
-      // Buscar dados para o gráfico de receita mensal (removendo filtro muito restritivo)
+      // Buscar dados da tabela alunos_parcelas
       const { data: parcelasData, error: parcelasError } = await supabase
-        .from('parcelas_alunos')
+        .from('alunos_parcelas')
         .select(`
           valor,
           data_vencimento,
           data_pagamento,
           status_pagamento,
           idioma_registro,
-          financeiro_alunos!inner (
+          alunos_financeiro!inner (
             alunos (
               status
             )
           )
         `)
-        .eq('financeiro_alunos.alunos.status', 'Ativo');
-        // Removido o filtro .eq('status_pagamento', 'pago') para ter mais dados
+        .eq('alunos_financeiro.alunos.status', 'Ativo');
 
       if (parcelasError) {
-        console.error('Erro ao buscar dados das parcelas para gráficos:', parcelasError);
+        console.error('Erro ao buscar dados das parcelas ativas para gráficos:', parcelasError);
         return;
       }
 
-      console.log('Dados das parcelas encontrados:', parcelasData?.length || 0);
+      console.log('Dados das parcelas ativas encontrados:', parcelasData?.length || 0);
+
+      // Normalizar dados das parcelas ativas (que podem ter estrutura aninhada)
+      const parcelasAtivasNormalizadas = (parcelasData || []).map(parcela => ({
+        valor: parcela.valor,
+        data_vencimento: parcela.data_vencimento,
+        data_pagamento: parcela.data_pagamento,
+        status_pagamento: parcela.status_pagamento,
+        idioma_registro: parcela.idioma_registro
+      }));
+
+      // Usar apenas dados das parcelas ativas
+      const todasParcelas = parcelasAtivasNormalizadas;
+      console.log('Total de parcelas combinadas:', todasParcelas.length);
 
       // Filtrar apenas parcelas pagas para receita
-      const parcelasPagas = (parcelasData || []).filter(p => p.status_pagamento === 'pago');
+      const parcelasPagas = todasParcelas.filter(p => p.status_pagamento === 'pago');
       console.log('Parcelas pagas encontradas:', parcelasPagas.length);
 
       // Processar dados para receita mensal
@@ -563,8 +684,8 @@ const FinancialReportsTable = () => {
       console.log('Receita mensal processada:', receitaMensalData);
       setReceitaMensal(receitaMensalData);
 
-      // Processar dados para receita por idioma
-      const receitaPorIdiomaData = (parcelasData || []).reduce((acc, parcela) => {
+      // Processar dados para receita por idioma usando apenas parcelas pagas
+      const receitaPorIdiomaData = parcelasPagas.reduce((acc, parcela) => {
         const idioma = parcela.idioma_registro || 'Não informado';
         acc[idioma] = (acc[idioma] || 0) + (parcela.valor || 0);
         return acc;
@@ -620,32 +741,151 @@ const FinancialReportsTable = () => {
     }
   };
 
+  // Debounce para o searchTerm
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300); // 300ms de delay
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Debounce para o searchCiclosTerm
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchCiclosTerm(searchCiclosTerm);
+      // Resetar página quando pesquisar (tanto para ciclos quanto para alunos sem ciclos)
+      setPaginaAlunosSemCiclos(1);
+    }, 300); // 300ms de delay
+
+    return () => clearTimeout(timer);
+  }, [searchCiclosTerm]);
+
+
+
   useEffect(() => {
     carregarDados();
   }, []);
 
   // Filtrar parcelas com base nos critérios de busca e ano
-  const parcelasFiltradas = parcelas.filter(parcela => {
-    const matchesSearch = !searchTerm || 
-      parcela.aluno_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      parcela.plano_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      parcela.tipo_item.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      parcela.status_pagamento.toLowerCase().includes(searchTerm.toLowerCase());
+  const parcelasFiltradas = useMemo(() => {
+    return parcelas.filter(parcela => {
+      const matchesSearch = !debouncedSearchTerm || 
+        parcela.aluno_nome?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        parcela.plano_nome?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        parcela.tipo_item.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        parcela.status_pagamento.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
+      
+      const matchesYear = anoFiltro === 'todos' || 
+        new Date(parcela.data_vencimento).getFullYear().toString() === anoFiltro;
+      
+      return matchesSearch && matchesYear;
+    });
+  }, [parcelas, debouncedSearchTerm, anoFiltro]);
+
+  // Filtrar ciclos ativos com base no filtro selecionado e pesquisa por nome
+  const ciclosFiltrados = useMemo(() => {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0); // Zerar horas para comparação apenas de data
+    const umMesEmMs = 30 * 24 * 60 * 60 * 1000; // 30 dias em milissegundos
     
-    const matchesYear = anoFiltro === 'todos' || 
-      new Date(parcela.data_vencimento).getFullYear().toString() === anoFiltro;
-    
-    return matchesSearch && matchesYear;
-  });
+    return ciclos.filter(ciclo => {
+      const finalCiclo = new Date(ciclo.final_ciclo);
+      finalCiclo.setHours(23, 59, 59, 999); // Definir para o final do dia
+      const inicioCiclo = new Date(ciclo.inicio_ciclo);
+      inicioCiclo.setHours(0, 0, 0, 0); // Definir para o início do dia
+      
+      // Filtro por status do ciclo
+      let matchesStatus = true;
+      switch (filtroCiclo) {
+        case 'ativos':
+          matchesStatus = hoje >= inicioCiclo && hoje <= finalCiclo;
+          break;
+        case 'quase_encerrados':
+          const tempoRestante = finalCiclo.getTime() - hoje.getTime();
+          const diasRestantes = Math.ceil(tempoRestante / (24 * 60 * 60 * 1000));
+          matchesStatus = hoje >= inicioCiclo && hoje <= finalCiclo && diasRestantes <= 30 && diasRestantes > 0;
+          break;
+        case 'encerrados':
+          matchesStatus = hoje > finalCiclo;
+          break;
+        default:
+          matchesStatus = true; // mostrar todos quando nenhum filtro específico está ativo
+      }
+      
+      // Filtro por nome do aluno
+      const matchesSearch = !debouncedSearchCiclosTerm || 
+        ciclo.aluno_nome.toLowerCase().includes(debouncedSearchCiclosTerm.toLowerCase());
+      
+      return matchesStatus && matchesSearch;
+    });  
+  }, [ciclos, filtroCiclo, debouncedSearchCiclosTerm]);
+
+  // Filtrar e paginar alunos sem ciclos
+  const alunosSemCiclosFiltrados = useMemo(() => {
+    return alunosSemCiclos.filter(aluno => 
+      !debouncedSearchCiclosTerm || 
+      aluno.nome.toLowerCase().includes(debouncedSearchCiclosTerm.toLowerCase())
+    );
+  }, [alunosSemCiclos, debouncedSearchCiclosTerm]);
+
+  const alunosSemCiclosPaginados = useMemo(() => {
+    const inicio = (paginaAlunosSemCiclos - 1) * alunosPorPagina;
+    const fim = inicio + alunosPorPagina;
+    return alunosSemCiclosFiltrados.slice(inicio, fim);
+  }, [alunosSemCiclosFiltrados, paginaAlunosSemCiclos, alunosPorPagina]);
+
+  const totalPaginasAlunosSemCiclos = Math.ceil(alunosSemCiclosFiltrados.length / alunosPorPagina);
+
+  // Agrupar parcelas por aluno (apenas para dados migrados)
+
 
   // Cálculos de paginação
-  const totalPagesRegistros = Math.ceil(parcelasFiltradas.length / registrosPorPagina);
-  const startItemRegistros = (currentPageRegistros - 1) * registrosPorPagina + 1;
-  const endItemRegistros = Math.min(currentPageRegistros * registrosPorPagina, parcelasFiltradas.length);
-  const parcelasExibidas = parcelasFiltradas.slice(
-    (currentPageRegistros - 1) * registrosPorPagina,
-    currentPageRegistros * registrosPorPagina
-  );
+  const paginationData = useMemo(() => {
+    const itensPorPagina = registrosPorPagina === 999999 ? parcelasFiltradas.length : registrosPorPagina;
+    const totalPagesRegistros = Math.ceil(parcelasFiltradas.length / itensPorPagina);
+    const startItemRegistros = registrosPorPagina === 999999 ? 1 : (currentPageRegistros - 1) * registrosPorPagina + 1;
+    const endItemRegistros = registrosPorPagina === 999999 ? parcelasFiltradas.length : Math.min(currentPageRegistros * registrosPorPagina, parcelasFiltradas.length);
+    const parcelasExibidas = registrosPorPagina === 999999 ? parcelasFiltradas : parcelasFiltradas.slice(
+      (currentPageRegistros - 1) * registrosPorPagina,
+      currentPageRegistros * registrosPorPagina
+    );
+    
+    return {
+      itensPorPagina,
+      totalPagesRegistros,
+      startItemRegistros,
+      endItemRegistros,
+      parcelasExibidas
+    };
+  }, [parcelasFiltradas, registrosPorPagina, currentPageRegistros]);
+  
+  const { itensPorPagina, totalPagesRegistros, startItemRegistros, endItemRegistros, parcelasExibidas } = paginationData;
+
+  // Filtrar vencimentos por pesquisa
+  const vencimentosFiltrados = useMemo(() => {
+    if (!searchVencimentosTerm.trim()) {
+      return proximosVencimentosRegistros;
+    }
+    return proximosVencimentosRegistros.filter(vencimento =>
+      vencimento.alunoNome.toLowerCase().includes(searchVencimentosTerm.toLowerCase())
+    );
+  }, [proximosVencimentosRegistros, searchVencimentosTerm]);
+
+  // Cálculos de paginação para próximos vencimentos
+  const paginationVencimentos = useMemo(() => {
+    const totalPaginasVencimentos = Math.ceil(vencimentosFiltrados.length / itensVencimentosPorPagina);
+    const indiceInicialVencimentos = (paginaAtualVencimentos - 1) * itensVencimentosPorPagina;
+    const indiceFinalVencimentos = indiceInicialVencimentos + itensVencimentosPorPagina;
+    const vencimentosExibidos = vencimentosFiltrados.slice(indiceInicialVencimentos, indiceFinalVencimentos);
+    
+    return {
+      totalPaginasVencimentos,
+      vencimentosExibidos
+    };
+  }, [vencimentosFiltrados, paginaAtualVencimentos, itensVencimentosPorPagina]);
+  
+  const { totalPaginasVencimentos, vencimentosExibidos } = paginationVencimentos;
 
 
 
@@ -687,10 +927,10 @@ const FinancialReportsTable = () => {
   
   const visiblePagesRegistros = getVisiblePagesRegistros();
 
-  // Reset página quando busca muda, ano muda ou itens por página muda
+  // Reset página quando ano muda ou itens por página muda
   useEffect(() => {
     setCurrentPageRegistros(1);
-  }, [searchTerm, anoFiltro, registrosPorPagina]);
+  }, [anoFiltro, registrosPorPagina]);
 
   // Função para calcular totais dinâmicos
   const calcularTotaisDinamicos = (parcelas: ParcelaDetalhada[]) => {
@@ -1032,7 +1272,7 @@ const FinancialReportsTable = () => {
         </div>
       </motion.div>
 
-      {/* Despesas Recentes */}
+      {/* Ciclos Ativos */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -1041,39 +1281,243 @@ const FinancialReportsTable = () => {
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5" />
-              Despesas Recentes
+              <CalendarDays className="h-5 w-5" />
+              Ciclos 
             </CardTitle>
+            
+            {/* Barra de pesquisa para ciclos */}
+            <div className="mt-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Pesquisar por nome do aluno..."
+                  value={searchCiclosTerm}
+                  onChange={(e) => setSearchCiclosTerm(e.target.value)}
+                  className="pl-10 pr-4 py-2 w-full"
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-between items-center gap-2 mt-4 p-3 bg-red-50 rounded-lg">
+              <div className="flex gap-2">
+
+              <Button
+                onClick={() => {
+                  setFiltroCiclo('ativos');
+                  setMostrandoAlunosSemCiclos(false);
+                }}
+                className={`inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 h-9 relative px-6 py-2 rounded-lg font-medium transition-all duration-300 ${
+                   filtroCiclo === 'ativos' 
+                     ? 'text-[#D90429] bg-white' 
+                     : 'text-gray-600 hover:text-[#D90429] hover:bg-white'
+                 }`}
+                variant="ghost"
+              >
+                Ativos
+              </Button>
+              <Button
+                onClick={() => {
+                  setFiltroCiclo('quase_encerrados');
+                  setMostrandoAlunosSemCiclos(false);
+                }}
+                className={`inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 h-9 relative px-6 py-2 rounded-lg font-medium transition-all duration-300 ${
+                   filtroCiclo === 'quase_encerrados' 
+                     ? 'text-[#D90429] bg-white' 
+                     : 'text-gray-600 hover:text-[#D90429] hover:bg-white'
+                 }`}
+                variant="ghost"
+              >
+                Quase Encerrados
+              </Button>
+              <Button
+                onClick={() => {
+                  setFiltroCiclo('encerrados');
+                  setMostrandoAlunosSemCiclos(false);
+                }}
+                className={`inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 h-9 relative px-6 py-2 rounded-lg font-medium transition-all duration-300 ${
+                   filtroCiclo === 'encerrados' 
+                     ? 'text-[#D90429] bg-white' 
+                     : 'text-gray-600 hover:text-[#D90429] hover:bg-white'
+                 }`}
+                variant="ghost"
+              >
+                Encerrados
+              </Button>
+              </div>
+              <Button
+                onClick={() => {
+                  setMostrandoAlunosSemCiclos(!mostrandoAlunosSemCiclos);
+                  if (!mostrandoAlunosSemCiclos) {
+                    setFiltroCiclo('');
+                  }
+                }}
+                className={`inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 h-9 relative px-6 py-2 rounded-lg font-medium transition-all duration-300 ${
+                   mostrandoAlunosSemCiclos 
+                     ? 'text-[#D90429] bg-white' 
+                     : 'text-gray-600 hover:text-[#D90429] hover:bg-white'
+                 }`}
+                variant="ghost"
+              >
+                Alunos sem Ciclos ({alunosSemCiclos.length})
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
-            {despesas.length === 0 ? (
+            {mostrandoAlunosSemCiclos ? (
+              <div className="space-y-4">
+                {alunosSemCiclosFiltrados.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">
+                      {searchCiclosTerm ? 'Nenhum aluno encontrado com esse nome' : 'Nenhum aluno sem ciclo encontrado'}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-3">
+                      {alunosSemCiclosPaginados.map((aluno) => (
+                        <motion.div 
+                          key={aluno.id}
+                          className="flex items-center justify-between p-4 rounded-lg transition-colors duration-200" 
+                          style={{backgroundColor: '#F9FAFB'}} 
+                          onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.backgroundColor = '#F3F4F6'} 
+                          onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.backgroundColor = '#F9FAFB'}
+                          whileHover={{ scale: 1.02 }}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3 }}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                              <span className="text-gray-600 font-medium">{aluno.nome.charAt(0).toUpperCase()}</span>
+                            </div>
+                            <div>
+                              <h3 className="font-medium text-gray-900">{aluno.nome}</h3>
+                              <p className="text-sm text-gray-500">Sem ciclo ativo</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-orange-600 border-orange-200">
+                              {aluno.financeiro_id ? 'Sem Ciclo' : 'Sem Registro Financeiro'}
+                            </Badge>
+                            {aluno.financeiro_id ? (
+                              <CycleManager
+                                alunoId={aluno.financeiro_id}
+                                isMigrationMode={false}
+                                setIsMigrationMode={() => {}}
+                                onCycleCreated={() => {
+                                  // Recarregar a lista de alunos sem ciclos
+                                  buscarAlunosSemCiclos().then(setAlunosSemCiclos);
+                                  toast({
+                                    title: "Sucesso",
+                                    description: "Ciclo criado com sucesso!",
+                                  });
+                                }}
+                                trigger={
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="hover:bg-blue-50"
+                                    style={{
+                                      borderColor: '#BFDBFE',
+                                      color: '#2563EB'
+                                    }}
+                                  >
+                                    <Clock className="h-4 w-4" />
+                                  </Button>
+                                }
+                              />
+                            ) : (
+                              <Badge variant="outline" className="text-gray-500 border-gray-300">
+                                Criar Plano Primeiro
+                              </Badge>
+                            )}
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                    
+                    {/* Paginação */}
+                    {totalPaginasAlunosSemCiclos > 1 && (
+                      <div className="flex items-center justify-between mt-6">
+                        <p className="text-sm text-gray-500">
+                          Mostrando {((paginaAlunosSemCiclos - 1) * alunosPorPagina) + 1} a {Math.min(paginaAlunosSemCiclos * alunosPorPagina, alunosSemCiclosFiltrados.length)} de {alunosSemCiclosFiltrados.length} alunos
+                        </p>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPaginaAlunosSemCiclos(prev => Math.max(prev - 1, 1))}
+                            disabled={paginaAlunosSemCiclos === 1}
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                            Anterior
+                          </Button>
+                          <span className="text-sm text-gray-600">
+                            Página {paginaAlunosSemCiclos} de {totalPaginasAlunosSemCiclos}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPaginaAlunosSemCiclos(prev => Math.min(prev + 1, totalPaginasAlunosSemCiclos))}
+                            disabled={paginaAlunosSemCiclos === totalPaginasAlunosSemCiclos}
+                          >
+                            Próxima
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            ) : ciclosFiltrados.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-gray-500">Nenhuma despesa encontrada</p>
+                <p className="text-gray-500">
+                  {!filtroCiclo ? 'Nenhum ciclo encontrado' :
+                   filtroCiclo === 'ativos' ? 'Nenhum ciclo ativo encontrado' :
+                   filtroCiclo === 'quase_encerrados' ? 'Nenhum ciclo quase encerrado encontrado' :
+                   'Nenhum ciclo encerrado encontrado'}
+                </p>
               </div>
             ) : (
               <div className="space-y-3">
-                {despesas.map((despesa) => (
+                {ciclosFiltrados.map((ciclo, index) => (
                   <motion.div 
-                    key={despesa.id} 
-                    className="flex items-center justify-between p-4 rounded-lg transition-colors duration-200" style={{backgroundColor: '#F9FAFB'}} onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.backgroundColor = '#F3F4F6'} onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.backgroundColor = '#F9FAFB'}
+                    key={`${ciclo.aluno_id}-${ciclo.inicio_ciclo}`}
+                    className="flex items-center justify-between p-4 rounded-lg transition-colors duration-200" 
+                    style={{backgroundColor: '#F9FAFB'}} 
+                    onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.backgroundColor = '#F3F4F6'} 
+                    onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.backgroundColor = '#F9FAFB'}
                     whileHover={{ scale: 1.02 }}
                     transition={{ type: "spring", stiffness: 300 }}
                   >
                     <div className="flex items-center gap-3">
                       <div className="flex-1">
-                        <p className="font-medium">{despesa.descricao}</p>
+                        <p className="font-medium">{ciclo.aluno_nome}</p>
                         <p className="text-sm" style={{color: '#6B7280'}}>
-                          {despesa.categoria} • {formatDate(despesa.data)}
+                          {formatDate(ciclo.inicio_ciclo)} - {formatDate(ciclo.final_ciclo)}
+                        </p>
+                        <p className="text-xs" style={{color: '#9CA3AF'}}>
+                          {ciclo.parcelas_pagas}/{ciclo.total_parcelas} parcelas pagas
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold">R$ {despesa.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                      <p className="font-bold">R$ {ciclo.valor_total_ciclo.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                       <Badge 
-                        variant={despesa.status === 'Pago' ? "default" : "secondary"}
+                        variant={ciclo.status_ciclo === 'ativo' ? "default" : "destructive"}
                       >
-                        {despesa.status === 'Pago' ? 'Pago' : 'Pendente'}
+                        {ciclo.status_ciclo === 'ativo' ? 'Ativo' : 'Vencido'}
                       </Badge>
+                      <div className="mt-1">
+                        <div className="w-20 bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full" 
+                            style={{ width: `${(ciclo.parcelas_pagas / ciclo.total_parcelas) * 100}%` }}
+                          ></div>
+                        </div>
+                      </div>
                     </div>
                   </motion.div>
                 ))}
@@ -1095,6 +1539,20 @@ const FinancialReportsTable = () => {
               <Calendar className="h-5 w-5" />
               Próximos Vencimentos (30 dias)
             </CardTitle>
+            <div className="flex items-center gap-2 mt-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Pesquisar por nome do aluno..."
+                  value={searchVencimentosTerm}
+                  onChange={(e) => {
+                    setSearchVencimentosTerm(e.target.value);
+                    setPaginaAtualVencimentos(1); // Reset para primeira página ao pesquisar
+                  }}
+                  className="pl-10"
+                />
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             {proximosVencimentosRegistros.length === 0 ? (
@@ -1103,35 +1561,69 @@ const FinancialReportsTable = () => {
                 <p className="text-gray-500">Nenhum vencimento nos próximos 30 dias</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {proximosVencimentosRegistros.map((vencimento) => (
-                  <motion.div 
-                    key={vencimento.id} 
-                    className="flex items-center justify-between p-4 rounded-lg transition-colors duration-200" style={{backgroundColor: '#F9FAFB'}} onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.backgroundColor = '#F3F4F6'} onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.backgroundColor = '#F9FAFB'}
-                    whileHover={{ scale: 1.02 }}
-                    transition={{ type: "spring", stiffness: 300 }}
-                  >
-                    <div className="flex items-center gap-3">
-                      {getStatusIcon(vencimento.status)}
-                      <div className="flex-1">
-                        <p className="font-medium">{vencimento.alunoNome}</p>
-                        <p className="text-sm" style={{color: '#6B7280'}}>
-                          {vencimento.planoNome} - Parcela {vencimento.numeroParcela}
-                        </p>
+              <>
+                <div className="space-y-3">
+                  {vencimentosExibidos.map((vencimento) => (
+                    <motion.div 
+                      key={vencimento.id} 
+                      className="flex items-center justify-between p-4 rounded-lg transition-colors duration-200" style={{backgroundColor: '#F9FAFB'}} onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.backgroundColor = '#F3F4F6'} onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.backgroundColor = '#F9FAFB'}
+                      whileHover={{ scale: 1.02 }}
+                      transition={{ type: "spring", stiffness: 300 }}
+                    >
+                      <div className="flex items-center gap-3">
+                        {getStatusIcon(vencimento.status)}
+                        <div className="flex-1">
+                          <p className="font-medium">{vencimento.alunoNome}</p>
+                          <p className="text-sm" style={{color: '#6B7280'}}>
+                            {vencimento.tipoItem === 'plano' ? 'Módulo de curso' : vencimento.planoNome} - Parcela {vencimento.numeroParcela}
+                          </p>
+                        </div>
                       </div>
+                      <div className="text-right">
+                        <p className="font-bold">R$ {vencimento.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        <Badge 
+                          variant={vencimento.diasRestantes <= 7 ? "destructive" : "secondary"}
+                          className={vencimento.diasRestantes <= 7 ? "animate-pulse" : ""}
+                        >
+                          {vencimento.diasRestantes} dias
+                        </Badge>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+                
+                {/* Controles de Paginação para Próximos Vencimentos */}
+                {totalPaginasVencimentos > 1 && (
+                  <div className="flex items-center justify-between mt-6 pt-4 border-t">
+                    <div className="text-sm text-gray-500">
+                      Mostrando {((paginaAtualVencimentos - 1) * itensVencimentosPorPagina) + 1} a {Math.min(paginaAtualVencimentos * itensVencimentosPorPagina, vencimentosFiltrados.length)} de {vencimentosFiltrados.length} vencimentos{searchVencimentosTerm.trim() ? ` (filtrados de ${proximosVencimentosRegistros.length} total)` : ''}
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold">R$ {vencimento.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                      <Badge 
-                        variant={vencimento.diasRestantes <= 7 ? "destructive" : "secondary"}
-                        className={vencimento.diasRestantes <= 7 ? "animate-pulse" : ""}
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPaginaAtualVencimentos(prev => Math.max(prev - 1, 1))}
+                        disabled={paginaAtualVencimentos === 1}
                       >
-                        {vencimento.diasRestantes} dias
-                      </Badge>
+                        <ChevronLeft className="h-4 w-4" />
+                        Anterior
+                      </Button>
+                      <span className="text-sm text-gray-600">
+                        Página {paginaAtualVencimentos} de {totalPaginasVencimentos}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPaginaAtualVencimentos(prev => Math.min(prev + 1, totalPaginasVencimentos))}
+                        disabled={paginaAtualVencimentos === totalPaginasVencimentos}
+                      >
+                        Próxima
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
                     </div>
-                  </motion.div>
-                ))}
-              </div>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
@@ -1167,15 +1659,25 @@ const FinancialReportsTable = () => {
             </CardHeader>
             <CardContent className="pt-0">
               <div className="h-80 p-4 bg-white rounded-lg border" style={{borderColor: '#F3F4F6'}}>
-                <Chart
-                  options={areaChartOptions}
-                  series={[{
-                    name: 'Receita',
-                    data: receitaMensal.map(item => item.receita)
-                  }]}
-                  type="area"
-                  height={320}
-                />
+                {console.log('Dados receita mensal para gráfico:', receitaMensal)}
+                {receitaMensal.length > 0 ? (
+                  <Chart
+                    options={areaChartOptions}
+                    series={[{
+                      name: 'Receita',
+                      data: receitaMensal.map(item => item.receita)
+                    }]}
+                    type="area"
+                    height={320}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    <div className="text-center">
+                      <BarChart3 className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>Nenhum dado de receita disponível</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -1195,47 +1697,31 @@ const FinancialReportsTable = () => {
             </CardHeader>
             <CardContent className="pt-0 px-2">
               <div className="h-80 p-2 bg-white rounded-lg border" style={{borderColor: '#F3F4F6'}}>
-                <Chart
-                  options={barChartOptions}
-                  series={[{
-                    name: 'Receita',
-                    data: receitaPorIdioma.map(item => item.receita)
-                  }]}
-                  type="bar"
-                  height={320}
-                />
+                {console.log('Dados receita por idioma para gráfico:', receitaPorIdioma)}
+                {receitaPorIdioma.length > 0 ? (
+                  <Chart
+                    options={barChartOptions}
+                    series={[{
+                      name: 'Receita',
+                      data: receitaPorIdioma.map(item => item.receita)
+                    }]}
+                    type="bar"
+                    height={320}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    <div className="text-center">
+                      <BarChart3 className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>Nenhum dado por idioma disponível</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Gráfico de Variação de Saldo - Largura Total */}
-        <Card className="border-0 shadow-xl bg-[#F9FAFB]">
-          <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-3 text-lg">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <BarChart3 className="h-5 w-5 text-purple-600" />
-              </div>
-              <div>
-                <span style={{color: '#1F2937'}}>Variação de Saldo</span>
-                <p className="text-sm text-gray-500 font-normal mt-1">Entradas e saídas por categoria</p>
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0 px-6">
-            <div className="h-80 p-6 bg-white rounded-lg border" style={{borderColor: '#F3F4F6'}}>
-              <Chart
-                options={columnChartOptions}
-                series={[{
-                  name: 'Valor',
-                  data: variacaoSaldo.map(item => item.valor)
-                }]}
-                type="bar"
-                height={320}
-              />
-            </div>
-          </CardContent>
-        </Card>
+
       </motion.div>
 
       {/* Parcelas Detalhadas */}
@@ -1249,25 +1735,10 @@ const FinancialReportsTable = () => {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="h-5 w-5" />
-                Parcelas Detalhadas dos Migrados
+                Parcelas Detalhadas
               </CardTitle>
               
               <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
-                {/* Filtro de Tipo de Parcela */}
-                <div className="flex items-center gap-2">
-                  <CreditCard className="h-4 w-4 text-gray-500" />
-                  <Select value={tipoParcelaFiltro} onValueChange={handleTipoParcelaChange}>
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue placeholder="Tipo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todas">Todas</SelectItem>
-                      <SelectItem value="ativas">Ativas (Não Migradas)</SelectItem>
-                      <SelectItem value="migradas_ativas">Migradas Ativas</SelectItem>
-                      <SelectItem value="migradas">Migradas (Histórico)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
 
                 {/* Filtro de Ano */}
                 <div className="flex items-center gap-2">
@@ -1292,7 +1763,12 @@ const FinancialReportsTable = () => {
                   <Input
                     placeholder="Buscar por aluno, plano..."
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={handleSearchChange}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                      }
+                    }}
                     className="pl-10"
                   />
                 </div>
@@ -1314,24 +1790,25 @@ const FinancialReportsTable = () => {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">Status</TableHead>
-                    <TableHead>Aluno</TableHead>
-                    <TableHead>Plano</TableHead>
-                    <TableHead>Parcela</TableHead>
-                    <TableHead>Valor</TableHead>
-                    <TableHead>Vencimento</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Descrição do Item</TableHead>
+                  <TableRow className="bg-red-600 text-white">
+                    <TableHead className="w-12 text-white">Status</TableHead>
+                    <TableHead className="text-white">Aluno</TableHead>
+                    <TableHead className="text-white">Plano</TableHead>
+                    <TableHead className="text-white">Parcela</TableHead>
+                    <TableHead className="text-white">Valor</TableHead>
+                    <TableHead className="text-white">Vencimento</TableHead>
+                    <TableHead className="text-white">Tipo</TableHead>
+                    <TableHead className="text-white">Descrição do Item</TableHead>
                     {detalhesAbertos && (
                       <>
-                        <TableHead>Idioma</TableHead>
-                        <TableHead>Forma de Pagamento</TableHead>
-                        <TableHead>Data de Pagamento</TableHead>
-                        <TableHead>Observações</TableHead>
-                        <TableHead>Fonte</TableHead>
+                        <TableHead className="text-white">Idioma</TableHead>
+                        <TableHead className="text-white">Forma de Pagamento</TableHead>
+                        <TableHead className="text-white">Data de Pagamento</TableHead>
+                        <TableHead className="text-white">Observações</TableHead>
+                        <TableHead className="text-white">Fonte</TableHead>
                       </>
                     )}
+
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1342,8 +1819,14 @@ const FinancialReportsTable = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    parcelasExibidas.map((parcela) => (
-                      <TableRow key={`${parcela.fonte}-${parcela.id}`}>
+                    // Renderização simples - cada parcela em uma linha própria
+                    parcelasExibidas.map((parcela, index) => (
+                      <TableRow 
+                        key={`${parcela.fonte}-${parcela.id}`} 
+                        className={`border-b hover:bg-gray-50/50 transition-colors ${
+                          index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
+                        }`}
+                      >
                         <TableCell>
                           <Badge 
                             variant={parcela.status_pagamento === 'Pago' ? 'default' : 
@@ -1362,38 +1845,39 @@ const FinancialReportsTable = () => {
                         <TableCell className="font-medium">{parcela.aluno_nome}</TableCell>
                         <TableCell>{parcela.plano_nome || '-'}</TableCell>
                         <TableCell>{parcela.numero_parcela}</TableCell>
-                        <TableCell className="font-semibold">
-                          R$ {parcela.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </TableCell>
-                        <TableCell>
-                          {formatDate(parcela.data_vencimento)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{parcela.tipo_item}</Badge>
-                        </TableCell>
-                        <TableCell>{parcela.descricao_item || '-'}</TableCell>
-                        {detalhesAbertos && (
-                          <>
-                            <TableCell>{parcela.idioma_registro}</TableCell>
-                            <TableCell>{parcela.forma_pagamento || '-'}</TableCell>
-                            <TableCell>
-                              {parcela.data_pagamento ? formatDate(parcela.data_pagamento) : '-'}
-                            </TableCell>
-                            <TableCell>{parcela.observacoes || '-'}</TableCell>
-                            <TableCell>
-                              <Badge variant={parcela.fonte === 'parcelas_alunos' ? 'default' : 'secondary'}>
-                                {parcela.fonte === 'parcelas_alunos' ? 'Ativo' : 'Migrado'}
-                              </Badge>
-                            </TableCell>
-                          </>
-                        )}
-                      </TableRow>
-                    ))
-                  )}
+                        <TableCell className="font-semibold text-green-600">
+                           R$ {parcela.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                         </TableCell>
+                         <TableCell>
+                           {formatDate(parcela.data_vencimento)}
+                         </TableCell>
+                         <TableCell>
+                           <Badge variant="outline">{parcela.tipo_item}</Badge>
+                         </TableCell>
+                         <TableCell>{parcela.descricao_item || '-'}</TableCell>
+                         {detalhesAbertos && (
+                           <>
+                             <TableCell>{parcela.idioma_registro}</TableCell>
+                             <TableCell>{parcela.forma_pagamento || '-'}</TableCell>
+                             <TableCell>
+                               {parcela.data_pagamento ? formatDate(parcela.data_pagamento) : '-'}
+                             </TableCell>
+                             <TableCell>{parcela.observacoes || '-'}</TableCell>
+                             <TableCell>
+                               <Badge variant={parcela.fonte === 'parcelas_migracao_raw' ? 'secondary' : 'default'}>
+                                 {parcela.fonte === 'parcelas_migracao_raw' ? 'Migrado' : 'Ativo'}
+                               </Badge>
+                             </TableCell>
+                           </>
+                         )}
+
+                       </TableRow>
+                     ))
+                   )}
                 </TableBody>
                 <TableFooter>
                   <TableRow>
-                    <TableCell colSpan={detalhesAbertos ? 15 : 8} className="bg-gray-50">
+                    <TableCell colSpan={detalhesAbertos ? 14 : 7} className="bg-gray-50">
                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4">
                         <div className="flex flex-col sm:flex-row gap-4 text-sm">
                           <div className="flex items-center gap-2">
@@ -1542,6 +2026,7 @@ const FinancialReportsTable = () => {
                             <SelectItem value="20">20</SelectItem>
                             <SelectItem value="50">50</SelectItem>
                             <SelectItem value="100">100</SelectItem>
+                            <SelectItem value="999999">Todos</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>

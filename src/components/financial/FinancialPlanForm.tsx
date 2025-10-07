@@ -6,6 +6,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -20,6 +31,7 @@ import { criarParcelasComNumeracaoCorreta } from '@/utils/parcelaNumbering';
 import { criarDataDeString } from '@/utils/dateUtils';
 import { PlanoGenerico } from '@/types/financial';
 import { formatDate } from '@/utils/formatters';
+import { CycleManager } from '@/components/financial/CycleManager';
 
 // HELPER FUNCTION: Formatação de valores decimais para padrão brasileiro
 const formatarDecimalBR = (valor: number): string => {
@@ -51,6 +63,11 @@ interface FormData {
   forma_pagamento_matricula: string;
   numero_parcelas_matricula: string;
   data_vencimento_primeira: string;
+  // Campos de ciclo
+  inicio_ciclo?: string;
+  final_ciclo?: string;
+  // Campo de observações
+  observacoes?: string;
 }
 
 const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: FinancialPlanFormProps) => {
@@ -62,6 +79,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
   const [openCombobox, setOpenCombobox] = useState(false); // Adicionado estado faltante
   const [existingPlan, setExistingPlan] = useState<any>(null);
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   
   // Adicionar esta linha que está faltando:
   const { toast } = useToast();
@@ -79,7 +97,9 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
       numero_parcelas_material: '', // Removido valor padrão '1'
       forma_pagamento_matricula: 'boleto',
       numero_parcelas_matricula: '', // Removido valor padrão '1'
-      data_vencimento_primeira: ''
+      data_vencimento_primeira: '',
+      inicio_ciclo: '',
+      final_ciclo: ''
     }
   });
 
@@ -96,7 +116,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
     }
   }, [preSelectedStudent]);
 
-  // Verificar se aluno já possui plano financeiro
+  // Verificar se aluno já possui plano financeiro ativo
   const checkExistingPlan = async (alunoId: string) => {
     if (!alunoId) {
       setExistingPlan(null);
@@ -106,9 +126,10 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
 
     try {
       const { data: existingPlan, error } = await supabase
-        .from('financeiro_alunos')
+        .from('alunos_financeiro')
         .select('id, created_at')
         .eq('aluno_id', alunoId)
+        .eq('historico', false) // Apenas planos ativos
         .single();
         
       if (error && error.code !== 'PGRST116') {
@@ -428,61 +449,24 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
       
       let financeiroData;
       
-      // Se há confirmação para sobrescrever, atualizar o registro existente
-      if (existingPlan && confirmOverwrite) {
-        console.log('=== ATUALIZANDO REGISTRO EXISTENTE ===');
-        console.log('ID do registro a ser atualizado:', existingPlan.id);
-        
-        // 1. Excluir apenas as parcelas antigas
-        const { error: deleteParcelasError } = await supabase
-          .from('parcelas_alunos')
-          .delete()
-          .eq('registro_financeiro_id', existingPlan.id);
-        
-        if (deleteParcelasError) {
-          console.error('Erro ao excluir parcelas antigas:', deleteParcelasError);
-          throw new Error('Erro ao excluir parcelas antigas: ' + deleteParcelasError.message);
-        }
-        
-        console.log('Parcelas antigas excluídas com sucesso');
-        
-        // 2. Atualizar o registro financeiro com os novos dados
-        const { data: updatedData, error: updateError } = await supabase
-          .from('financeiro_alunos')
-          .update(dadosFinanceiros)
-          .eq('id', existingPlan.id)
-          .select()
-          .single();
-        
-        if (updateError) {
-          console.error('Erro ao atualizar registro:', updateError);
-          throw updateError;
-        }
-        
-        financeiroData = updatedData;
-        console.log('=== REGISTRO ATUALIZADO COM SUCESSO ===');
-        console.log('financeiroData:', JSON.stringify(financeiroData, null, 2));
-        
-      } else {
-        // Criar novo registro normalmente
-        console.log('=== CRIANDO NOVO REGISTRO ===');
-        
-        const { data: insertedData, error: financeiroError } = await supabase
-          .schema('public')
-          .from('financeiro_alunos')
-          .insert(dadosFinanceiros)
-          .select()
-          .single();
-        
-        if (financeiroError) {
-          console.error('Erro do Supabase:', financeiroError);
-          throw financeiroError;
-        }
-        
-        financeiroData = insertedData;
-        console.log('=== NOVO REGISTRO CRIADO COM SUCESSO ===');
-        console.log('financeiroData:', JSON.stringify(financeiroData, null, 2));
+      // Sempre criar novo registro (o plano antigo foi movido para histórico se existia)
+      console.log('=== CRIANDO NOVO REGISTRO ===');
+      
+      const { data: insertedData, error: financeiroError } = await supabase
+        .schema('public')
+        .from('alunos_financeiro')
+        .insert(dadosFinanceiros)
+        .select()
+        .single();
+      
+      if (financeiroError) {
+        console.error('Erro do Supabase:', financeiroError);
+        throw financeiroError;
       }
+      
+      financeiroData = insertedData;
+      console.log('=== NOVO REGISTRO CRIADO COM SUCESSO ===');
+      console.log('financeiroData:', JSON.stringify(financeiroData, null, 2));
       
       if (financeiroData) {
         console.log('=== COMPARAÇÃO DE VALORES ===');
@@ -507,7 +491,8 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
             numParcelas: parseInt(data.numero_parcelas_plano) || 1,
             dataBase,
             formaPagamento: data.forma_pagamento_plano,
-            descricao: 'Plano de aulas'
+            descricao: 'Plano de aulas',
+            observacoes: data.observacoes
           };
         }
         
@@ -518,7 +503,8 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
             numParcelas: parseInt(data.numero_parcelas_matricula) || 1,
             dataBase,
             formaPagamento: data.forma_pagamento_matricula,
-            descricao: 'Taxa de matrícula'
+            descricao: 'Taxa de matrícula',
+            observacoes: data.observacoes
           };
         }
         
@@ -529,7 +515,8 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
             numParcelas: parseInt(data.numero_parcelas_material) || 1,
             dataBase,
             formaPagamento: data.forma_pagamento_material,
-            descricao: 'Material didático'
+            descricao: 'Material didático',
+            observacoes: data.observacoes
           };
         }
         
@@ -545,7 +532,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
         // Inserir as parcelas no banco
         if (parcelas.length > 0) {
           const { error: parcelasError } = await supabase
-            .from('parcelas_alunos')
+            .from('alunos_parcelas')
             .insert(parcelas);
           
           if (parcelasError) {
@@ -574,6 +561,33 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
           title: "Plano Criado",
           description: "Plano financeiro criado com sucesso!",
         });
+      }
+      
+      // Criar ciclo se as datas foram fornecidas
+      if (data.inicio_ciclo && data.final_ciclo && financeiroData?.id) {
+        try {
+          // Atualizar as parcelas criadas com as datas de ciclo
+          const { error: cycleError } = await supabase
+            .from('alunos_parcelas')
+            .update({
+              inicio_ciclo: data.inicio_ciclo,
+              final_ciclo: data.final_ciclo
+            })
+            .eq('alunos_financeiro_id', financeiroData.id);
+          
+          if (cycleError) {
+            console.error('Erro ao definir ciclo:', cycleError);
+            toast({
+              title: "Aviso",
+              description: "Plano criado com sucesso, mas houve erro ao definir o ciclo.",
+              variant: "destructive",
+            });
+          } else {
+            console.log('Ciclo definido com sucesso!');
+          }
+        } catch (cycleError) {
+          console.error('Erro ao criar ciclo:', cycleError);
+        }
       }
       
       reset();
@@ -698,6 +712,106 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
             />
           </div>
           
+          {/* Aviso de plano existente */}
+          {existingPlan && (
+            <div className="space-y-2">
+              <Label htmlFor="confirm-overwrite" className="peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-sm font-medium">
+                Aluno já tem um plano financeiro, você deseja colocar o plano antigo em histórico?
+              </Label>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="confirm-overwrite"
+                  checked={confirmOverwrite}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setShowConfirmModal(true);
+                    } else {
+                      setConfirmOverwrite(false);
+                    }
+                  }}
+                />
+                <Label htmlFor="confirm-overwrite" className="text-sm">
+                  Sim, desejo mover o plano antigo para histórico
+                </Label>
+              </div>
+            </div>
+          )}
+
+          {/* Modal de Confirmação */}
+          <AlertDialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirmar Ação</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Tem certeza que deseja mover o plano financeiro existente para o histórico? 
+                  Esta ação irá:
+                  <br />• Marcar todas as parcelas existentes como histórico
+                  <br />• Permitir a criação de um novo plano financeiro
+                  <br />• Preservar os dados antigos para consulta
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => {
+                  setShowConfirmModal(false);
+                  setConfirmOverwrite(false);
+                }}>
+                  Cancelar
+                </AlertDialogCancel>
+                <AlertDialogAction onClick={async () => {
+                  try {
+                    // Mover parcelas existentes para histórico
+                    // Primeiro, buscar o ID do registro financeiro do aluno
+                    const { data: financeiroData, error: financeiroError } = await supabase
+                      .from('alunos_financeiro')
+                      .select('id')
+                      .eq('aluno_id', watchedValues.aluno_id)
+                      .eq('historico', false) // Apenas planos ativos
+                      .single();
+
+                    if (financeiroError) throw financeiroError;
+
+                    // Agora mover as parcelas para histórico usando alunos_financeiro_id
+                    const { error: parcelasError } = await supabase
+                      .from('alunos_parcelas')
+                      .update({ historico: true })
+                      .eq('alunos_financeiro_id', financeiroData.id)
+                      .eq('historico', false);
+
+                    if (parcelasError) throw parcelasError;
+
+                    // Marcar o plano financeiro como histórico
+                    const { error: financeiroUpdateError } = await supabase
+                      .from('alunos_financeiro')
+                      .update({ historico: true })
+                      .eq('id', financeiroData.id);
+
+                    if (financeiroUpdateError) throw financeiroUpdateError;
+
+                    setConfirmOverwrite(true);
+                    // Limpar o existingPlan já que agora está em histórico
+                    setExistingPlan(null);
+                    setShowConfirmModal(false);
+                    
+                    toast({
+                      title: "Sucesso",
+                      description: "Plano antigo movido para histórico com sucesso!",
+                    });
+                  } catch (error) {
+                    console.error('Erro ao mover plano para histórico:', error);
+                    toast({
+                      title: "Erro",
+                      description: "Erro ao mover plano para histórico. Tente novamente.",
+                      variant: "destructive",
+                    });
+                    setShowConfirmModal(false);
+                  }
+                }}>
+                  Confirmar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          
           <div>
             <Label htmlFor="plano_id">Plano *</Label>
             <Controller
@@ -717,7 +831,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
                           value={plano.id}
                           className="cursor-pointer hover:bg-gray-50"
                         >
-                          {plano.nome} - R$ {(plano.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          {plano.nome} - R$ {(plano.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -754,7 +868,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
                       <div>
                         <p className="text-xs text-gray-500 font-medium">Valor Total</p>
                         <p className="text-sm font-bold" style={{color: '#1F2937'}}>
-                          R$ {(planoSelecionado.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          R$ {(planoSelecionado.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                       </div>
                       <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center">
@@ -784,7 +898,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
                       <div>
                         <p className="text-xs font-medium" style={{color: '#6B7280'}}>Valor/Aula</p>
                         <p className="text-sm font-bold" style={{color: '#1F2937'}}>
-                          R$ {valorPorAula.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          R$ {valorPorAula.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                       </div>
                       <div className="w-8 h-8 bg-purple-50 rounded-full flex items-center justify-center">
@@ -1056,7 +1170,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
           {calculatedValues.valorAPagar > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Plano - R$ {calculatedValues.valorAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</CardTitle>
+                <CardTitle className="text-base">Plano - R$ {calculatedValues.valorAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-3 gap-4">
@@ -1113,7 +1227,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
           {parseFloat(watchedValues.valor_material || '0') > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Materiais - R$ {parseFloat(watchedValues.valor_material || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</CardTitle>
+                <CardTitle className="text-base">Materiais - R$ {parseFloat(watchedValues.valor_material || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-3 gap-4">
@@ -1170,7 +1284,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
           {parseFloat(watchedValues.valor_matricula || '0') > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Taxa de Matrícula - R$ {parseFloat(watchedValues.valor_matricula || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</CardTitle>
+                <CardTitle className="text-base">Taxa de Matrícula - R$ {parseFloat(watchedValues.valor_matricula || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-3 gap-4">
@@ -1307,6 +1421,64 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
               </Label>
             </div>
           </div>
+        )}
+
+        {/* Seção de Observações */}
+        {watchedValues.aluno_id && (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="text-lg">Observações</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div>
+                <Label htmlFor="observacoes">Observações sobre o plano</Label>
+                <Textarea
+                  id="observacoes"
+                  {...register('observacoes')}
+                  placeholder="Observações adicionais sobre o plano financeiro..."
+                  rows={3}
+                  className="mt-1"
+                />
+              </div>
+              <p className="text-sm text-gray-600 mt-2">
+                Adicione observações relevantes sobre este plano financeiro que possam ser úteis para referência futura.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Seção de Criação de Ciclo */}
+        {watchedValues.aluno_id && (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="text-lg">Definir Ciclo de Parcelas</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="inicio_ciclo">Data de Início do Ciclo</Label>
+                  <Input
+                    id="inicio_ciclo"
+                    type="date"
+                    {...register('inicio_ciclo')}
+                    placeholder="Selecione a data de início"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="final_ciclo">Data de Fim do Ciclo</Label>
+                  <Input
+                    id="final_ciclo"
+                    type="date"
+                    {...register('final_ciclo')}
+                    placeholder="Selecione a data de fim"
+                  />
+                </div>
+              </div>
+              <p className="text-sm text-gray-600 mt-2">
+                Defina o período do ciclo para organizar as parcelas do aluno. Se o aluno já possuir um ciclo ativo, será solicitada a confirmação para mover o ciclo anterior para o histórico.
+              </p>
+            </CardContent>
+          </Card>
         )}
 
         {/* Botões */}

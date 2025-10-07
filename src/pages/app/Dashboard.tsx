@@ -6,7 +6,7 @@ import StudentsLanguageChart from '@/components/dashboard/StudentsLanguageChart'
 import { useDashboardData } from '@/hooks/useDashboardData';
 
 const Dashboard = () => {
-  const { dashboardData, loading } = useDashboardData();
+  const { data, loading } = useDashboardData();
 
   if (loading) {
     return (
@@ -21,7 +21,7 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      <DashboardStats data={dashboardData} />
+      <DashboardStats data={data} />
 
       {/* Alertas de Contratos */}
       <div>
@@ -33,7 +33,7 @@ const Dashboard = () => {
       </div>
 
       <div className="grid gap-6">
-        <StudentsLanguageChart data={dashboardData.alunosPorIdioma} />
+        <StudentsLanguageChart data={data.alunosPorIdioma} />
       </div>
     </div>
   );

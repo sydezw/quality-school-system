@@ -251,6 +251,7 @@ const BoletoManager = ({ filtroStatus = 'todos', alunoSelecionado }: BoletoManag
                             <SelectItem value="material">Material</SelectItem>
                             <SelectItem value="matricula">Matrícula</SelectItem>
                             <SelectItem value="cancelamento">Cancelamento</SelectItem>
+                            <SelectItem value="avulso">Avulso</SelectItem>
                             <SelectItem value="outros">Outros</SelectItem>
                           </SelectContent>
                         </Select>

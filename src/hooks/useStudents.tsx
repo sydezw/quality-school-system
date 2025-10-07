@@ -56,7 +56,7 @@ export const useStudents = () => {
           aulas_turma,
           turma_regular:turmas!turma_id(nome, idioma),
           turma_particular:turmas!turma_particular_id(nome, idioma),
-          responsaveis(nome, telefone)
+          responsaveis(nome, telefone, email, cpf)
         `);
       
       // Remover o filtro de status - mostrar todos os alunos
@@ -104,7 +104,9 @@ export const useStudents = () => {
         } : undefined,
         responsaveis: item.responsaveis ? {
           nome: item.responsaveis.nome,
-          telefone: item.responsaveis.telefone || ''
+          telefone: item.responsaveis.telefone || '',
+          email: item.responsaveis.email || '',
+          cpf: item.responsaveis.cpf || ''
         } : undefined
       }));
       

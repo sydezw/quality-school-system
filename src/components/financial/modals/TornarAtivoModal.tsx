@@ -517,7 +517,7 @@ export const TornarAtivoModal: React.FC<TornarAtivoModalProps> = ({
                                   value={plano.id}
                                   className="cursor-pointer hover:bg-gray-50"
                                 >
-                                  {plano.nome} - R$ {(plano.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  {plano.nome} - R$ {(plano.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -554,7 +554,7 @@ export const TornarAtivoModal: React.FC<TornarAtivoModalProps> = ({
                               <div>
                                 <p className="text-xs text-gray-500 font-medium">Valor Total</p>
                                 <p className="text-sm font-bold" style={{color: '#1F2937'}}>
-                                  R$ {(planoSelecionado.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  R$ {(planoSelecionado.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </p>
                               </div>
                               <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center">
@@ -584,7 +584,7 @@ export const TornarAtivoModal: React.FC<TornarAtivoModalProps> = ({
                               <div>
                                 <p className="text-xs text-gray-500 font-medium">Valor/Aula</p>
                                 <p className="text-sm font-bold text-gray-800">
-                                  R$ {valorPorAula.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  R$ {valorPorAula.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </p>
                               </div>
                               <div className="w-8 h-8 bg-purple-50 rounded-full flex items-center justify-center">
@@ -854,7 +854,7 @@ export const TornarAtivoModal: React.FC<TornarAtivoModalProps> = ({
                   {calculatedValues.valorAPagar > 0 && (
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-base">Plano - R$ {calculatedValues.valorAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</CardTitle>
+                        <CardTitle className="text-base">Plano - R$ {calculatedValues.valorAPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="grid grid-cols-3 gap-4">
@@ -911,7 +911,7 @@ export const TornarAtivoModal: React.FC<TornarAtivoModalProps> = ({
                   {parseFloat(watchedValues.valor_material || '0') > 0 && (
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-base">Materiais - R$ {parseFloat(watchedValues.valor_material || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</CardTitle>
+                        <CardTitle className="text-base">Materiais - R$ {parseFloat(watchedValues.valor_material || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="grid grid-cols-3 gap-4">
@@ -968,7 +968,7 @@ export const TornarAtivoModal: React.FC<TornarAtivoModalProps> = ({
                   {parseFloat(watchedValues.valor_matricula || '0') > 0 && (
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-base">Taxa de Matrícula - R$ {parseFloat(watchedValues.valor_matricula || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</CardTitle>
+                        <CardTitle className="text-base">Taxa de Matrícula - R$ {parseFloat(watchedValues.valor_matricula || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="grid grid-cols-3 gap-4">

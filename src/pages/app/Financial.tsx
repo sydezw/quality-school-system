@@ -15,7 +15,6 @@ import FinancialDialogs from '@/components/financial/FinancialDialogs';
 import FinancialPlanDialog from '@/components/financial/FinancialPlanDialog';
 
 import ParcelasTable from '@/components/financial/ParcelasTable';
-import StudentGroupingView from '@/components/financial/StudentGroupingView';
 import DespesasTable from '@/components/financial/DespesasTable';
 import { StatusAluno } from '@/types/financial';
 import FinancialReportsTable from '@/components/financial/FinancialReportsTable';
@@ -125,42 +124,7 @@ const Financial = () => {
         <h1 className="text-3xl font-bold">Financeiro</h1>
       </div>
 
-      {/* Cards de Resumo */}
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Receitas (Pagas)</CardTitle>
-            <DollarSign className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              R$ {totalReceitas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Despesas (Pagas)</CardTitle>
-            <Receipt className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              R$ {totalDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Saldo</CardTitle>
-            <CreditCard className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${totalReceitas - totalDespesas >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              R$ {(totalReceitas - totalDespesas).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+
 
       <Tabs defaultValue="registros" className="space-y-4">
         <TabsList className="bg-gray-200 p-1 rounded-lg shadow-lg">
@@ -181,18 +145,7 @@ const Financial = () => {
                 Registros
               </motion.span>
             </TabsTrigger>
-            <TabsTrigger 
-              value="agrupamento" 
-              className="flex-1 data-[state=active]:bg-[#D90429] data-[state=active]:text-white data-[state=active]:shadow-lg text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-all duration-300 font-medium rounded-md"
-            >
-              <motion.span
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                transition={{ duration: 0.2 }}
-              >
-                Agrupamento
-              </motion.span>
-            </TabsTrigger>
+
             <TabsTrigger 
               value="operacional" 
               className="flex-1 data-[state=active]:bg-[#D90429] data-[state=active]:text-white data-[state=active]:shadow-lg text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-all duration-300 font-medium rounded-md"
@@ -206,6 +159,7 @@ const Financial = () => {
               </motion.span>
             </TabsTrigger>
             {/* Aba de renovações removida */}
+
             <TabsTrigger 
               value="relatorios" 
               className="flex-1 data-[state=active]:bg-[#D90429] data-[state=active]:text-white data-[state=active]:shadow-lg text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-all duration-300 font-medium rounded-md"
@@ -236,15 +190,7 @@ const Financial = () => {
             </motion.div>
           </TabsContent>
 
-          <TabsContent value="agrupamento" className="space-y-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3, delay: 0.1 }}
-            >
-              <StudentGroupingView />
-            </motion.div>
-          </TabsContent>
+
 
           <TabsContent value="operacional" className="space-y-4">
             <motion.div
@@ -259,7 +205,7 @@ const Financial = () => {
             </motion.div>
           </TabsContent>
 
-          {/* TabsContent de renovação removido */}
+
 
           <TabsContent value="relatorios" className="space-y-4">
             <motion.div

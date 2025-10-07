@@ -5,20 +5,21 @@ import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/type
 import { criarDataDeString } from '@/utils/dateUtils';
 
 // Tipo base da parcela
-type ParcelaBase = Tables<'parcelas_alunos'>;
+type ParcelaBase = Tables<'alunos_parcelas'>;
 
 // Tipo estendido com dados do aluno e plano (para exibição)
 export interface ParcelaComDetalhes extends ParcelaBase {
   aluno_nome?: string;
   plano_nome?: string;
+  turma_id?: string;
   status_calculado?: StatusCalculado;
 }
 
 // Tipo para inserção de nova parcela
-type NovaParcelaInput = TablesInsert<'parcelas_alunos'>;
+type NovaParcelaInput = TablesInsert<'alunos_parcelas'>;
 
 // Tipo para atualização de parcela
-type AtualizarParcelaInput = TablesUpdate<'parcelas_alunos'>;
+type AtualizarParcelaInput = TablesUpdate<'alunos_parcelas'>;
 
 // Status calculados automaticamente (agora usando enum)
 export type StatusCalculado = 'pago' | 'pendente' | 'vencido' | 'cancelado';
@@ -28,10 +29,11 @@ export type StatusCalculado = 'pago' | 'pendente' | 'vencido' | 'cancelado';
 export interface FiltrosParcelas {
   termo?: string; // Busca apenas por aluno.nome
   status?: StatusCalculado | 'todos';
-  tipo?: 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'outros' | 'todos';
+  tipo?: 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'avulso' | 'outros' | 'todos';
   dataVencimentoInicio?: string; // Date em formato string
   dataVencimentoFim?: string; // Date em formato string
   idioma?: 'Inglês' | 'Japonês' | 'todos';
+  incluirHistorico?: boolean; // Incluir parcelas marcadas como histórico
 }
 
 export const useParcelas = () => {
@@ -77,13 +79,13 @@ export const useParcelas = () => {
       
       while (true) {
         let query = supabase
-          .from('parcelas_alunos')
+          .from('alunos_parcelas')
           .select(`
             *,
-            financeiro_alunos!inner(
+            alunos_financeiro!inner(
               aluno_id,
               plano_id,
-              alunos!inner(nome),
+              alunos!inner(nome, turma_id),
               planos!inner(nome)
             )
           `)
@@ -91,9 +93,18 @@ export const useParcelas = () => {
         
         // Aplicar filtros
         if (filtros) {
+          // Filtro por histórico (padrão: não incluir histórico)
+          if (filtros.incluirHistorico === true) {
+            // Incluir apenas parcelas históricas
+            query = query.eq('historico', true);
+          } else {
+            // Excluir parcelas históricas (comportamento padrão)
+            query = query.eq('historico', false);
+          }
+          
           // Filtro por nome do aluno (busca parcial, case-insensitive)
           if (filtros.termo && filtros.termo.trim() !== '') {
-            query = query.ilike('financeiro_alunos.alunos.nome', `%${filtros.termo.trim()}%`);
+            query = query.ilike('alunos_financeiro.alunos.nome', `%${filtros.termo.trim()}%`);
           }
           
           // Filtro por tipo de item
@@ -115,10 +126,14 @@ export const useParcelas = () => {
           if (filtros.idioma && filtros.idioma !== 'todos') {
             query = query.eq('idioma_registro', filtros.idioma);
           }
+        } else {
+          // Se não há filtros, excluir parcelas históricas por padrão
+          query = query.eq('historico', false);
         }
         
-        // Ordenação por data de vencimento (mais recente primeiro)
-        query = query.order('data_vencimento', { ascending: false });
+        // Ordenação por data de vencimento (mais recente primeiro) e depois por nome do aluno (alfabética)
+        query = query.order('data_vencimento', { ascending: false })
+                     .order('nome_aluno', { ascending: true });
         
         const { data, error } = await query;
         
@@ -133,15 +148,16 @@ export const useParcelas = () => {
         from += batchSize;
       }
       
-      console.log(`=== DEBUG PARCELAS ===`);
-      console.log(`Total de parcelas carregadas: ${allParcelas.length}`);
-      console.log(`=== FIM DEBUG ===`);
+
+      
+
       
       // Processar dados para incluir nomes do aluno e plano
       let parcelasProcessadas = allParcelas.map(parcela => ({
         ...parcela,
-        aluno_nome: parcela.financeiro_alunos?.alunos?.nome,
-        plano_nome: parcela.financeiro_alunos?.planos?.nome,
+        aluno_nome: parcela.nome_aluno || parcela.alunos_financeiro?.alunos?.nome,
+        plano_nome: parcela.alunos_financeiro?.planos?.nome,
+        turma_id: parcela.alunos_financeiro?.alunos?.turma_id,
         status_calculado: calcularStatusAutomatico(parcela)
       }));
       
@@ -170,7 +186,7 @@ export const useParcelas = () => {
   const criarParcela = async (novaParcela: NovaParcelaInput) => {
     try {
       const { data, error } = await supabase
-        .from('parcelas_alunos')
+        .from('alunos_parcelas')
         .insert(novaParcela)
         .select()
         .single();
@@ -201,7 +217,7 @@ export const useParcelas = () => {
   const atualizarParcela = async (id: number, atualizacao: AtualizarParcelaInput) => {
     try {
       const { data, error } = await supabase
-        .from('parcelas_alunos')
+        .from('alunos_parcelas')
         .update(atualizacao)
         .eq('id', id)
         .select()
@@ -245,7 +261,7 @@ export const useParcelas = () => {
   const excluirParcela = async (id: number) => {
     try {
       const { error } = await supabase
-        .from('parcelas_alunos')
+        .from('alunos_parcelas')
         .delete()
         .eq('id', id);
       
@@ -273,7 +289,7 @@ export const useParcelas = () => {
   const excluirMultiplasParcelas = async (ids: number[]) => {
     try {
       const { error } = await supabase
-        .from('parcelas_alunos')
+        .from('alunos_parcelas')
         .delete()
         .in('id', ids);
       

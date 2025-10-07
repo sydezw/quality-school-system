@@ -147,8 +147,16 @@ export const useBoletos = () => {
         }
       });
       
-      // Ordenar boletos por data de vencimento
-      boletosConvertidos.sort((a, b) => new Date(a.data_vencimento).getTime() - new Date(b.data_vencimento).getTime());
+      // Ordenar boletos por data de vencimento e depois por nome do aluno (alfabética)
+      boletosConvertidos.sort((a, b) => {
+        const dataA = new Date(a.data_vencimento).getTime();
+        const dataB = new Date(b.data_vencimento).getTime();
+        if (dataA !== dataB) {
+          return dataA - dataB;
+        }
+        // Ordenação secundária por nome do aluno
+        return (a.aluno_nome || '').localeCompare(b.aluno_nome || '', 'pt-BR');
+      });
       
       setBoletos(boletosConvertidos);
     } catch (error) {

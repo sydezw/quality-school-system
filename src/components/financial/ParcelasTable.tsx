@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { 
   Search, 
@@ -24,13 +25,15 @@ import {
   Eye,
   EyeOff,
   RotateCcw,
-  FilterX
+  FilterX,
+  Database
 } from 'lucide-react';
 import { useParcelas, ParcelaComDetalhes } from '@/hooks/useParcelas';
 import { criarDataDeString } from '@/utils/dateUtils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import FinancialPlanForm from './FinancialPlanForm';
+import CreateParcelasForm from './CreateParcelasForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import {
@@ -49,16 +52,21 @@ import { useMultipleSelection } from '@/hooks/useMultipleSelection';
 import { MultipleSelectionBar } from '@/components/shared/MultipleSelectionBar';
 import { SelectionCheckbox } from '@/components/shared/SelectionCheckbox';
 import { ConfirmDeleteModal } from '@/components/shared/ConfirmDeleteModal';
+import { CycleManager } from './CycleManager';
+import HistoricoParcelasFilter from './HistoricoParcelasFilter';
+import { buscarAlunosSemCiclos } from '@/utils/alunosSemCiclos';
+import { TurmaFilter } from './TurmaFilter';
 
 interface Parcela {
   id: number;
   registro_financeiro_id: string;
+  alunos_financeiro_id: string;
   numero_parcela: number;
   valor: number;
   data_vencimento: string;
   data_pagamento: string | null;
   status_pagamento: string;
-  tipo_item: 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'outros';
+  tipo_item: 'plano' | 'material' | 'matrícula' | 'cancelamento' | 'avulso' | 'outros';
   descricao_item?: string | null;
   idioma_registro: 'Inglês' | 'Japonês';
   comprovante: string | null;
@@ -66,9 +74,11 @@ interface Parcela {
   criado_em: string | null;
   atualizado_em: string | null;
   forma_pagamento?: string;
+  historico: boolean;
   // Dados relacionados via join
   aluno_nome?: string;
   plano_nome?: string;
+  turma_id?: string;
 }
 
 interface ParcelasTableProps {
@@ -84,8 +94,9 @@ const ParcelasTable: React.FC<ParcelasTableProps> = ({ onRefresh }) => {
   const [statusFilters, setStatusFilters] = useState<string[]>(['pendente', 'vencido']); // Filtro inicial: apenas pendentes e vencidas
   const [tipoFilters, setTipoFilters] = useState<string[]>(['plano', 'material', 'matrícula', 'cancelamento', 'outros']);
   const [dataInicio, setDataInicio] = useState(''); // Sem data início para mostrar desde o início
-  const [dataFim, setDataFim] = useState(new Date().toISOString().split('T')[0]); // Data atual como fim para mostrar até hoje
+  const [dataFim, setDataFim] = useState(''); // Sem data fim automática
   const [idiomaFilter, setIdiomaFilter] = useState<'todos' | 'Inglês' | 'Japonês'>('todos');
+  const [turmaFilter, setTurmaFilter] = useState<string | null>(null);
   
   // Estados para paginação
   const [currentPage, setCurrentPage] = useState(1);
@@ -95,20 +106,124 @@ const ParcelasTable: React.FC<ParcelasTableProps> = ({ onRefresh }) => {
   const [isFinancialPlanDialogOpen, setIsFinancialPlanDialogOpen] = useState(false);
   const [selectedStudentForPlan, setSelectedStudentForPlan] = useState<Student | null>(null);
   
-  // Estado para controlar se os filtros avançados estão expandidos
+  // Estados para o modal de criação de parcelas individuais
+  const [isCreateParcelasDialogOpen, setIsCreateParcelasDialogOpen] = useState(false);
+  
+  // Estados para controlar se os filtros avançados estão expandidos
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
+  
+  // Estado para controlar o interruptor de migração
+  const [isMigrationMode, setIsMigrationMode] = useState(false);
+  const [parcelasMigradas, setParcelasMigradas] = useState<any[]>([]);
+  const [loadingMigration, setLoadingMigration] = useState(false);
   
   // Estado para o modal de confirmação de exclusão
   const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Estado para controlar o filtro de histórico
+  const [showHistorico, setShowHistorico] = useState(false);
+  
+  // Estado para controlar o filtro de alunos sem ciclos
+  const [showAlunosSemCiclos, setShowAlunosSemCiclos] = useState(false);
+  const [alunosSemCiclos, setAlunosSemCiclos] = useState<{id: string, nome: string}[]>([]);
 
-  // Função para aplicar filtro automático inicial (apenas na primeira vez)
+  // Função para marcar que o componente foi carregado
   useEffect(() => {
     if (isInitialLoad) {
-      toast.success("🎯 Filtro automático aplicado - Mostrando apenas parcelas pendentes e vencidas até hoje.");
       setIsInitialLoad(false);
     }
   }, [isInitialLoad]);
+
+  // Função para buscar parcelas migradas
+  const fetchParcelasMigradas = async () => {
+    setLoadingMigration(true);
+    try {
+      // Buscar TODAS as parcelas migradas usando paginação em lotes
+      let allParcelas: any[] = [];
+      let from = 0;
+      const batchSize = 1000;
+      
+      while (true) {
+        const { data, error } = await supabase
+          .from('parcelas_migracao_raw')
+          .select('*')
+          .eq('historico_migrados', true)
+          .range(from, from + batchSize - 1)
+          .order('data_vencimento', { ascending: false })
+          .order('aluno_nome', { ascending: true });
+        
+        if (error) throw error;
+        
+        if (!data || data.length === 0) break;
+        
+        allParcelas = [...allParcelas, ...data];
+        
+        if (data.length < batchSize) break; // Última página
+        
+        from += batchSize;
+      }
+      
+      console.log(`=== DEBUG PARCELAS MIGRADAS ===`);
+      console.log(`Total de parcelas migradas carregadas: ${allParcelas.length}`);
+      console.log(`=== FIM DEBUG ===`);
+      
+      // Processar dados para ter a mesma estrutura das parcelas normais
+      const parcelasProcessadas = allParcelas.map(parcela => ({
+        ...parcela,
+        aluno_nome: parcela.aluno_nome,
+        plano_nome: parcela.plano_nome,
+        status_calculado: calcularStatusAutomatico(parcela)
+      }));
+      
+      setParcelasMigradas(parcelasProcessadas);
+    } catch (error) {
+      console.error('Erro ao buscar parcelas migradas:', error);
+      toast.error('Erro ao carregar dados migrados');
+    } finally {
+      setLoadingMigration(false);
+    }
+  };
+
+  // Função para buscar alunos sem ciclos
+  const fetchAlunosSemCiclos = async () => {
+    try {
+      const alunos = await buscarAlunosSemCiclos();
+      setAlunosSemCiclos(alunos);
+      console.log(`Alunos sem ciclos encontrados: ${alunos.length}`);
+    } catch (error) {
+      console.error('Erro ao buscar alunos sem ciclos:', error);
+      toast.error('Erro ao carregar alunos sem ciclos');
+    }
+  };
+
+  // Buscar parcelas migradas quando o modo migração for ativado
+  useEffect(() => {
+    if (isMigrationMode) {
+      fetchParcelasMigradas();
+      // Manter paginação padrão de 10 itens por página
+      setItemsPerPage(10);
+      setCurrentPage(1);
+      // Incluir todos os status possíveis para mostrar todos os dados migrados
+      setStatusFilters(['pago', 'pendente', 'vencido', 'cancelado']);
+      // Incluir todos os tipos possíveis
+      setTipoFilters(['plano', 'material', 'matrícula', 'cancelamento', 'outros']);
+    } else {
+      // Voltar para paginação padrão quando sair do modo migração
+      setItemsPerPage(10);
+      setCurrentPage(1);
+      // Voltar para filtros padrão (apenas pendentes e vencidas)
+      setStatusFilters(['pendente', 'vencido']);
+      setTipoFilters(['plano', 'material', 'matrícula', 'cancelamento', 'outros']);
+    }
+  }, [isMigrationMode]);
+
+  // Buscar alunos sem ciclos quando o filtro for ativado
+  useEffect(() => {
+    if (showAlunosSemCiclos) {
+      fetchAlunosSemCiclos();
+    }
+  }, [showAlunosSemCiclos]);
 
   // Funções para gerenciar filtros múltiplos
   const handleStatusFilterChange = (status: string, checked: boolean) => {
@@ -136,6 +251,23 @@ const ParcelasTable: React.FC<ParcelasTableProps> = ({ onRefresh }) => {
     excluirMultiplasParcelas,
     calcularStatusAutomatico
   } = useParcelas();
+
+  // Recarregar parcelas quando o filtro de histórico mudar
+  useEffect(() => {
+    const filtros = {
+      // Remover termo de busca para evitar chamadas desnecessárias - filtragem será feita localmente
+      // termo: searchTerm,
+      // Não passar status pois é um array e a filtragem é feita localmente
+      // status: statusFilters,
+      // Não passar tipo pois é um array e a filtragem é feita localmente
+      // tipo: tipoFilters,
+      dataVencimentoInicio: dataInicio,
+      dataVencimentoFim: dataFim,
+      idioma: idiomaFilter === 'todos' ? undefined : idiomaFilter,
+      incluirHistorico: showHistorico
+    };
+    fetchParcelas(filtros);
+  }, [showHistorico, fetchParcelas, dataInicio, dataFim, idiomaFilter]);
 
   // Função para criar plano de pagamento
   const handleCreatePlan = async () => {
@@ -183,7 +315,53 @@ const ParcelasTable: React.FC<ParcelasTableProps> = ({ onRefresh }) => {
   const handlePlanSuccess = () => {
     fetchParcelas(); // Atualizar a lista de parcelas
     setIsFinancialPlanDialogOpen(false);
-    setSelectedStudentForPlan(null);
+  };
+
+  // Função para criar parcelas individuais
+  const handleCreateParcelas = async () => {
+    try {
+      // Buscar todos os alunos ativos
+      const { data: students, error: studentsError } = await supabase
+        .from('alunos')
+        .select('id, nome')
+        .eq('status', 'Ativo')
+        .order('nome');
+
+      if (studentsError) throw studentsError;
+
+      if (!students || students.length === 0) {
+        toast.error("Nenhum aluno encontrado - Não há alunos ativos para criar parcelas.");
+        return;
+      }
+
+      // Verificar se existem alunos COM plano financeiro (diferente do handleCreatePlan)
+      const { data: existingPlans, error: plansError } = await supabase
+        .from('financeiro_alunos')
+        .select('aluno_id');
+
+      if (plansError) throw plansError;
+
+      const studentsWithPlans = new Set(existingPlans?.map(p => p.aluno_id) || []);
+      const studentsWithFinancialPlans = students.filter(student => studentsWithPlans.has(student.id));
+
+      if (studentsWithFinancialPlans.length === 0) {
+        toast.error("Nenhum aluno com plano financeiro - É necessário ter alunos com planos financeiros criados para gerar parcelas individuais.");
+        return;
+      }
+
+      // Abrir o modal de criação de parcelas
+      setIsCreateParcelasDialogOpen(true);
+      
+      toast.success(`Modal de criação aberto - ${studentsWithFinancialPlans.length} aluno(s) com plano financeiro disponível(is) para criar parcelas.`);
+    } catch (error) {
+      console.error('Erro ao verificar alunos:', error);
+      toast.error("Erro ao verificar alunos disponíveis.");
+    }
+  };
+
+  const handleParcelasSuccess = () => {
+    fetchParcelas(); // Atualizar a lista de parcelas
+    setIsCreateParcelasDialogOpen(false);
   };
 
   // Função para lidar com exclusão (individual ou múltipla)
@@ -234,12 +412,17 @@ const ParcelasTable: React.FC<ParcelasTableProps> = ({ onRefresh }) => {
 
 
 
-  // Filtragem local atualizada para múltipla seleção + filtro de data automático
+  // Filtragem local atualizada para múltipla seleção + filtro de data automático + histórico
   const parcelasFiltradas = useMemo(() => {
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0); // Zerar horas para comparação apenas de data
     
-    return todasParcelas.filter((parcela) => {
+    // Usar dados migrados quando modo migração estiver ativo, senão usar parcelas normais
+    const dadosParaFiltrar = isMigrationMode ? parcelasMigradas : todasParcelas;
+    
+
+    
+    const resultadoFiltrado = dadosParaFiltrar.filter((parcela) => {
       // Filtro por nome do aluno
       const filtroNome = !searchTerm || 
         parcela.aluno_nome?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -260,32 +443,52 @@ const ParcelasTable: React.FC<ParcelasTableProps> = ({ onRefresh }) => {
       const filtroDataInicio = !dataInicio || dataVencimento >= criarDataDeString(dataInicio);
       const filtroDataFim = !dataFim || dataVencimento <= criarDataDeString(dataFim);
       
-      // Filtro automático: apenas parcelas até hoje (quando filtro inicial está ativo)
-      const isFilteringCurrentDate = !dataInicio && 
-                                     dataFim === new Date().toISOString().split('T')[0] &&
-                                     statusFilters.length === 2 && 
-                                     statusFilters.includes('pendente') && 
-                                     statusFilters.includes('vencido');
+      // Filtro por alunos sem ciclos
+      const filtroAlunosSemCiclos = !showAlunosSemCiclos || 
+        alunosSemCiclos.some(aluno => aluno.nome === parcela.aluno_nome);
       
-      const filtroDataAutomatico = !isFilteringCurrentDate || dataVencimento <= hoje;
+      // Filtro por turma
+      const filtroTurma = !turmaFilter || 
+        parcela.turma_id === turmaFilter;
+      
+      // Não aplicar filtro de histórico aqui pois já é feito no hook useParcelas
+      // O hook já retorna apenas as parcelas corretas baseado no filtro incluirHistorico
       
       return filtroNome && filtroStatus && filtroTipo && filtroIdioma && 
-             filtroDataInicio && filtroDataFim && filtroDataAutomatico;
+             filtroDataInicio && filtroDataFim && filtroAlunosSemCiclos && filtroTurma;
     });
-  }, [todasParcelas, searchTerm, statusFilters, tipoFilters, idiomaFilter, 
-      dataInicio, dataFim, calcularStatusAutomatico]);
+    
+    // Aplicar ordenação adicional no frontend para garantir ordem alfabética por nome do aluno
+    // após a filtragem local, mantendo a ordenação por data de vencimento como primária
+    const resultadoOrdenado = resultadoFiltrado.sort((a, b) => {
+      // Primeiro ordena por data de vencimento (mais recente primeiro)
+      const dataA = new Date(a.data_vencimento);
+      const dataB = new Date(b.data_vencimento);
+      if (dataA.getTime() !== dataB.getTime()) {
+        return dataB.getTime() - dataA.getTime();
+      }
+      // Depois ordena alfabeticamente por nome do aluno
+      return (a.aluno_nome || '').localeCompare(b.aluno_nome || '', 'pt-BR');
+    });
+    
+    return resultadoOrdenado;
+  }, [todasParcelas, parcelasMigradas, isMigrationMode, searchTerm, statusFilters, tipoFilters, idiomaFilter, turmaFilter, 
+      dataInicio, dataFim, calcularStatusAutomatico, showHistorico, showAlunosSemCiclos, alunosSemCiclos]);
 
   // Função para resetar filtros para o padrão inicial
   const resetarFiltrosParaPadrao = () => {
     setSearchTerm('');
     setStatusFilters(['pendente', 'vencido']);
     setTipoFilters(['plano', 'material', 'matrícula', 'cancelamento', 'outros']);
-    setDataInicio(''); // Sem data início para mostrar desde o início
-    setDataFim(new Date().toISOString().split('T')[0]); // Data atual como fim
+    setDataInicio(''); // Sem data início
+    setDataFim(''); // Sem data fim
     setIdiomaFilter('todos');
+    setTurmaFilter(null);
+    setShowAlunosSemCiclos(false);
+    setAlunosSemCiclos([]);
     setCurrentPage(1);
     
-    toast.success("🔄 Filtros resetados - Filtros voltaram ao padrão inicial (pendentes/vencidas até hoje).");
+    toast.success("🔄 Filtros resetados - Filtros voltaram ao padrão inicial (pendentes/vencidas).");
   };
 
   // Função para limpar todos os filtros
@@ -296,6 +499,9 @@ const ParcelasTable: React.FC<ParcelasTableProps> = ({ onRefresh }) => {
     setDataInicio('');
     setDataFim('');
     setIdiomaFilter('todos');
+    setTurmaFilter(null);
+    setShowAlunosSemCiclos(false);
+    setAlunosSemCiclos([]);
     setCurrentPage(1);
     
     toast.success("🧹 Todos os filtros removidos - Mostrando todas as parcelas sem filtros.");
@@ -320,7 +526,8 @@ const ParcelasTable: React.FC<ParcelasTableProps> = ({ onRefresh }) => {
            tipoFilters.length < 5 || 
            dataInicio || 
            dataFim || 
-           idiomaFilter !== 'todos';
+           idiomaFilter !== 'todos' ||
+           turmaFilter !== null;
   };
 
   // Cálculos de paginação
@@ -462,6 +669,8 @@ const ParcelasTable: React.FC<ParcelasTableProps> = ({ onRefresh }) => {
         return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'cancelamento':
         return <XCircle className="h-4 w-4" style={{color: '#D90429'}} />;
+      case 'avulso':
+        return <FileText className="h-4 w-4 text-indigo-600" />;
       case 'outros':
         return <FileText className="h-4 w-4 text-orange-600" />;
       default:
@@ -534,162 +743,257 @@ const ParcelasTable: React.FC<ParcelasTableProps> = ({ onRefresh }) => {
               style={{ overflow: "hidden" }}
             >
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-                  {/* Busca */}
-                  <div className="lg:col-span-2">
-                    <Label htmlFor="search" className="text-sm font-medium" style={{color: '#6B7280'}}>Buscar</Label>
-                    <div className="relative mt-1">
-                      <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <div className="space-y-4">
+                  {/* Primeira linha de filtros */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Busca */}
+                    <div>
+                      <Label htmlFor="search" className="text-sm font-medium" style={{color: '#6B7280'}}>Buscar</Label>
+                      <div className="relative mt-1">
+                        <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="search"
+                          placeholder="Nome do aluno..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="pl-10" style={{borderColor: '#D1D5DB'}} onFocus={(e) => {e.target.style.borderColor = '#D90429'; e.target.style.boxShadow = '0 0 0 1px #D90429'}} onBlur={(e) => {e.target.style.borderColor = '#D1D5DB'; e.target.style.boxShadow = 'none'}}
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Filtros de Status com Multi-Select */}
+                    <div>
+                      <Label className="text-sm font-medium mb-2 block" style={{color: '#6B7280'}}>Status</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="w-full justify-between" style={{borderColor: '#D1D5DB'}} onFocus={(e) => {e.target.style.borderColor = '#D90429'; e.target.style.boxShadow = '0 0 0 1px #D90429'}} onBlur={(e) => {e.target.style.borderColor = '#D1D5DB'; e.target.style.boxShadow = 'none'}}
+                          >
+                            <span className="text-sm">
+                              {statusFilters.length === 4 
+                                ? 'Todos os status' 
+                                : statusFilters.length === 0 
+                                ? 'Selecione os status...' 
+                                : statusFilters.length === 2 && statusFilters.includes('pendente') && statusFilters.includes('vencido')
+                                ? 'Pendentes e Vencidas (Padrão)'
+                                : `${statusFilters.length} status selecionado${statusFilters.length > 1 ? 's' : ''}`
+                              }
+                            </span>
+                            <ChevronDown className="h-4 w-4 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0">
+                          <div className="p-2 space-y-1">
+                            {[
+                              { value: 'pago', label: 'Pagas', icon: CheckCircle },
+                              { value: 'pendente', label: 'Pendentes', icon: Clock },
+                              { value: 'vencido', label: 'Vencidas', icon: AlertTriangle },
+                              { value: 'cancelado', label: 'Canceladas', icon: XCircle }
+                            ].map((status) => {
+                              const isChecked = statusFilters.includes(status.value);
+                              const IconComponent = status.icon;
+                              return (
+                                <div 
+                                  key={status.value}
+                                  className="flex items-center space-x-2 p-2 rounded hover:bg-gray-50 cursor-pointer"
+                                >
+                                  <Checkbox
+                                    checked={isChecked}
+                                    onCheckedChange={(checked) => handleStatusFilterChange(status.value, checked as boolean)}
+                                  />
+                                  <IconComponent className="h-4 w-4 text-gray-600" />
+                                  <span className="text-sm">{status.label}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    
+                    {/* Filtros de Tipo com Multi-Select */}
+                    <div>
+                      <Label className="text-sm font-medium mb-2 block" style={{color: '#6B7280'}}>Tipo</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="w-full justify-between" style={{borderColor: '#D1D5DB'}} onFocus={(e) => {e.target.style.borderColor = '#D90429'; e.target.style.boxShadow = '0 0 0 1px #D90429'}} onBlur={(e) => {e.target.style.borderColor = '#D1D5DB'; e.target.style.boxShadow = 'none'}}
+                          >
+                            <span className="text-sm">
+                              {tipoFilters.length === 6 
+                                ? 'Todos os tipos' 
+                                : tipoFilters.length === 0 
+                                ? 'Selecione os tipos...' 
+                                : `${tipoFilters.length} tipo${tipoFilters.length > 1 ? 's' : ''} selecionado${tipoFilters.length > 1 ? 's' : ''}`
+                              }
+                            </span>
+                            <ChevronDown className="h-4 w-4 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0">
+                          <div className="p-2 space-y-1">
+                            {[
+                              { value: 'plano', label: 'Planos', icon: CreditCard },
+                              { value: 'material', label: 'Materiais', icon: Calendar },
+                              { value: 'matrícula', label: 'Matrículas', icon: CheckCircle },
+                              { value: 'cancelamento', label: 'Cancelamentos', icon: XCircle },
+                              { value: 'avulso', label: 'Avulsos', icon: FileText },
+                              { value: 'outros', label: 'Outros', icon: FileText }
+                            ].map((tipo) => {
+                              const isChecked = tipoFilters.includes(tipo.value);
+                              const IconComponent = tipo.icon;
+                              return (
+                                <div 
+                                  key={tipo.value}
+                                  className="flex items-center space-x-2 p-2 rounded hover:bg-gray-50 cursor-pointer"
+                                >
+                                  <Checkbox
+                                    checked={isChecked}
+                                    onCheckedChange={(checked) => handleTipoFilterChange(tipo.value, checked as boolean)}
+                                  />
+                                  <IconComponent className="h-4 w-4 text-gray-600" />
+                                  <span className="text-sm">{tipo.label}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    
+                    {/* Filtro de Idioma */}
+                    <div>
+                      <Label className="text-sm font-medium" style={{color: '#6B7280'}}>Idioma</Label>
+                      <Select value={idiomaFilter} onValueChange={handleIdiomaChange}>
+                        <SelectTrigger className="mt-1" style={{borderColor: '#D1D5DB'}} onFocus={(e) => {e.target.style.borderColor = '#D90429'; e.target.style.boxShadow = '0 0 0 1px #D90429'}} onBlur={(e) => {e.target.style.borderColor = '#D1D5DB'; e.target.style.boxShadow = 'none'}}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todos">Todos</SelectItem>
+                          <SelectItem value="Inglês">Inglês</SelectItem>
+                          <SelectItem value="Japonês">Japonês</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+
+                  </div>
+                  
+                  {/* Segunda linha de filtros */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Filtro de Data Início */}
+                    <div>
+                      <Label htmlFor="dataInicio" className="text-sm font-medium" style={{color: '#6B7280'}}>Data Início</Label>
                       <Input
-                        id="search"
-                        placeholder="Nome do aluno..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10" style={{borderColor: '#D1D5DB'}} onFocus={(e) => {e.target.style.borderColor = '#D90429'; e.target.style.boxShadow = '0 0 0 1px #D90429'}} onBlur={(e) => {e.target.style.borderColor = '#D1D5DB'; e.target.style.boxShadow = 'none'}}
+                        id="dataInicio"
+                        type="date"
+                        value={dataInicio}
+                        onChange={(e) => handleDataInicioChange(e.target.value)}
+                        className="mt-1" style={{borderColor: '#D1D5DB'}} onFocus={(e) => {e.target.style.borderColor = '#D90429'; e.target.style.boxShadow = '0 0 0 1px #D90429'}} onBlur={(e) => {e.target.style.borderColor = '#D1D5DB'; e.target.style.boxShadow = 'none'}}
                       />
                     </div>
-                  </div>
-                  
-                  {/* Filtros de Status com Multi-Select */}
-                  <div>
-                    <Label className="text-sm font-medium mb-2 block" style={{color: '#6B7280'}}>Status</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-between" style={{borderColor: '#D1D5DB'}} onFocus={(e) => {e.target.style.borderColor = '#D90429'; e.target.style.boxShadow = '0 0 0 1px #D90429'}} onBlur={(e) => {e.target.style.borderColor = '#D1D5DB'; e.target.style.boxShadow = 'none'}}
-                        >
-                          <span className="text-sm">
-                            {statusFilters.length === 4 
-                              ? 'Todos os status' 
-                              : statusFilters.length === 0 
-                              ? 'Selecione os status...' 
-                              : statusFilters.length === 2 && statusFilters.includes('pendente') && statusFilters.includes('vencido')
-                              ? 'Pendentes e Vencidas (Padrão)'
-                              : `${statusFilters.length} status selecionado${statusFilters.length > 1 ? 's' : ''}`
-                            }
-                          </span>
-                          <ChevronDown className="h-4 w-4 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-full p-0">
-                        <div className="p-2 space-y-1">
-                          {[
-                            { value: 'pago', label: 'Pagas', icon: CheckCircle },
-                            { value: 'pendente', label: 'Pendentes', icon: Clock },
-                            { value: 'vencido', label: 'Vencidas', icon: AlertTriangle },
-                            { value: 'cancelado', label: 'Canceladas', icon: XCircle }
-                          ].map((status) => {
-                            const isChecked = statusFilters.includes(status.value);
-                            const IconComponent = status.icon;
-                            return (
-                              <div 
-                                key={status.value}
-                                className="flex items-center space-x-2 p-2 rounded hover:bg-gray-50 cursor-pointer"
-                              >
-                                <Checkbox
-                                  checked={isChecked}
-                                  onCheckedChange={(checked) => handleStatusFilterChange(status.value, checked as boolean)}
-                                />
-                                <IconComponent className="h-4 w-4 text-gray-600" />
-                                <span className="text-sm">{status.label}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  
-                  {/* Filtros de Tipo com Multi-Select */}
-                  <div>
-                    <Label className="text-sm font-medium mb-2 block" style={{color: '#6B7280'}}>Tipo</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-between" style={{borderColor: '#D1D5DB'}} onFocus={(e) => {e.target.style.borderColor = '#D90429'; e.target.style.boxShadow = '0 0 0 1px #D90429'}} onBlur={(e) => {e.target.style.borderColor = '#D1D5DB'; e.target.style.boxShadow = 'none'}}
-                        >
-                          <span className="text-sm">
-                            {tipoFilters.length === 5 
-                              ? 'Todos os tipos' 
-                              : tipoFilters.length === 0 
-                              ? 'Selecione os tipos...' 
-                              : `${tipoFilters.length} tipo${tipoFilters.length > 1 ? 's' : ''} selecionado${tipoFilters.length > 1 ? 's' : ''}`
-                            }
-                          </span>
-                          <ChevronDown className="h-4 w-4 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-full p-0">
-                        <div className="p-2 space-y-1">
-                          {[
-                            { value: 'plano', label: 'Planos', icon: CreditCard },
-                            { value: 'material', label: 'Materiais', icon: Calendar },
-                            { value: 'matrícula', label: 'Matrículas', icon: CheckCircle },
-                            { value: 'cancelamento', label: 'Cancelamentos', icon: XCircle },
-                            { value: 'outros', label: 'Outros', icon: FileText }
-                          ].map((tipo) => {
-                            const isChecked = tipoFilters.includes(tipo.value);
-                            const IconComponent = tipo.icon;
-                            return (
-                              <div 
-                                key={tipo.value}
-                                className="flex items-center space-x-2 p-2 rounded hover:bg-gray-50 cursor-pointer"
-                              >
-                                <Checkbox
-                                  checked={isChecked}
-                                  onCheckedChange={(checked) => handleTipoFilterChange(tipo.value, checked as boolean)}
-                                />
-                                <IconComponent className="h-4 w-4 text-gray-600" />
-                                <span className="text-sm">{tipo.label}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  
-                  {/* Filtro de Idioma */}
-                  <div>
-                    <Label className="text-sm font-medium" style={{color: '#6B7280'}}>Idioma</Label>
-                    <Select value={idiomaFilter} onValueChange={handleIdiomaChange}>
-                      <SelectTrigger className="mt-1" style={{borderColor: '#D1D5DB'}} onFocus={(e) => {e.target.style.borderColor = '#D90429'; e.target.style.boxShadow = '0 0 0 1px #D90429'}} onBlur={(e) => {e.target.style.borderColor = '#D1D5DB'; e.target.style.boxShadow = 'none'}}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="todos">Todos</SelectItem>
-                        <SelectItem value="Inglês">Inglês</SelectItem>
-                        <SelectItem value="Japonês">Japonês</SelectItem>
+                    
+                    {/* Filtro de Data Fim */}
+                    <div>
+                      <Label htmlFor="dataFim" className="text-sm font-medium" style={{color: '#6B7280'}}>Data Fim</Label>
+                      <Input
+                        id="dataFim"
+                        type="date"
+                        value={dataFim}
+                        onChange={(e) => handleDataFimChange(e.target.value)}
+                        className="mt-1 border-gray-300 focus:border-red-500 focus:ring-red-500"
+                      />
+                    </div>
+                    
+                    {/* Filtro de Alunos sem Ciclos */}
+                     <div>
+                       <Label className="text-sm font-medium" style={{color: '#6B7280'}}>Alunos sem Ciclos</Label>
+                       <Select value={showAlunosSemCiclos ? 'sim' : 'nao'} onValueChange={(value) => setShowAlunosSemCiclos(value === 'sim')}>
+                         <SelectTrigger className="mt-1" style={{borderColor: '#D1D5DB'}} onFocus={(e) => {e.target.style.borderColor = '#D90429'; e.target.style.boxShadow = '0 0 0 1px #D90429'}} onBlur={(e) => {e.target.style.borderColor = '#D1D5DB'; e.target.style.boxShadow = 'none'}}>
+                           <SelectValue />
+                         </SelectTrigger>
+                         <SelectContent>
+                           <SelectItem value="nao">Desativado</SelectItem>
+                           <SelectItem value="sim">
+                          Sim {showAlunosSemCiclos && alunosSemCiclos.length > 0 && `(${alunosSemCiclos.length} encontrados)`}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   
-                  {/* Filtro de Data Início */}
+                  {/* Filtro de Turma */}
                   <div>
-                    <Label htmlFor="dataInicio" className="text-sm font-medium" style={{color: '#6B7280'}}>Data Início</Label>
-                    <Input
-                      id="dataInicio"
-                      type="date"
-                      value={dataInicio}
-                      onChange={(e) => handleDataInicioChange(e.target.value)}
-                      className="mt-1" style={{borderColor: '#D1D5DB'}} onFocus={(e) => {e.target.style.borderColor = '#D90429'; e.target.style.boxShadow = '0 0 0 1px #D90429'}} onBlur={(e) => {e.target.style.borderColor = '#D1D5DB'; e.target.style.boxShadow = 'none'}}
-                    />
-                  </div>
-                  
-                  {/* Filtro de Data Fim */}
-                  <div>
-                    <Label htmlFor="dataFim" className="text-sm font-medium" style={{color: '#6B7280'}}>Data Fim</Label>
-                    <Input
-                      id="dataFim"
-                      type="date"
-                      value={dataFim}
-                      onChange={(e) => handleDataFimChange(e.target.value)}
-                      className="mt-1 border-gray-300 focus:border-red-500 focus:ring-red-500"
+                    <TurmaFilter
+                      selectedTurma={turmaFilter}
+                      onTurmaChange={setTurmaFilter}
                     />
                   </div>
                 </div>
+              </div>
+                
+                {/* Seção de Migração */}
+                <div className="mt-6 pt-4 border-t border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-database h-5 w-5 text-purple-600">
+                        <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                        <path d="M3 5V19A9 3 0 0 0 21 19V5"></path>
+                        <path d="M3 12A9 3 0 0 0 21 12"></path>
+                      </svg>
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-900">Migração</h3>
+                        <p className="text-xs text-gray-500">Visualizar dados migrados do sistema anterior</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-sm font-medium text-gray-700" htmlFor="migration-toggle">
+                        Ativo
+                      </label>
+                      <button 
+                        type="button" 
+                        role="switch" 
+                        aria-checked={isMigrationMode ? "true" : "false"}
+                        data-state={isMigrationMode ? "checked" : "unchecked"}
+                        onClick={() => setIsMigrationMode(!isMigrationMode)}
+                        className="peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-all duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=unchecked]:bg-gray-400 data-[state=checked]:bg-purple-600" 
+                        id="migration-toggle"
+                      >
+                        <span 
+                          data-state={isMigrationMode ? "checked" : "unchecked"}
+                          className="pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-all duration-300 ease-in-out data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0 data-[state=checked]:shadow-xl data-[state=unchecked]:shadow-md"
+                        ></span>
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Indicador quando modo migração está ativo */}
+                  {isMigrationMode && (
+                    <motion.div 
+                      className="mt-3 flex items-center gap-2 px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg"
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <Database className="h-4 w-4 text-purple-600" />
+                      <span className="text-sm text-purple-700 font-medium">
+                        Modo migração ativo - Quando ativado, o sistema mostra apenas as parcelas do site antigo
+                      </span>
+                      {loadingMigration && (
+                        <RefreshCw className="h-4 w-4 text-purple-600 animate-spin ml-2" />
+                      )}
+                    </motion.div>
+                  )}
+                </div>
+                
+                {/* Filtro de Histórico */}
+                <HistoricoParcelasFilter 
+                  showHistorico={showHistorico}
+                  onHistoricoToggle={setShowHistorico}
+                />
+                
+
                 
                 {/* Indicador de Filtro Automático e Botões de Reset */}
                 <div className="mt-4 flex items-center justify-between">
@@ -826,6 +1130,21 @@ const ParcelasTable: React.FC<ParcelasTableProps> = ({ onRefresh }) => {
                   <motion.div
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
+                    className="flex-1 max-w-xs"
+                  >
+                    <Button
+                      onClick={handleCreateParcelas}
+                      className="w-full text-gray-800 border-0 px-6 py-2 shadow-lg transition-all duration-300 bg-white hover:bg-gray-100"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      <FileText className="h-4 w-4 mr-2" />
+                      Criar Parcelas
+                    </Button>
+                  </motion.div>
+                  
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                   >
                     <Button
                       onClick={() => fetchParcelas()}
@@ -878,14 +1197,19 @@ const ParcelasTable: React.FC<ParcelasTableProps> = ({ onRefresh }) => {
                         )}
                         <TableHead className="font-bold w-20" style={{color: '#6B7280'}}>ID</TableHead>
               <TableHead className="font-bold min-w-[180px]" style={{color: '#6B7280'}}>Aluno</TableHead>
-              <TableHead className="font-bold min-w-[150px]" style={{color: '#6B7280'}}>Plano</TableHead>
+              {!isMigrationMode && (
+                <TableHead className="font-bold min-w-[150px]" style={{color: '#6B7280'}}>Plano</TableHead>
+              )}
               <TableHead className="font-bold w-32" style={{color: '#6B7280'}}>Tipo</TableHead>
-              <TableHead className="font-bold w-24" style={{color: '#6B7280'}}>Idioma</TableHead>
-              <TableHead className="font-bold w-20" style={{color: '#6B7280'}}>Parcela</TableHead>
+              {!isMigrationMode && (
+                <TableHead className="font-bold w-24" style={{color: '#6B7280'}}>Idioma</TableHead>
+              )}
+              <TableHead className="font-bold w-20" style={{color: '#6B7280'}}>
+                {isMigrationMode ? 'Data Pagamento' : 'Parcela'}
+              </TableHead>
               <TableHead className="font-bold w-32" style={{color: '#6B7280'}}>Valor</TableHead>
               <TableHead className="font-bold w-32" style={{color: '#6B7280'}}>Vencimento</TableHead>
               <TableHead className="font-bold w-32" style={{color: '#6B7280'}}>Forma Pagamento</TableHead>
-              <TableHead className="font-bold min-w-[150px]" style={{color: '#6B7280'}}>Descrição do Item</TableHead>
               <TableHead className="font-bold w-32" style={{color: '#6B7280'}}>Status</TableHead>
               <TableHead className="font-bold min-w-[200px]" style={{color: '#6B7280'}}>Observações</TableHead>
               <TableHead className="font-bold text-center w-32" style={{color: '#6B7280'}}>Ações</TableHead>
@@ -916,25 +1240,32 @@ const ParcelasTable: React.FC<ParcelasTableProps> = ({ onRefresh }) => {
                               <TableCell className="font-medium text-base text-gray-900">
                                 {parcela.aluno_nome || 'N/A'}
                               </TableCell>
-                              <TableCell className="text-base" style={{color: '#6B7280'}}>
-                                {parcela.plano_nome || 'N/A'}
-                              </TableCell>
+                              {!isMigrationMode && (
+                                <TableCell className="text-base" style={{color: '#6B7280'}}>
+                                  {parcela.plano_nome || 'N/A'}
+                                </TableCell>
+                              )}
                               <TableCell>
                                 <div className="flex items-center gap-2">
                                   {getTipoIcon(parcela.tipo_item)}
                                   <span className="capitalize font-medium text-base">{parcela.tipo_item}</span>
                                 </div>
                               </TableCell>
-                              <TableCell>
-                                <span className="inline-block px-3 py-1 rounded-md text-base font-medium border" style={{backgroundColor: '#F3F4F6', color: '#6B7280', borderColor: '#E5E7EB'}}>
-                                  {parcela.idioma_registro}
-                                </span>
-                              </TableCell>
+                              {!isMigrationMode && (
+                                <TableCell>
+                                  <span className="inline-block px-3 py-1 rounded-md text-base font-medium border" style={{backgroundColor: '#F3F4F6', color: '#6B7280', borderColor: '#E5E7EB'}}>
+                                    {parcela.idioma_registro}
+                                  </span>
+                                </TableCell>
+                              )}
                               <TableCell className="font-medium text-base">
-                                {calcularNumeroPorTipo(parcela, todasParcelas)}ª
+                                {isMigrationMode ? 
+                                  (parcela.data_pagamento ? formatDate(parcela.data_pagamento) : '-') : 
+                                  `${parcela.numero_parcela}ª`
+                                }
                               </TableCell>
                               <TableCell className="font-bold text-base text-green-700">
-                                R$ {parcela.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                R$ {parcela.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </TableCell>
                               <TableCell>
                                 <div className="text-base">
@@ -943,17 +1274,6 @@ const ParcelasTable: React.FC<ParcelasTableProps> = ({ onRefresh }) => {
                               </TableCell>
                               <TableCell className="text-base" style={{color: '#6B7280'}}>
                                 {formatarFormaPagamento(parcela.forma_pagamento) || '-'}
-                              </TableCell>
-                              <TableCell className="max-w-xs">
-                                <div className="text-sm text-gray-600">
-                                  {parcela.descricao_item ? (
-                                    <div className="truncate" title={parcela.descricao_item}>
-                                      {parcela.descricao_item}
-                                    </div>
-                                  ) : (
-                                    <span className="text-gray-400 italic">-</span>
-                                  )}
-                                </div>
                               </TableCell>
                               <TableCell>
                                 <motion.div
@@ -1001,6 +1321,42 @@ const ParcelasTable: React.FC<ParcelasTableProps> = ({ onRefresh }) => {
                                     </motion.div>
                                   )}
                                   
+                                  {/* Botão de Ciclo */}
+                                  <motion.div
+                                    whileHover={{ scale: 1.1 }}
+                                    whileTap={{ scale: 0.9 }}
+                                  >
+                                    <CycleManager
+                                      alunoId={parcela.alunos_financeiro_id}
+                                      isMigrationMode={isMigrationMode}
+                                      setIsMigrationMode={setIsMigrationMode}
+                                      showHistorico={showHistorico}
+                                      onCycleCreated={() => {
+                                        fetchParcelas();
+                                        toast.success('Ciclo atualizado com sucesso!');
+                                      }}
+                                      trigger={
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className={showHistorico ? "hover:bg-orange-50" : "hover:bg-blue-50"} 
+                                          style={{
+                                            borderColor: showHistorico ? '#FB923C' : '#BFDBFE', 
+                                            color: showHistorico ? '#EA580C' : '#2563EB'
+                                          }} 
+                                          onMouseEnter={(e) => {
+                                            (e.target as HTMLElement).style.borderColor = showHistorico ? '#F97316' : '#93C5FD';
+                                          }} 
+                                          onMouseLeave={(e) => {
+                                            (e.target as HTMLElement).style.borderColor = showHistorico ? '#FB923C' : '#BFDBFE';
+                                          }}
+                                        >
+                                          <Clock className="h-4 w-4" />
+                                        </Button>
+                                      }
+                                    />
+                                  </motion.div>
+
                                   {/* Manter o botão de Excluir */}
                                   <motion.div
                                     whileHover={{ scale: 1.1 }}
@@ -1200,7 +1556,7 @@ const ParcelasTable: React.FC<ParcelasTableProps> = ({ onRefresh }) => {
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-white/90 uppercase tracking-wide truncate">Total a Receber</p>
                       <p className="text-sm font-bold text-white truncate">
-                        R$ {parcelasFiltradas.reduce((total, parcela) => total + parcela.valor, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        R$ {parcelasFiltradas.reduce((total, parcela) => total + parcela.valor, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </div>
                   </div>
@@ -1257,6 +1613,19 @@ const ParcelasTable: React.FC<ParcelasTableProps> = ({ onRefresh }) => {
             preSelectedStudent={selectedStudentForPlan}
             onSuccess={handlePlanSuccess}
             onCancel={() => setIsFinancialPlanDialogOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de criação de parcelas individuais */}
+      <Dialog open={isCreateParcelasDialogOpen} onOpenChange={setIsCreateParcelasDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Criar Parcelas Individuais</DialogTitle>
+          </DialogHeader>
+          <CreateParcelasForm
+            onSuccess={handleParcelasSuccess}
+            onCancel={() => setIsCreateParcelasDialogOpen(false)}
           />
         </DialogContent>
       </Dialog>

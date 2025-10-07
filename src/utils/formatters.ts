@@ -1,19 +1,4 @@
 
-export const formatCPF = (value: string) => {
-  if (!value) return "";
-  const cleanValue = value.replace(/\D/g, '');
-  
-  if (cleanValue.length <= 3) {
-    return cleanValue;
-  } else if (cleanValue.length <= 6) {
-    return `${cleanValue.slice(0, 3)}.${cleanValue.slice(3)}`;
-  } else if (cleanValue.length <= 9) {
-    return `${cleanValue.slice(0, 3)}.${cleanValue.slice(3, 6)}.${cleanValue.slice(6)}`;
-  } else {
-    return `${cleanValue.slice(0, 3)}.${cleanValue.slice(3, 6)}.${cleanValue.slice(6, 9)}-${cleanValue.slice(9, 11)}`;
-  }
-};
-
 export const formatCEP = (value: string) => {
   if (!value) return "";
   const cleanValue = value.replace(/\D/g, '');
@@ -60,6 +45,20 @@ export const formatCurrency = (value: number): string => {
     style: 'currency',
     currency: 'BRL'
   }).format(value);
+};
+
+export const formatCPF = (cpf: string): string => {
+  if (!cpf) return '';
+  
+  // Remove todos os caracteres não numéricos
+  const cleanCPF = cpf.replace(/\D/g, '');
+  
+  // Aplica a máscara XXX.XXX.XXX-XX
+  if (cleanCPF.length === 11) {
+    return cleanCPF.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  }
+  
+  return cpf; // Retorna o valor original se não tiver 11 dígitos
 };
 
 // Função para converter números em valores por extenso

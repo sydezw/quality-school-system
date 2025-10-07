@@ -2,11 +2,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 import { adicionarMesesSeguro } from '@/utils/dateUtils';
 
-type ParcelaInsert = Database['public']['Tables']['parcelas_alunos']['Insert'];
+type ParcelaInsert = Database['public']['Tables']['alunos_parcelas']['Insert'];
 export type TipoItem = Database['public']['Enums']['tipo_item'];
 
 export interface ParcelaData {
-  registro_financeiro_id: string;
+  alunos_financeiro_id: string;
   valor: number;
   data_vencimento: string;
   status_pagamento: 'pago' | 'pendente' | 'vencido' | 'cancelado';
@@ -14,31 +14,63 @@ export interface ParcelaData {
   descricao_item?: string;
   forma_pagamento?: string;
   idioma_registro: 'Inglês' | 'Japonês';
+  observacoes?: string;
 }
 
 export interface ParcelaComNumero extends ParcelaData {
   numero_parcela: number;
+  nome_aluno?: string | null;
+  observacoes?: string;
 }
+
+// Função utilitária para converter ID de financeiro_alunos para alunos_financeiro
+const converterParaAlunosFinanceiroId = async (id: string): Promise<string> => {
+  // Verificar se o ID é da tabela financeiro_alunos e converter
+  const { data: registroFinanceiroAlunos } = await supabase
+    .from('financeiro_alunos')
+    .select('aluno_id')
+    .eq('id', id)
+    .single();
+  
+  if (registroFinanceiroAlunos) {
+    // Buscar o ID correspondente na alunos_financeiro
+    const { data: alunosFinanceiro } = await supabase
+      .from('alunos_financeiro')
+      .select('id')
+      .eq('aluno_id', registroFinanceiroAlunos.aluno_id)
+      .single();
+    
+    if (alunosFinanceiro) {
+      return alunosFinanceiro.id;
+    }
+  }
+  
+  // Se não encontrou conversão, retorna o ID original
+  return id;
+};
 
 /**
  * Busca o próximo número de parcela para um tipo específico de item
  */
 export const getProximoNumeroParcela = async (
-  registroFinanceiroId: string,
+  alunosFinanceiroId: string,
   tipoItem: TipoItem
 ): Promise<number> => {
   try {
-    // Validar se o registroFinanceiroId é válido
-    if (!registroFinanceiroId || registroFinanceiroId === 'undefined' || registroFinanceiroId.trim() === '') {
-      throw new Error('ID do registro financeiro é obrigatório e não pode estar vazio');
+    // Validar se o alunosFinanceiroId é válido
+    if (!alunosFinanceiroId || alunosFinanceiroId === 'undefined' || alunosFinanceiroId.trim() === '') {
+      throw new Error('ID do alunos_financeiro é obrigatório e não pode estar vazio');
     }
     
-    console.log('Buscando próximo número para:', { registroFinanceiroId, tipoItem });
+    // Converter o ID se necessário (de financeiro_alunos para alunos_financeiro)
+    const alunosFinanceiroIdCorreto = await converterParaAlunosFinanceiroId(alunosFinanceiroId);
+    
+    console.log('Buscando próximo número para:', { alunosFinanceiroId: alunosFinanceiroIdCorreto, tipoItem });
     
     const { data: parcelas, error } = await supabase
-      .from('parcelas_alunos')
+      .from('alunos_parcelas')
       .select('numero_parcela')
-      .eq('registro_financeiro_id', registroFinanceiroId)
+      .eq('alunos_financeiro_id', alunosFinanceiroIdCorreto)
       .eq('tipo_item', tipoItem)
       .order('numero_parcela', { ascending: false })
       .limit(1);
@@ -70,15 +102,56 @@ export const getProximoNumeroParcela = async (
  * Cria parcelas com numeração correta por tipo de item
  */
 export const criarParcelasComNumeracaoCorreta = async (
-  registroFinanceiroId: string,
+  alunosFinanceiroId: string,
   parcelasData: {
-    plano?: { valor: number; numParcelas: number; dataBase: Date; formaPagamento?: string; descricao?: string };
-    matricula?: { valor: number; numParcelas: number; dataBase: Date; formaPagamento?: string; descricao?: string };
-    material?: { valor: number; numParcelas: number; dataBase: Date; formaPagamento?: string; descricao?: string };
+    plano?: { valor: number; numParcelas: number; dataBase: Date; formaPagamento?: string; descricao?: string; observacoes?: string };
+    matricula?: { valor: number; numParcelas: number; dataBase: Date; formaPagamento?: string; descricao?: string; observacoes?: string };
+    material?: { valor: number; numParcelas: number; dataBase: Date; formaPagamento?: string; descricao?: string; observacoes?: string };
   },
   idiomaRegistro: 'Inglês' | 'Japonês' = 'Inglês'
 ): Promise<ParcelaComNumero[]> => {
   const parcelas: ParcelaComNumero[] = [];
+  
+  // Converter o ID se necessário (de financeiro_alunos para alunos_financeiro)
+  let alunosFinanceiroIdCorreto = alunosFinanceiroId;
+  let nomeAluno = null;
+  
+  // Tentar buscar na tabela financeiro_alunos primeiro (caso comum)
+  const { data: registroFinanceiroAlunos, error: errorFinanceiroAlunos } = await supabase
+    .from('financeiro_alunos')
+    .select(`
+      aluno_id,
+      alunos!inner(nome)
+    `)
+    .eq('id', alunosFinanceiroId)
+    .single();
+  
+  if (registroFinanceiroAlunos && !errorFinanceiroAlunos) {
+    // Se encontrou na financeiro_alunos, buscar o ID correspondente na alunos_financeiro
+    const { data: alunosFinanceiro, error: errorAlunosFinanceiro } = await supabase
+      .from('alunos_financeiro')
+      .select('id')
+      .eq('aluno_id', registroFinanceiroAlunos.aluno_id)
+      .single();
+    
+    if (alunosFinanceiro && !errorAlunosFinanceiro) {
+      alunosFinanceiroIdCorreto = alunosFinanceiro.id;
+      nomeAluno = registroFinanceiroAlunos.alunos?.nome || null;
+    }
+  } else {
+    // Se não encontrou na financeiro_alunos, tentar buscar diretamente na alunos_financeiro
+    const { data: registroAlunosFinanceiro, error: errorAlunosFinanceiro } = await supabase
+      .from('alunos_financeiro')
+      .select(`
+        alunos!inner(nome)
+      `)
+      .eq('id', alunosFinanceiroId)
+      .single();
+    
+    if (registroAlunosFinanceiro && !errorAlunosFinanceiro) {
+      nomeAluno = registroAlunosFinanceiro.alunos?.nome || null;
+    }
+  }
 
   // Ordem de criação: matrícula, material, plano (conforme solicitado)
   const tiposOrdenados: Array<{ tipo: TipoItem; dados: any; descricaoPadrao: string }> = [
@@ -91,7 +164,7 @@ export const criarParcelasComNumeracaoCorreta = async (
     if (!dados || dados.valor <= 0) continue;
 
     // Buscar o próximo número para este tipo específico
-    const proximoNumero = await getProximoNumeroParcela(registroFinanceiroId, tipo);
+    const proximoNumero = await getProximoNumeroParcela(alunosFinanceiroIdCorreto, tipo);
     const valorParcela = dados.valor / dados.numParcelas;
 
     for (let i = 0; i < dados.numParcelas; i++) {
@@ -99,7 +172,7 @@ export const criarParcelasComNumeracaoCorreta = async (
       const dataVencimento = adicionarMesesSeguro(dados.dataBase, i);
 
       parcelas.push({
-        registro_financeiro_id: registroFinanceiroId,
+        alunos_financeiro_id: alunosFinanceiroIdCorreto,
         numero_parcela: proximoNumero + i, // Numeração específica por tipo
         valor: valorParcela,
         data_vencimento: dataVencimento.toISOString().split('T')[0],
@@ -107,7 +180,9 @@ export const criarParcelasComNumeracaoCorreta = async (
         tipo_item: tipo,
         descricao_item: dados.descricao || descricaoPadrao,
         forma_pagamento: dados.formaPagamento,
-        idioma_registro: idiomaRegistro
+        idioma_registro: idiomaRegistro,
+        nome_aluno: nomeAluno,
+        observacoes: dados.observacoes
       });
     }
   }
@@ -144,12 +219,15 @@ export const ordenarParcelasPorTipoENumero = (parcelas: any[]): any[] => {
 /**
  * Busca todas as parcelas de um registro e as ordena corretamente
  */
-export const buscarParcelasOrdenadas = async (registroFinanceiroId: string): Promise<any[]> => {
+export const buscarParcelasOrdenadas = async (alunosFinanceiroId: string): Promise<any[]> => {
   try {
+    // Converter o ID se necessário (de financeiro_alunos para alunos_financeiro)
+    const alunosFinanceiroIdCorreto = await converterParaAlunosFinanceiroId(alunosFinanceiroId);
+    
     const { data: parcelas, error } = await supabase
-      .from('parcelas_alunos')
+      .from('alunos_parcelas')
       .select('*')
-      .eq('registro_financeiro_id', registroFinanceiroId);
+      .eq('alunos_financeiro_id', alunosFinanceiroIdCorreto);
 
     if (error) throw error;
 
@@ -164,22 +242,70 @@ export const buscarParcelasOrdenadas = async (registroFinanceiroId: string): Pro
  * Cria uma nova parcela com numeração correta para o tipo específico
  */
 export const criarNovaParcela = async (
-  registroFinanceiroId: string,
+  alunosFinanceiroId: string,
   tipoItem: TipoItem,
-  dadosParcela: Omit<ParcelaData, 'registro_financeiro_id' | 'tipo_item'>
+  dadosParcela: Omit<ParcelaData, 'alunos_financeiro_id' | 'tipo_item'>
 ): Promise<ParcelaComNumero | null> => {
   try {
-    const proximoNumero = await getProximoNumeroParcela(registroFinanceiroId, tipoItem);
+    // Primeiro, verificar se o ID fornecido é da tabela financeiro_alunos e converter para alunos_financeiro
+    let alunosFinanceiroIdCorreto = alunosFinanceiroId;
+    let nomeAluno = null;
+    
+    // Tentar buscar na tabela financeiro_alunos primeiro (caso comum)
+    const { data: registroFinanceiroAlunos, error: errorFinanceiroAlunos } = await supabase
+      .from('financeiro_alunos')
+      .select(`
+        aluno_id,
+        alunos!inner(nome)
+      `)
+      .eq('id', alunosFinanceiroId)
+      .single();
+    
+    if (registroFinanceiroAlunos && !errorFinanceiroAlunos) {
+      // Se encontrou na financeiro_alunos, buscar o ID correspondente na alunos_financeiro
+      const { data: alunosFinanceiro, error: errorAlunosFinanceiro } = await supabase
+        .from('alunos_financeiro')
+        .select('id')
+        .eq('aluno_id', registroFinanceiroAlunos.aluno_id)
+        .single();
+      
+      if (alunosFinanceiro && !errorAlunosFinanceiro) {
+        alunosFinanceiroIdCorreto = alunosFinanceiro.id;
+        nomeAluno = registroFinanceiroAlunos.alunos?.nome || null;
+      } else {
+        console.error('Erro ao buscar ID na tabela alunos_financeiro:', errorAlunosFinanceiro);
+        throw new Error('Registro financeiro não encontrado na tabela alunos_financeiro');
+      }
+    } else {
+      // Se não encontrou na financeiro_alunos, tentar buscar diretamente na alunos_financeiro
+      const { data: registroAlunosFinanceiro, error: errorAlunosFinanceiro } = await supabase
+        .from('alunos_financeiro')
+        .select(`
+          alunos!inner(nome)
+        `)
+        .eq('id', alunosFinanceiroId)
+        .single();
+      
+      if (registroAlunosFinanceiro && !errorAlunosFinanceiro) {
+        nomeAluno = registroAlunosFinanceiro.alunos?.nome || null;
+      } else {
+        console.error('Erro ao buscar registro financeiro:', errorAlunosFinanceiro);
+        throw new Error('Registro financeiro não encontrado em nenhuma das tabelas');
+      }
+    }
+    
+    const proximoNumero = await getProximoNumeroParcela(alunosFinanceiroIdCorreto, tipoItem);
     
     const novaParcela: ParcelaComNumero = {
       ...dadosParcela,
-      registro_financeiro_id: registroFinanceiroId,
+      alunos_financeiro_id: alunosFinanceiroIdCorreto,
       tipo_item: tipoItem,
-      numero_parcela: proximoNumero
+      numero_parcela: proximoNumero,
+      nome_aluno: nomeAluno
     };
 
     const { data, error } = await supabase
-      .from('parcelas_alunos')
+      .from('alunos_parcelas')
       .insert(novaParcela)
       .select()
       .single();

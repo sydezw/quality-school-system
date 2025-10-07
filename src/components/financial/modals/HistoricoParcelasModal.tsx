@@ -320,6 +320,7 @@ export const HistoricoParcelasModal: React.FC<HistoricoParcelasModalProps> = ({
                             <SelectItem value="material">Material</SelectItem>
                             <SelectItem value="uniforme">Uniforme</SelectItem>
                             <SelectItem value="taxa">Taxa</SelectItem>
+                            <SelectItem value="avulso">Avulso</SelectItem>
                             <SelectItem value="outros">Outros</SelectItem>
                           </SelectContent>
                         </Select>

@@ -28,7 +28,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { formatDate } from '@/utils/formatters';
+import { formatDate, formatCPF } from '@/utils/formatters';
 
 interface Student {
   id: string;
@@ -55,7 +55,7 @@ interface Student {
   created_at?: string | null;
   updated_at?: string | null;
   turmas?: { nome: string } | null;
-  responsaveis?: { nome: string } | null;
+  responsaveis?: { nome: string; telefone?: string; email?: string; cpf?: string } | null;
 }
 
 interface FinanceiroAluno {
@@ -93,7 +93,7 @@ interface FinanceiroAluno {
 
 interface ParcelaAluno {
   id: number;
-  registro_financeiro_id: string;
+  alunos_financeiro_id: string;
   numero_parcela: number;
   valor: number;
   data_vencimento: string;
@@ -107,6 +107,10 @@ interface ParcelaAluno {
   comprovante: string | null;
   criado_em: string | null;
   atualizado_em: string | null;
+  historico: boolean;
+  nome_aluno: string | null;
+  inicio_ciclo: string | null;
+  final_ciclo: string | null;
 }
 
 interface ContratoAluno {
@@ -262,9 +266,9 @@ export const StudentDetailsModal: React.FC<StudentDetailsModalProps> = ({
 
   const buscarDadosFinanceiros = async (alunoId: string) => {
     try {
-      // Buscar registro financeiro ativo
-      const { data: registroFinanceiro, error: errorRegistro } = await supabase
-        .from('financeiro_alunos')
+      // Buscar registro financeiro ativo (mais recente)
+      const { data: registrosFinanceiros, error: errorRegistro } = await supabase
+        .from('alunos_financeiro')
         .select(`
           *,
           planos (
@@ -276,8 +280,10 @@ export const StudentDetailsModal: React.FC<StudentDetailsModalProps> = ({
           )
         `)
         .eq('aluno_id', alunoId)
-        .eq('ativo_ou_encerrado', 'ativo')
-        .single();
+        .eq('ativo_ou_encerrado', true)
+        .order('created_at', { ascending: false });
+        
+      const registroFinanceiro = registrosFinanceiros?.[0] || null;
 
       if (errorRegistro && errorRegistro.code !== 'PGRST116') {
         console.error('Erro ao buscar registro financeiro:', errorRegistro);
@@ -296,11 +302,29 @@ export const StudentDetailsModal: React.FC<StudentDetailsModalProps> = ({
         return;
       }
 
+      // Verificar se há registro financeiro antes de buscar parcelas
+      if (!registroFinanceiro) {
+        setDadosFinanceiros({
+          registroFinanceiro: null,
+          parcelas: [],
+          valorTotal: 0,
+          statusGeral: 'Sem plano financeiro',
+          proximoVencimento: null,
+          progresso: 0,
+          parcelasPagas: 0,
+          parcelasPendentes: 0,
+          valorEmAtraso: 0,
+          planoNome: 'Nenhum plano ativo'
+        });
+        return;
+      }
+
       // Buscar parcelas se houver registro financeiro
       const { data: parcelasData, error: errorParcelas } = await supabase
-        .from('parcelas_alunos')
+        .from('alunos_parcelas')
         .select('*')
-        .eq('registro_financeiro_id', registroFinanceiro.id)
+        .eq('alunos_financeiro_id', registroFinanceiro.id)
+        .eq('historico', false)
         .order('data_vencimento', { ascending: true });
 
       if (errorParcelas) {
@@ -323,7 +347,9 @@ export const StudentDetailsModal: React.FC<StudentDetailsModalProps> = ({
       
       // Encontrar próximo vencimento
       const parcelasNaoPagas = parcelasArray.filter(p => p.status_pagamento !== 'pago');
-      const proximaParcelaVencimento = parcelasNaoPagas.length > 0 ? parcelasNaoPagas[0].data_vencimento : null;
+      const proximaParcelaVencimento = parcelasNaoPagas.length > 0 
+        ? parcelasNaoPagas.sort((a, b) => new Date(a.data_vencimento).getTime() - new Date(b.data_vencimento).getTime())[0].data_vencimento 
+        : null;
       
       // Calcular progresso
       const totalParcelas = parcelasArray.length;
@@ -348,14 +374,14 @@ export const StudentDetailsModal: React.FC<StudentDetailsModalProps> = ({
   };
 
   useEffect(() => {
-    if (student?.id) {
+    if (student?.id && isOpen) {
       const fetchData = async () => {
         await buscarDadosFinanceiros(student.id);
         await buscarDadosContratos(student.id);
       };
       fetchData();
     }
-  }, [student?.id]);
+  }, [student?.id, isOpen]);
 
   if (!student) return null;
 
@@ -759,10 +785,284 @@ export const StudentDetailsModal: React.FC<StudentDetailsModalProps> = ({
                 </div>
               </div>
             </motion.div>
+
+            {/* Card Ciclos */}
+            <motion.div 
+              className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 shadow-lg hover:shadow-xl transition-all duration-300"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+            >
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-12 h-12 bg-gradient-to-r from-teal-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <Calendar className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-[#111827]">Ciclos</h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Período de aulas
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {dadosFinanceiros.parcelas.length > 0 && dadosFinanceiros.parcelas.some(p => p.inicio_ciclo && p.final_ciclo) ? (
+                    <>
+                      {/* Ciclo Ativo */}
+                       <div className="flex justify-between items-center p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
+                         <span className="text-sm font-medium text-gray-700">Status do Ciclo</span>
+                         <div className="inline-flex items-center rounded-full border text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent hover:bg-primary/80 bg-green-500 text-white px-3 py-1">
+                           Ativo
+                         </div>
+                       </div>
+
+                      {/* Cards de Informações do Ciclo */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                              <Calendar className="w-4 h-4 text-white" />
+                            </div>
+                            <span className="text-xs font-medium text-gray-600">Início do Ciclo</span>
+                          </div>
+                          <span className="font-semibold text-[#111827] text-sm">
+                            {dadosFinanceiros.parcelas.find(p => p.inicio_ciclo)?.inicio_ciclo ? 
+                              formatarData(dadosFinanceiros.parcelas.find(p => p.inicio_ciclo)!.inicio_ciclo!) : 
+                              'Não definido'
+                            }
+                          </span>
+                        </div>
+
+                        <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="w-8 h-8 bg-gradient-to-r from-red-500 to-red-600 rounded-lg flex items-center justify-center">
+                              <Calendar className="w-4 h-4 text-white" />
+                            </div>
+                            <span className="text-xs font-medium text-gray-600">Fim do Ciclo</span>
+                          </div>
+                          <span className="font-semibold text-[#111827] text-sm">
+                            {dadosFinanceiros.parcelas.find(p => p.final_ciclo)?.final_ciclo ? 
+                              formatarData(dadosFinanceiros.parcelas.find(p => p.final_ciclo)!.final_ciclo!) : 
+                              'Não definido'
+                            }
+                          </span>
+                        </div>
+
+                        <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
+                              <Clock className="w-4 h-4 text-white" />
+                            </div>
+                            <span className="text-xs font-medium text-gray-600">Duração do Ciclo</span>
+                          </div>
+                          <span className="font-semibold text-[#111827] text-sm">
+                            {(() => {
+                              const inicioCiclo = dadosFinanceiros.parcelas.find(p => p.inicio_ciclo)?.inicio_ciclo;
+                              const fimCiclo = dadosFinanceiros.parcelas.find(p => p.final_ciclo)?.final_ciclo;
+                              if (inicioCiclo && fimCiclo) {
+                                const inicio = new Date(inicioCiclo);
+                                const fim = new Date(fimCiclo);
+                                
+                                // Calcular diferença em meses de forma mais precisa
+                                let meses = (fim.getFullYear() - inicio.getFullYear()) * 12;
+                                meses += fim.getMonth() - inicio.getMonth();
+                                
+                                // Ajustar se o dia final é menor que o dia inicial
+                                if (fim.getDate() < inicio.getDate()) {
+                                  meses--;
+                                }
+                                
+                                // Se a diferença for menor que 1 mês, calcular em dias
+                                if (meses < 1) {
+                                  const diffTime = Math.abs(fim.getTime() - inicio.getTime());
+                                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                  return `${diffDays} dias`;
+                                }
+                                
+                                return `${meses} ${meses === 1 ? 'mês' : 'meses'}`;
+                              }
+                              return 'Não calculado';
+                            })()
+                            }
+                          </span>
+                        </div>
+
+                        <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                              <FileText className="w-4 h-4 text-white" />
+                            </div>
+                            <span className="text-xs font-medium text-gray-600">Parcelas no Ciclo</span>
+                          </div>
+                          <span className="font-semibold text-[#111827] text-sm">
+                            {dadosFinanceiros.parcelas.filter(p => p.inicio_ciclo && p.final_ciclo).length}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Barra de Progresso do Ciclo */}
+                      <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                            <TrendingUp className="w-4 h-4 text-white" />
+                          </div>
+                          <span className="text-xs font-medium text-gray-600">Progresso do Ciclo</span>
+                        </div>
+                        
+                        {(() => {
+                          const inicioCiclo = dadosFinanceiros.parcelas.find(p => p.inicio_ciclo)?.inicio_ciclo;
+                          const fimCiclo = dadosFinanceiros.parcelas.find(p => p.final_ciclo)?.final_ciclo;
+                          
+                          if (inicioCiclo && fimCiclo) {
+                            const hoje = new Date();
+                            const inicio = new Date(inicioCiclo);
+                            const fim = new Date(fimCiclo);
+                            
+                            const totalDias = Math.abs(fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24);
+                            const diasDecorridos = Math.max(0, Math.abs(hoje.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
+                            
+                            let progresso = Math.min(100, Math.max(0, (diasDecorridos / totalDias) * 100));
+                            
+                            // Se a data atual é anterior ao início, progresso = 0
+                            if (hoje < inicio) {
+                              progresso = 0;
+                            }
+                            // Se a data atual é posterior ao fim, progresso = 100
+                            else if (hoje > fim) {
+                              progresso = 100;
+                            }
+                            
+                            return (
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm font-medium text-gray-700">
+                                    {progresso.toFixed(1)}% concluído
+                                  </span>
+                                  <span className="text-xs text-gray-500">
+                                    {Math.floor(diasDecorridos)} de {Math.floor(totalDias)} dias
+                                  </span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                                  <div 
+                                    className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-full transition-all duration-500 ease-out"
+                                    style={{ width: `${progresso}%` }}
+                                  ></div>
+                                </div>
+                                <div className="flex justify-between text-xs text-gray-500">
+                                  <span>Início: {formatarData(inicioCiclo)}</span>
+                                  <span>Fim: {formatarData(fimCiclo)}</span>
+                                </div>
+                              </div>
+                            );
+                          }
+                          
+                          return (
+                            <div className="text-center py-4">
+                              <span className="text-sm text-gray-500">Não é possível calcular o progresso</span>
+                            </div>
+                          );
+                        })()
+                        }
+                      </div>
+                    </>
+                  ) : (
+                    <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200 text-center">
+                      <span className="text-sm text-gray-600">Nenhum ciclo definido para este aluno</span>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+
+            {/* Card Responsáveis */}
+            <motion.div 
+              className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 shadow-lg hover:shadow-xl transition-all duration-300"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+            >
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 bg-gradient-to-r from-pink-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <Users className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-[#111827]">Responsáveis</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Informações de contato
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex justify-between items-center p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
+                  <span className="text-sm font-medium text-gray-700">Status do Cadastro</span>
+                  <Badge className={`px-3 py-1 ${
+                    student?.responsaveis ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                  }`}>
+                    {student?.responsaveis ? 'Ativo' : 'Não'}
+                  </Badge>
+                </div>
+
+                {student?.responsaveis ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                          <User className="w-4 h-4 text-white" />
+                        </div>
+                        <span className="text-xs font-medium text-gray-600">Responsável Principal</span>
+                      </div>
+                      <span className="font-semibold text-[#111827] text-sm">
+                        {student.responsaveis.nome || 'Não informado'}
+                      </span>
+                    </div>
+
+                    <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                          <Phone className="w-4 h-4 text-white" />
+                        </div>
+                        <span className="text-xs font-medium text-gray-600">Telefone</span>
+                      </div>
+                      <span className="font-semibold text-[#111827] text-sm">
+                        {student.responsaveis.telefone || 'Não informado'}
+                      </span>
+                    </div>
+
+                    <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
+                          <Mail className="w-4 h-4 text-white" />
+                        </div>
+                        <span className="text-xs font-medium text-gray-600">Email</span>
+                      </div>
+                      <span className="font-semibold text-[#111827] text-sm">
+                        {student.responsaveis.email || 'Não informado'}
+                      </span>
+                    </div>
+
+                    <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
+                          <CreditCard className="w-4 h-4 text-white" />
+                        </div>
+                        <span className="text-xs font-medium text-gray-600">CPF</span>
+                      </div>
+                      <span className="font-semibold text-[#111827] text-sm">
+                         {student.responsaveis.cpf ? formatCPF(student.responsaveis.cpf) : 'Não informado'}
+                       </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200 text-center">
+                    <span className="text-sm text-gray-600">Nenhum responsável cadastrado para este aluno</span>
+                  </div>
+                )}
+              </div>
+            </motion.div>
           </div>
 
           {/* Cards secundários */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Histórico Acadêmico */}
             <motion.div 
               className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 shadow-lg hover:shadow-xl transition-all duration-300"
@@ -796,42 +1096,7 @@ export const StudentDetailsModal: React.FC<StudentDetailsModalProps> = ({
               </div>
             </motion.div>
 
-            {/* Responsáveis */}
-            <motion.div 
-              className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 shadow-lg hover:shadow-xl transition-all duration-300"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.6 }}
-            >
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 bg-gradient-to-r from-pink-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <Users className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-[#111827]">Responsáveis</h3>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-3">
-                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 border border-gray-200/50">
-                    <span className="text-xs font-medium text-gray-600">Responsável Principal</span>
-                    <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
-                  </div>
-                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 border border-gray-200/50">
-                    <span className="text-xs font-medium text-gray-600">Telefone</span>
-                    <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
-                  </div>
-                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 border border-gray-200/50">
-                    <span className="text-xs font-medium text-gray-600">Email</span>
-                    <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
-                  </div>
-                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 border border-gray-200/50">
-                    <span className="text-xs font-medium text-gray-600">Parentesco</span>
-                    <div className="font-semibold text-[#111827] text-sm mt-1">Em desenvolvimento...</div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
+
 
             {/* Horários & Frequência */}
             <motion.div 

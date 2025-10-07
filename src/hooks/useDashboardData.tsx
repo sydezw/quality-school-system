@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Database } from '@/integrations/supabase/types';
-import { calcularMetricasParcelas } from '@/utils/parcelaCalculations';
 
 type Aluno = Database['public']['Tables']['alunos']['Row'];
 type Turma = Database['public']['Tables']['turmas']['Row'];
@@ -24,7 +23,7 @@ interface DashboardData {
 }
 
 export const useDashboardData = () => {
-  const [dashboardData, setDashboardData] = useState<DashboardData>({
+  const [data, setData] = useState<DashboardData>({
     totalAlunos: 0,
     totalTurmas: 0,
     faturamentoMes: 0,
@@ -44,172 +43,147 @@ export const useDashboardData = () => {
 
       // Buscar dados de forma segura, com tipagem simplificada
       const [alunosResult, turmasResult, professoresResult, contratosResult, parcelasResult, financeirosResult, despesasResult] = await Promise.allSettled([
-        supabase.from('alunos').select('nome, idioma, status, data_nascimento').eq('status', 'Ativo'),
+        supabase.from('alunos').select('nome, idioma, status, data_nascimento'),
         supabase.from('turmas').select('id'),
         supabase.from('professores').select('id'),
         supabase.from('contratos').select('id').eq('status_contrato', 'Ativo'),
-        supabase.from('parcelas_alunos').select('status_pagamento, data_vencimento'),
-        supabase.from('financeiro_alunos').select('status_geral, valor_total, created_at'),
+        supabase.from('alunos_parcelas').select('status_pagamento, data_vencimento, alunos_financeiro_id'),
+        supabase.from('alunos_financeiro').select('id, status_geral, valor_total, created_at, aluno_id'),
         supabase.from('despesas').select('valor, data').gte('data', new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0])
       ]);
 
-      // Extrair dados de forma segura
-      const alunos = alunosResult.status === 'fulfilled' && !alunosResult.value.error ? alunosResult.value.data : [];
-      const turmas = turmasResult.status === 'fulfilled' && !turmasResult.value.error ? turmasResult.value.data : [];
-      const professores = professoresResult.status === 'fulfilled' && !professoresResult.value.error ? professoresResult.value.data : [];
-      const contratos = contratosResult.status === 'fulfilled' && !contratosResult.value.error ? contratosResult.value.data : [];
-      const parcelas = parcelasResult.status === 'fulfilled' && !parcelasResult.value.error ? parcelasResult.value.data : [];
-      const financeiros = financeirosResult.status === 'fulfilled' && !financeirosResult.value.error ? financeirosResult.value.data : [];
-      const despesas = despesasResult.status === 'fulfilled' && !despesasResult.value.error ? despesasResult.value.data : [];
+      // Extrair dados com verificação de erro
+      const alunos = alunosResult.status === 'fulfilled' ? alunosResult.value.data || [] : [];
+      const turmas = turmasResult.status === 'fulfilled' ? turmasResult.value.data || [] : [];
+      const professores = professoresResult.status === 'fulfilled' ? professoresResult.value.data || [] : [];
+      const contratos = contratosResult.status === 'fulfilled' ? contratosResult.value.data || [] : [];
+      const parcelas = parcelasResult.status === 'fulfilled' ? parcelasResult.value.data || [] : [];
+      const financeiros = financeirosResult.status === 'fulfilled' ? financeirosResult.value.data || [] : [];
+      const despesas = despesasResult.status === 'fulfilled' ? despesasResult.value.data || [] : [];
 
-      // Calcular aniversariantes de hoje usando comparação de string
-      const hoje = new Date();
-      const diaHoje = String(hoje.getDate()).padStart(2, '0');
-      const mesHoje = String(hoje.getMonth() + 1).padStart(2, '0');
-      
-      const aniversariantesHoje = alunos && alunos.length > 0 
-        ? alunos.filter(aluno => {
-            if (!aluno.data_nascimento) return false;
-            try {
-              // Formato esperado: YYYY-MM-DD
-              const [ano, mes, dia] = aluno.data_nascimento.split('-');
-              return dia === diaHoje && mes === mesHoje;
-            } catch {
-              return false;
-            }
-          }).length
-        : 0;
-      
-      // Calcular métricas financeiras usando função centralizada
+      // Calcular faturamento do mês atual
       const inicioMes = new Date();
       inicioMes.setDate(1);
+      const fimMes = new Date(inicioMes.getFullYear(), inicioMes.getMonth() + 1, 0);
       
-      // Converter parcelas para o formato esperado pela função
-      const parcelasFormatadas = (parcelas || []).map((p, index) => ({
-        id: `parcela-${index}`,
-        data_vencimento: p.data_vencimento,
-        status_pagamento: p.status_pagamento,
-        tipo_item: 'mensalidade' as const,
-        registro_financeiro_id: `reg-${index}`,
-        valor: 0 // Valor não é usado no cálculo de métricas
-      }));
-      
-      const metricas = calcularMetricasParcelas(parcelasFormatadas);
-      const parcelasVencidasCount = metricas.parcelasVencidas;
-      
-      // Calcular receitas do mês (mantendo a lógica original)
+      const faturamentoMes = financeiros
+        .filter(f => {
+          const dataCreated = new Date(f.created_at);
+          return dataCreated >= inicioMes && dataCreated <= fimMes;
+        })
+        .reduce((total, f) => total + (Number(f.valor_total) || 0), 0);
+
+      // Calcular aniversariantes de hoje
+      const hoje = new Date();
+      const aniversariantesHoje = alunos.filter(aluno => {
+        if (!aluno.data_nascimento) return false;
+        const nascimento = new Date(aluno.data_nascimento);
+        return nascimento.getDate() === hoje.getDate() && nascimento.getMonth() === hoje.getMonth();
+      }).length;
+
+      // Calcular inadimplentes (pessoas únicas com parcelas pendentes)
+        let inadimplentesCount = 0;
+        if (parcelas && parcelas.length > 0 && financeiros && financeiros.length > 0) {
+          // Filtrar parcelas pendentes (não pagas)
+          const parcelasPendentes = parcelas.filter(parcela => {
+            return parcela.status_pagamento === 'pendente';
+          });
+          
+          // Obter IDs únicos de registros financeiros com parcelas pendentes
+          const registrosFinanceirosInadimplentes = new Set(
+            parcelasPendentes.map(parcela => parcela.alunos_financeiro_id).filter(Boolean)
+          );
+          
+          // Contar alunos únicos inadimplentes
+          const alunosInadimplentes = new Set();
+          financeiros.forEach(financeiro => {
+            if (financeiro.id && registrosFinanceirosInadimplentes.has(financeiro.id)) {
+              alunosInadimplentes.add(financeiro.aluno_id);
+            }
+          });
+          
+          inadimplentesCount = alunosInadimplentes.size;
+        }
+
+      // Calcular receitas do mês
       let receitasMesTotal = 0;
       if (financeiros && financeiros.length > 0) {
         financeiros.forEach(registro => {
           try {
-            const dataCriacao = new Date(registro.created_at);
-            
-            if (registro.status_geral === 'Pago' && dataCriacao >= inicioMes) {
+            const dataRegistro = new Date(registro.created_at);
+            if (dataRegistro >= inicioMes && dataRegistro <= fimMes) {
               receitasMesTotal += Number(registro.valor_total) || 0;
             }
           } catch (error) {
-            // Ignorar registros com datas inválidas
+            console.warn('Erro ao processar data do registro financeiro:', error);
           }
         });
       }
 
-      // Processar alunos por idioma
-      const alunosPorIdioma = alunos && alunos.length > 0 
-        ? alunos.reduce((acc: { name: string; value: number }[], aluno) => {
-            if (aluno.idioma) {
-              const existing = acc.find((item) => item.name === aluno.idioma);
-              if (existing) {
-                existing.value += 1;
-              } else {
-                acc.push({ name: aluno.idioma, value: 1 });
-              }
-            }
-            return acc;
-          }, [])
-        : [];
+      // Calcular despesas do mês
+      const despesasMesTotal = despesas.reduce((total, despesa) => {
+        return total + (Number(despesa.valor) || 0);
+      }, 0);
 
-      // Gerar dados para gráfico de receitas vs despesas
-      const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-      const receitasDespesas: { name: string; Receitas: number; Despesas: number }[] = [];
-      const anoAtual = new Date().getFullYear();
-      
-      for (let mes = 0; mes < 12; mes++) {
-        let receitasMes = 0;
-        let despesasMes = 0;
-
-        // Calcular receitas do mês
-        if (financeiros && financeiros.length > 0) {
-          receitasMes = financeiros
-            .filter(r => {
-              try {
-                const dataReceita = new Date(r.created_at);
-                return r.status_geral === 'Pago' && 
-                       dataReceita.getMonth() === mes && 
-                       dataReceita.getFullYear() === anoAtual;
-              } catch {
-                return false;
-              }
-            })
-            .reduce((sum, r) => sum + (Number(r.valor_total) || 0), 0);
-        }
-
-        // Calcular despesas do mês
-        if (despesas && despesas.length > 0) {
-          despesasMes = despesas
-            .filter(d => {
-              try {
-                const dataDespesa = new Date(d.data);
-                return dataDespesa.getUTCMonth() === mes && 
-                       dataDespesa.getUTCFullYear() === anoAtual;
-              } catch {
-                return false;
-              }
-            })
-            .reduce((sum, d) => sum + (Number(d.valor) || 0), 0);
-        }
-
+      // Dados para gráfico de receitas vs despesas (últimos 6 meses)
+      const receitasDespesas = [];
+      for (let i = 5; i >= 0; i--) {
+        const mes = new Date();
+        mes.setMonth(mes.getMonth() - i);
+        const inicioMesGrafico = new Date(mes.getFullYear(), mes.getMonth(), 1);
+        const fimMesGrafico = new Date(mes.getFullYear(), mes.getMonth() + 1, 0);
+        
+        const receitasMes = financeiros
+          .filter(f => {
+            const dataCreated = new Date(f.created_at);
+            return dataCreated >= inicioMesGrafico && dataCreated <= fimMesGrafico;
+          })
+          .reduce((total, f) => total + (Number(f.valor_total) || 0), 0);
+        
+        const despesasMes = despesas
+          .filter(d => {
+            const dataDespesa = new Date(d.data);
+            return dataDespesa >= inicioMesGrafico && dataDespesa <= fimMesGrafico;
+          })
+          .reduce((total, d) => total + (Number(d.valor) || 0), 0);
+        
         receitasDespesas.push({
-          name: meses[mes],
+          name: mes.toLocaleDateString('pt-BR', { month: 'short' }),
           Receitas: receitasMes,
           Despesas: despesasMes
         });
       }
 
-      // Atualizar estado com dados seguros
-      setDashboardData({
-        totalAlunos: alunos?.length || 0,
-        totalTurmas: turmas?.length || 0,
-        faturamentoMes: receitasMesTotal,
-        inadimplentes: parcelasVencidasCount,
-        professoresAtivos: professores?.length || 0,
-        contratosAtivos: contratos?.length || 0,
+      // Calcular alunos por idioma
+      const idiomasCount = alunos.reduce((acc, aluno) => {
+        const idioma = aluno.idioma || 'Não informado';
+        acc[idioma] = (acc[idioma] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const alunosPorIdioma = Object.entries(idiomasCount).map(([name, value]) => ({
+        name,
+        value
+      }));
+
+      setData({
+        totalAlunos: alunos.length,
+        totalTurmas: turmas.length,
+        faturamentoMes,
+        inadimplentes: inadimplentesCount,
+        professoresAtivos: professores.length,
+        contratosAtivos: contratos.length,
         aniversariantesHoje,
         receitasDespesas,
         alunosPorIdioma
       });
 
     } catch (error) {
-      // Em caso de erro, manter os valores zerados sem mostrar erro
-      console.log('Dashboard carregado com valores padrão devido a:', error);
-      
-      // Gerar dados básicos para o gráfico mesmo sem dados do banco
-      const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-      const receitasDespesas = meses.map(mes => ({
-        name: mes,
-        Receitas: 0,
-        Despesas: 0
-      }));
-
-      setDashboardData({
-        totalAlunos: 0,
-        totalTurmas: 0,
-        faturamentoMes: 0,
-        inadimplentes: 0,
-        professoresAtivos: 0,
-        contratosAtivos: 0,
-        aniversariantesHoje: 0,
-        receitasDespesas,
-        alunosPorIdioma: []
+      console.error('Erro ao buscar dados do dashboard:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar dados do dashboard",
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
@@ -219,62 +193,34 @@ export const useDashboardData = () => {
   useEffect(() => {
     fetchDashboardData();
 
-    // Configurar subscriptions apenas se não houver erro
-    const setupSubscriptions = () => {
-      try {
-        const parcelasChannel = supabase
-          .channel('parcelas-changes')
-          .on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table: 'parcelas_alunos'
-            },
-            () => fetchDashboardData()
-          )
-          .subscribe();
+    // Configurar subscriptions para atualizações em tempo real
+    const parcelasChannel = supabase
+      .channel('alunos_parcelas_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'alunos_parcelas' }, () => {
+        fetchDashboardData();
+      })
+      .subscribe();
 
-        const financeirosChannel = supabase
-          .channel('financeiros-changes')
-          .on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table: 'financeiro_alunos'
-            },
-            () => fetchDashboardData()
-          )
-          .subscribe();
+    const financeirosChannel = supabase
+      .channel('alunos_financeiro_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'alunos_financeiro' }, () => {
+        fetchDashboardData();
+      })
+      .subscribe();
 
-        const despesasChannel = supabase
-          .channel('despesas-changes')
-          .on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table: 'despesas'
-            },
-            () => fetchDashboardData()
-          )
-          .subscribe();
+    const despesasChannel = supabase
+      .channel('despesas_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'despesas' }, () => {
+        fetchDashboardData();
+      })
+      .subscribe();
 
-        return () => {
-          supabase.removeChannel(parcelasChannel);
-          supabase.removeChannel(financeirosChannel);
-          supabase.removeChannel(despesasChannel);
-        };
-      } catch (error) {
-        console.log('Subscriptions não configuradas:', error);
-        return () => {};
-      }
+    return () => {
+      supabase.removeChannel(parcelasChannel);
+      supabase.removeChannel(financeirosChannel);
+      supabase.removeChannel(despesasChannel);
     };
-
-    const cleanup = setupSubscriptions();
-    return cleanup;
   }, []);
 
-  return { dashboardData, loading, refetch: fetchDashboardData };
+  return { data, loading, refetch: fetchDashboardData };
 };

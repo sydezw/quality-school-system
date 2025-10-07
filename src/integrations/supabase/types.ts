@@ -418,6 +418,113 @@ export type Database = {
           },
         ]
       }
+      alunos_financeiro: {
+        Row: {
+          aluno_id: string
+          created_at: string | null
+          data_contrato: string | null
+          data_inicio: string | null
+          desconto_total: number | null
+          id: string
+          observacoes: string | null
+          planos_id: string | null
+          status: string | null
+          tipo_valor: string | null
+          updated_at: string | null
+          valor_material: number | null
+          valor_matricula: number | null
+          valor_plano: number | null
+          valor_total: number | null
+        }
+        Insert: {
+          aluno_id: string
+          created_at?: string | null
+          data_contrato?: string | null
+          data_inicio?: string | null
+          desconto_total?: number | null
+          id?: string
+          observacoes?: string | null
+          planos_id?: string | null
+          status?: string | null
+          tipo_valor?: string | null
+          updated_at?: string | null
+          valor_material?: number | null
+          valor_matricula?: number | null
+          valor_plano?: number | null
+          valor_total?: number | null
+        }
+        Update: {
+          aluno_id?: string
+          created_at?: string | null
+          data_contrato?: string | null
+          data_inicio?: string | null
+          desconto_total?: number | null
+          id?: string
+          observacoes?: string | null
+          planos_id?: string | null
+          status?: string | null
+          tipo_valor?: string | null
+          updated_at?: string | null
+          valor_material?: number | null
+          valor_matricula?: number | null
+          valor_plano?: number | null
+          valor_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alunos_financeiro_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "alunos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alunos_financeiro_planos_id_fkey"
+            columns: ["planos_id"]
+            isOneToOne: false
+            referencedRelation: "planos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alunos_parcelas: {
+        Row: {
+          alunos_financeiro_id: string
+          data_vencimento: string
+          historico: boolean
+          id: string
+          nome_aluno: string | null
+          numero_parcela: number
+          valor: number
+        }
+        Insert: {
+          alunos_financeiro_id: string
+          data_vencimento: string
+          historico?: boolean
+          id?: string
+          nome_aluno?: string | null
+          numero_parcela: number
+          valor: number
+        }
+        Update: {
+          alunos_financeiro_id?: string
+          data_vencimento?: string
+          historico?: boolean
+          id?: string
+          nome_aluno?: string | null
+          numero_parcela?: number
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alunos_parcelas_alunos_financeiro_id_fkey"
+            columns: ["alunos_financeiro_id"]
+            isOneToOne: false
+            referencedRelation: "alunos_financeiro"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       aulas_particulares: {
         Row: {
           aluno_id: string
@@ -1627,6 +1734,7 @@ export type Database = {
           data_vencimento: string
           descricao_item: string | null
           forma_pagamento: string | null
+          historico: boolean
           id: number
           idioma_registro: Database["public"]["Enums"]["idioma_registro_financeiro"]
           numero_parcela: number
@@ -1644,6 +1752,7 @@ export type Database = {
           data_vencimento: string
           descricao_item?: string | null
           forma_pagamento?: string | null
+          historico?: boolean
           id?: number
           idioma_registro: Database["public"]["Enums"]["idioma_registro_financeiro"]
           numero_parcela: number
@@ -1661,6 +1770,7 @@ export type Database = {
           data_vencimento?: string
           descricao_item?: string | null
           forma_pagamento?: string | null
+          historico?: boolean
           id?: number
           idioma_registro?: Database["public"]["Enums"]["idioma_registro_financeiro"]
           numero_parcela?: number
@@ -2844,7 +2954,7 @@ export const Constants = {
         "comprovante_experiencia",
         "documento_pessoal",
       ],
-      tipo_item: ["plano", "material", "matrícula", "cancelamento", "outros"],
+      tipo_item: ["plano", "material", "matrícula", "cancelamento", "avulso", "outros"],
       tipo_notificacao: ["boleto", "presenca", "lembrete", "geral"],
       tipo_turma: ["Turma particular", "Turma"],
     },

@@ -104,6 +104,7 @@ export const EditarParcelaHistoricoModal: React.FC<EditarParcelaHistoricoModalPr
                   <SelectItem value="material">Material</SelectItem>
                   <SelectItem value="matrícula">Matrícula</SelectItem>
                   <SelectItem value="cancelamento">Cancelamento</SelectItem>
+                  <SelectItem value="avulso">Avulso</SelectItem>
                   <SelectItem value="outros">Outros</SelectItem>
                 </SelectContent>
               </Select>
