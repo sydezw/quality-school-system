@@ -187,7 +187,7 @@ export const useStudents = () => {
     try {
       // Processar apenas os campos essenciais, removendo campos UUID vazios
       const submitData: any = {
-        nome: data.nome || null,
+        nome: data.nome ? data.nome.trim() : null,
         cpf: data.cpf || null,
         data_nascimento: data.data_nascimento || null,
         telefone: data.telefone || null,
@@ -203,19 +203,19 @@ export const useStudents = () => {
         aulas_particulares: data.aulas_particulares || false,
         aulas_turma: data.aulas_turma !== undefined ? data.aulas_turma : true
       };
-  
+
       // Só incluir idioma se tiver valor válido
       if (data.idioma && data.idioma !== 'none' && data.idioma !== '') {
         submitData.idioma = data.idioma;
       }
-  
+
       // Manter turma_id apenas para compatibilidade (turma principal)
       if (data.turma_id && data.turma_id !== 'none' && data.turma_id !== '') {
         submitData.turma_id = data.turma_id;
       } else if (data.turma_id === 'none' || data.turma_id === '') {
         submitData.turma_id = null;
       }
-  
+
       // Só incluir responsavel_id se tiver valor UUID válido
       if (data.responsavel_id && data.responsavel_id !== 'none' && data.responsavel_id !== '') {
         submitData.responsavel_id = data.responsavel_id;
@@ -223,11 +223,48 @@ export const useStudents = () => {
         // Explicitamente definir como null para remover o responsável
         submitData.responsavel_id = null;
       }
-  
+      // Atualizar responsavel_id: string válida → valor; null/undefined/'none'/'' → null
+      if (typeof data.responsavel_id === 'string' && data.responsavel_id.trim() !== '' && data.responsavel_id !== 'none') {
+        submitData.responsavel_id = data.responsavel_id;
+      } else {
+        // Explicitamente definir como null para remover o responsável
+        submitData.responsavel_id = null;
+      }
+
+      // Validação robusta: nome obrigatório
+      if (!submitData.nome || submitData.nome.trim() === '') {
+        toast({
+          title: "Campos obrigatórios",
+          description: "Preencha o nome do aluno.",
+          variant: "destructive",
+        });
+        throw new Error('Nome do aluno é obrigatório');
+      }
+      submitData.nome = submitData.nome.trim();
+
+      // Checagem proativa de CPF duplicado (se informado)
+      if (submitData.cpf && submitData.cpf.trim() !== '') {
+        const { data: cpfMatches, error: cpfCheckError } = await supabase
+          .from('alunos')
+          .select('id, nome, cpf')
+          .eq('cpf', submitData.cpf);
+        if (!cpfCheckError) {
+          const conflict = (cpfMatches || []).find(s => !editingStudent || s.id !== editingStudent.id);
+          if (conflict) {
+            toast({
+              title: "CPF já cadastrado",
+              description: `Já existe o aluno "${conflict.nome}" com este CPF.`,
+              variant: "destructive",
+            });
+            throw new Error('CPF já cadastrado');
+          }
+        }
+      }
+
       console.log('Dados recebidos do formulário:', data);
       console.log('Dados que serão enviados para o banco:', submitData);
       console.log('Editando aluno:', editingStudent?.id, editingStudent?.nome);
-  
+
       let studentId: string;
       
       if (editingStudent) {
@@ -237,6 +274,14 @@ export const useStudents = () => {
           .eq('id', editingStudent.id);
 
         if (error) {
+          // Tratamento específico para constraint de CPF
+          if ((error as any).code === '23505' && String((error as any).message || '').includes('idx_alunos_cpf')) {
+            toast({
+              title: "CPF já cadastrado",
+              description: "Não foi possível atualizar: CPF duplicado.",
+              variant: "destructive",
+            });
+          }
           console.error('Erro ao atualizar:', error);
           throw error;
         }
@@ -254,6 +299,14 @@ export const useStudents = () => {
           .select();
 
         if (error) {
+          // Tratamento específico para constraint de CPF
+          if ((error as any).code === '23505' && String((error as any).message || '').includes('idx_alunos_cpf')) {
+            toast({
+              title: "CPF já cadastrado",
+              description: "Não foi possível criar: CPF duplicado.",
+              variant: "destructive",
+            });
+          }
           console.error('Erro ao inserir:', error);
           throw error;
         }
@@ -276,7 +329,7 @@ export const useStudents = () => {
       console.error('Erro ao salvar aluno:', error);
       toast({
         title: "Erro",
-        description: `Não foi possível salvar o aluno: ${error.message || 'Erro desconhecido'}`,
+        description: `Não foi possível salvar o aluno: ${(error as any)?.message || 'Erro desconhecido'}`,
         variant: "destructive",
       });
       throw error;

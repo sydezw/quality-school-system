@@ -92,7 +92,7 @@ const NewStudentForm = ({ classes, onSubmit, onCancel, onCloseWithPrivateClasses
   const handleFormSubmit = async (data: StudentFormValues) => {
     try {
       setIsSubmitting(true);
-      
+
       // Formatar CPF e CEP antes de enviar
       const formattedData = {
         ...data,
@@ -108,7 +108,7 @@ const NewStudentForm = ({ classes, onSubmit, onCancel, onCloseWithPrivateClasses
       
       toast({
         title: "Sucesso!",
-        description: "Aluno cadastrado com sucesso! Você pode continuar configurando o responsável ou fechar o modal.",
+        description: "Aluno cadastrado com sucesso!",
       });
       
       // Apenas remover a animação após um tempo, sem navegar automaticamente
@@ -331,7 +331,7 @@ const NewStudentForm = ({ classes, onSubmit, onCancel, onCloseWithPrivateClasses
                     {currentStep < formSteps.length - 1 ? (
                       <Button
                         type="button"
-                        onClick={nextStep}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); nextStep(); }}
                         className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md transition-all duration-200 z-20"
                       >
                         Próximo

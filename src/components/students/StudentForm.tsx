@@ -424,7 +424,7 @@ const StudentForm = ({ editingStudent, classes, onSubmit, onCancel, onCloseWithP
                     {currentStep < formSteps.length - 1 ? (
                       <Button
                         type="button"
-                        onClick={nextStep}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); nextStep(); }}
                         className={`px-4 py-2 text-sm font-medium bg-gradient-to-r ${currentStepData.color} hover:shadow-md transition-all duration-200 z-20`}
                       >
                         Próximo

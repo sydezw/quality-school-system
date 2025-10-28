@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 // Schema completo com todos os campos necessários
 export const studentFormSchema = z.object({
-  nome: z.string().optional(),
+  nome: z.string().min(1, "Nome é obrigatório"),
   cpf: z.string().optional(),
   data_nascimento: z.date().optional().nullable(),
   telefone: z.string().optional(),

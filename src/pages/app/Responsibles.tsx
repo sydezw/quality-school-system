@@ -294,15 +294,14 @@ const Responsibles = () => {
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
-                    {(!studentsData[responsible.id] || studentsData[responsible.id].length === 0) && (
-                      <Button
-                        size="sm"
-                        className="bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
-                        onClick={() => handleAttachStudent(responsible)}
-                      >
-                        <UserPlus className="h-4 w-4" />
-                      </Button>
-                    )}
+                    <Button
+                      size="sm"
+                      className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 h-9 rounded-md px-3 bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
+                      onClick={() => handleAttachStudent(responsible)}
+                      title="Anexar aluno ao responsável"
+                    >
+                      <UserPlus className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               </CardHeader>
