@@ -429,6 +429,7 @@ const FinancialPlanForm = ({ onSuccess, onCancel, preSelectedStudent }: Financia
       const dadosFinanceiros = {
         aluno_id: data.aluno_id,
         plano_id: data.plano_id,
+        aulas_pagas: aulasPagas,
         valor_plano: valorAPagar,
         valor_material: valorMaterial,
         valor_matricula: valorMatricula,

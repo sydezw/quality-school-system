@@ -69,23 +69,67 @@
   100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
 }
 
-/* Estilos específicos para impressão */
+/* Define tamanho padrão da página (impressão) */
+@page {
+  size: A4;
+  margin: 15mm;
+}
+
+/* Regras específicas para impressão */
 @media print {
-  /* Configurações gerais para impressão */
+  /* Ajustes gerais */
   * {
     -webkit-print-color-adjust: exact !important;
     color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-  
+
+  body {
+    overflow: visible !important;
+  }
+
+  /* Container padrão A4 */
+  .container-pdf {
+    width: 210mm;
+    min-height: 297mm;
+    background: white;
+    padding: 20mm;
+    margin: 0;
+    font-family: Arial, sans-serif;
+    font-size: 12pt;
+    color: #000;
+    box-sizing: border-box;
+  }
+
+  /* Evita cortes em blocos e tabelas */
+  table, tr, td, div, section {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Mantém cabeçalhos com o conteúdo */
+  h1, h2, h3 {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  /* Imagens responsivas na impressão */
+  img {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  /* Estilos existentes para impressão */
   .contract-preview {
     -webkit-print-color-adjust: exact !important;
     color-adjust: exact !important;
     print-color-adjust: exact !important;
     background: white !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
   }
-  
-  /* Força a exibição de todas as imagens na impressão */
+
   .contract-preview img,
   img {
     -webkit-print-color-adjust: exact !important;
@@ -99,8 +143,7 @@
     box-shadow: none !important;
     page-break-inside: avoid !important;
   }
-  
-  /* Força especificamente imagens base64 */
+
   img[src^="data:"],
   .contract-preview img[src^="data:"] {
     -webkit-print-color-adjust: exact !important;
@@ -123,8 +166,7 @@
     transform: none !important;
     page-break-inside: avoid !important;
   }
-  
-  /* Remove transformações que podem afetar a impressão */
+
   .contract-preview *,
   * {
     -webkit-filter: none !important;
@@ -133,12 +175,5 @@
     transform: none !important;
     transition: none !important;
     animation: none !important;
-  }
-  
-  /* Garante que o conteúdo seja visível */
-  .contract-preview {
-    overflow: visible !important;
-    height: auto !important;
-    max-height: none !important;
   }
 }

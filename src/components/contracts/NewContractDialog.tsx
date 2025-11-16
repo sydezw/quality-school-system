@@ -14,6 +14,7 @@ import { ContractFormData } from '@/hooks/useContracts';
 import { PlanoGenerico } from '@/types/financial';
 import DatePicker from '@/components/shared/DatePicker';
 import { format } from 'date-fns';
+import StudentSelectField from '@/components/students/StudentSelectField';
 
 interface Student {
   id: string;
@@ -230,21 +231,13 @@ export const NewContractDialog = ({ onContractCreated }: NewContractDialogProps)
           {/* Campo Aluno */}
           <div className="space-y-2">
             <Label htmlFor="aluno">Aluno *</Label>
-            <Select
-              value={formData.aluno_id}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, aluno_id: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione um aluno" />
-              </SelectTrigger>
-              <SelectContent>
-                {students.map((student) => (
-                  <SelectItem key={student.id} value={student.id}>
-                    {student.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <StudentSelectField
+              value={formData.aluno_id || null}
+              label=""
+              placeholder="Buscar aluno..."
+              options={students.map((student) => ({ value: student.id, label: student.nome }))}
+              onChange={(value) => setFormData(prev => ({ ...prev, aluno_id: value }))}
+            />
           </div>
 
           {/* Campos de Data */}

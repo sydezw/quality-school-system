@@ -19,6 +19,7 @@ import { EditContractDialog } from './StudentEditContractModal';
 import { formatCPF } from '@/utils/formatters';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { buildContractStudentData } from '@/hooks/useStudentContractData';
 
 // Definir o tipo Student baseado na tabela alunos do banco
 type Student = Database['public']['Tables']['alunos']['Row'] & {
@@ -96,9 +97,19 @@ const StudentTable = ({ students, onEdit, onDelete, onCreateFinancialPlan, onVie
     }
   };
 
-  const handleContractGenerator = (student: Student) => {
-    setSelectedStudent(student);
-    setContractGeneratorOpen(true);
+  const handleContractGenerator = async (student: Student) => {
+    try {
+      const enriched = await buildContractStudentData(student, supabase);
+      setSelectedStudent(enriched);
+      setContractGeneratorOpen(true);
+    } catch (error) {
+      console.error('Erro ao preparar dados do contrato:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível carregar dados para gerar o contrato.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleNewContract = (student: Student) => {

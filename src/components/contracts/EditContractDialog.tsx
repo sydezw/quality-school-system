@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Contract } from '@/hooks/useContracts';
 import DatePicker from '@/components/shared/DatePicker';
 import { format, parse } from 'date-fns';
+import StudentSelectField from '@/components/students/StudentSelectField';
 
 interface EditContractDialogProps {
   contract: Contract;
@@ -243,18 +244,13 @@ export const EditContractDialog = ({ contract, onContractUpdated }: EditContract
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="aluno">Aluno *</Label>
-            <Select value={formData.aluno_id} onValueChange={(value) => setFormData(prev => ({ ...prev, aluno_id: value }))}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione um aluno" />
-              </SelectTrigger>
-              <SelectContent>
-                {alunos.map((aluno) => (
-                  <SelectItem key={aluno.id} value={aluno.id}>
-                    {aluno.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <StudentSelectField
+              placeholder="Buscar aluno..."
+              value={formData.aluno_id}
+              options={alunos.map((aluno) => ({ label: aluno.nome, value: aluno.id }))}
+              onChange={(value) => setFormData(prev => ({ ...prev, aluno_id: value }))}
+              selectedLabel={alunos.find((a) => a.id === formData.aluno_id)?.nome}
+            />
           </div>
 
           {/* CAMPO PLANO */}

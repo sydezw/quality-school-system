@@ -33,15 +33,21 @@ const converterParaAlunosFinanceiroId = async (id: string): Promise<string> => {
     .single();
   
   if (registroFinanceiroAlunos) {
-    // Buscar o ID correspondente na alunos_financeiro
-    const { data: alunosFinanceiro } = await supabase
+    // Buscar o ID correspondente na alunos_financeiro (pegando o mais recente e não arquivado)
+    const { data: alunosFinanceiroList, error: alunosFinanceiroError } = await supabase
       .from('alunos_financeiro')
-      .select('id')
+      .select('id, status_geral, created_at')
       .eq('aluno_id', registroFinanceiroAlunos.aluno_id)
-      .single();
+      .neq('status_geral', 'Arquivado')
+      .order('created_at', { ascending: false })
+      .limit(1);
     
+    if (alunosFinanceiroError) {
+      console.error('Erro ao buscar alunos_financeiro:', alunosFinanceiroError);
+    }
+    const alunosFinanceiro = Array.isArray(alunosFinanceiroList) && alunosFinanceiroList.length > 0 ? alunosFinanceiroList[0] : null;
     if (alunosFinanceiro) {
-      return alunosFinanceiro.id;
+      return alunosFinanceiro.id as string;
     }
   }
   
@@ -127,15 +133,18 @@ export const criarParcelasComNumeracaoCorreta = async (
     .single();
   
   if (registroFinanceiroAlunos && !errorFinanceiroAlunos) {
-    // Se encontrou na financeiro_alunos, buscar o ID correspondente na alunos_financeiro
-    const { data: alunosFinanceiro, error: errorAlunosFinanceiro } = await supabase
+    // Se encontrou na financeiro_alunos, buscar o ID correspondente na alunos_financeiro (pegando o mais recente e não arquivado)
+    const { data: alunosFinanceiroList, error: errorAlunosFinanceiro } = await supabase
       .from('alunos_financeiro')
-      .select('id')
+      .select('id, status_geral, created_at')
       .eq('aluno_id', registroFinanceiroAlunos.aluno_id)
-      .single();
+      .neq('status_geral', 'Arquivado')
+      .order('created_at', { ascending: false })
+      .limit(1);
     
+    const alunosFinanceiro = Array.isArray(alunosFinanceiroList) && alunosFinanceiroList.length > 0 ? alunosFinanceiroList[0] : null;
     if (alunosFinanceiro && !errorAlunosFinanceiro) {
-      alunosFinanceiroIdCorreto = alunosFinanceiro.id;
+      alunosFinanceiroIdCorreto = (alunosFinanceiro.id as string);
       nomeAluno = registroFinanceiroAlunos.alunos?.nome || null;
     }
   } else {
@@ -262,15 +271,18 @@ export const criarNovaParcela = async (
       .single();
     
     if (registroFinanceiroAlunos && !errorFinanceiroAlunos) {
-      // Se encontrou na financeiro_alunos, buscar o ID correspondente na alunos_financeiro
-      const { data: alunosFinanceiro, error: errorAlunosFinanceiro } = await supabase
+      // Se encontrou na financeiro_alunos, buscar o ID correspondente na alunos_financeiro (pegando o mais recente e não arquivado)
+      const { data: alunosFinanceiroList, error: errorAlunosFinanceiro } = await supabase
         .from('alunos_financeiro')
-        .select('id')
+        .select('id, status_geral, created_at')
         .eq('aluno_id', registroFinanceiroAlunos.aluno_id)
-        .single();
+        .neq('status_geral', 'Arquivado')
+        .order('created_at', { ascending: false })
+        .limit(1);
       
+      const alunosFinanceiro = Array.isArray(alunosFinanceiroList) && alunosFinanceiroList.length > 0 ? alunosFinanceiroList[0] : null;
       if (alunosFinanceiro && !errorAlunosFinanceiro) {
-        alunosFinanceiroIdCorreto = alunosFinanceiro.id;
+        alunosFinanceiroIdCorreto = (alunosFinanceiro.id as string);
         nomeAluno = registroFinanceiroAlunos.alunos?.nome || null;
       } else {
         console.error('Erro ao buscar ID na tabela alunos_financeiro:', errorAlunosFinanceiro);

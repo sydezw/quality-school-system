@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Student } from '@/types/shared';
 import { formatDate } from '@/utils/formatters';
 import { criarNovaParcela, TipoItem } from '@/utils/parcelaNumbering';
+import StudentSelectField from '@/components/students/StudentSelectField';
 
 interface CreateParcelasFormProps {
   onSuccess: () => void;
@@ -341,21 +342,13 @@ const CreateParcelasForm: React.FC<CreateParcelasFormProps> = ({ onSuccess, onCa
                   <User className="h-4 w-4" />
                   Aluno
                 </Label>
-                <Select
+                <StudentSelectField
+                  placeholder="Buscar aluno..."
                   value={parcelaTemplate.aluno_id}
-                  onValueChange={(value) => updateTemplate('aluno_id', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um aluno" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {students.map((student) => (
-                      <SelectItem key={student.id} value={student.id}>
-                        {student.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={students.map((student) => ({ label: student.nome, value: student.id }))}
+                  onChange={(value) => updateTemplate('aluno_id', value)}
+                  selectedLabel={students.find((s) => s.id === parcelaTemplate.aluno_id)?.nome}
+                />
               </div>
 
               <div className="space-y-2">
@@ -501,21 +494,13 @@ const CreateParcelasForm: React.FC<CreateParcelasFormProps> = ({ onSuccess, onCa
                     <User className="h-4 w-4" />
                     Aluno
                   </Label>
-                  <Select
+                  <StudentSelectField
+                    placeholder="Buscar aluno..."
                     value={parcela.aluno_id}
-                    onValueChange={(value) => updateParcela(parcela.id, 'aluno_id', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um aluno" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {students.map((student) => (
-                        <SelectItem key={student.id} value={student.id}>
-                          {student.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    options={students.map((student) => ({ label: student.nome, value: student.id }))}
+                    onChange={(value) => updateParcela(parcela.id, 'aluno_id', value)}
+                    selectedLabel={students.find((s) => s.id === parcela.aluno_id)?.nome}
+                  />
                 </div>
 
                 <div className="space-y-2">

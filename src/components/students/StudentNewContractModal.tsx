@@ -14,6 +14,7 @@ import { PlanoGenerico } from '@/types/financial';
 import DatePicker from '@/components/shared/DatePicker';
 import { format } from 'date-fns';
 import { adicionarMesesSeguro } from '@/utils/dateUtils';
+import StudentSelectField from '@/components/students/StudentSelectField';
 
 interface Student {
   id: string;
@@ -271,21 +272,16 @@ export const NewContractDialog = ({ onContractCreated, student }: NewContractDia
                 className="bg-gray-100"
               />
             ) : (
-              <Select
-                value={formData.aluno_id}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, aluno_id: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um aluno" />
-                </SelectTrigger>
-                <SelectContent>
-                  {students.map((studentItem) => (
-                    <SelectItem key={studentItem.id} value={studentItem.id}>
-                      {studentItem.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              // Substituir Select tradicional por combobox com busca
+              <div>
+                <StudentSelectField
+                  value={formData.aluno_id || null}
+                  label="Aluno"
+                  placeholder="Buscar aluno..."
+                  options={students.map((s) => ({ value: s.id, label: s.nome }))}
+                  onChange={(value) => setFormData(prev => ({ ...prev, aluno_id: value }))}
+                />
+              </div>
             )}
           </div>
 

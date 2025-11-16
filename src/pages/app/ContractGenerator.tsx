@@ -40,10 +40,15 @@ interface Student {
   responsaveis?: {
     nome: string;
   } | null;
-  financeiro_alunos?: Array<{
-    plano_id: string;
+  alunos_financeiro?: Array<{
+    planos_id: string | null;
     valor_plano: number;
-    numero_parcelas_plano: number;
+    valor_material?: number | null;
+    valor_matricula?: number | null;
+    desconto_total?: number | null;
+    valor_total?: number | null;
+    data_primeiro_vencimento?: string | null;
+    status?: string | null;
     planos: {
       nome: string;
       valor_total: number;
@@ -51,6 +56,11 @@ interface Student {
       frequencia_aulas: string;
       descricao: string;
     };
+    parcelas_alunos?: Array<{
+      numero_parcela: number;
+      valor: number;
+      data_vencimento?: string | null;
+    }>;
   }>;
 }
 
@@ -180,8 +190,11 @@ const ContractGenerator = () => {
   const { toast } = useToast();
 
   // Derived data from selected student
-  const planData = selectedStudent?.financeiro_alunos && selectedStudent.financeiro_alunos.length > 0 ? selectedStudent.financeiro_alunos[0].planos : null;
-  const financialData = selectedStudent?.financeiro_alunos && selectedStudent.financeiro_alunos.length > 0 ? selectedStudent.financeiro_alunos[0] : null;
+  const activeFinanceiro = selectedStudent?.alunos_financeiro
+    ? selectedStudent.alunos_financeiro.find((f: any) => ['Ativo', 'ativo'].includes((f as any).status)) || selectedStudent.alunos_financeiro[0]
+    : null;
+  const planData = activeFinanceiro?.planos || null;
+  const financialData = activeFinanceiro || null;
   const [contractData, setContractData] = useState<any>(null);
 
   useEffect(() => {
@@ -245,7 +258,7 @@ const ContractGenerator = () => {
     // Filtro por plano
     if (selectedPlan && selectedPlan !== 'all') {
       filtered = filtered.filter(student => 
-        student.financeiro_alunos?.some(financeiro => 
+        student.alunos_financeiro?.some(financeiro => 
           financeiro.planos?.nome === selectedPlan
         )
       );
@@ -271,17 +284,26 @@ const ContractGenerator = () => {
           turma_regular:turmas!turma_id(nome, nivel, horario, dias_da_semana),
           turma_particular:turmas!turma_particular_id(nome, nivel, horario, dias_da_semana),
           responsaveis(nome, cpf, telefone, email, endereco, numero_endereco),
-          financeiro_alunos(
-            plano_id,
+          alunos_financeiro(
+            planos_id,
             valor_plano,
-            numero_parcelas_plano,
+            valor_material,
+            valor_matricula,
+            desconto_total,
+            valor_total,
             data_primeiro_vencimento,
+            status,
             planos(
               nome,
               valor_total,
               numero_aulas,
               frequencia_aulas,
               descricao
+            ),
+            parcelas_alunos:alunos_parcelas(
+              numero_parcela,
+              valor,
+              data_vencimento
             )
           )
         `)
@@ -363,7 +385,7 @@ const ContractGenerator = () => {
   <h3 style="font-size: 14px; font-weight: bold; margin: 10px 0;">CONTRATO DE PRESTAÇÃO DE SERVIÇOS EDUCACIONAIS</h3>
 </div>
 
-O contrato de prestação de serviços educacionais que entre si celebram, de um lado, o(a) aluno(a) abaixo qualificado(a), doravante denominado(a) CONTRATANTE, e, de outro lado, a TEEN SPEECH, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 30.857.093/0001-36, com sede na Avenida Armando Bei, nº 465, Vila Nova Bonsucesso, Guarulhos/SP, doravante denominada CONTRATADA, têm entre si justo e contratado o seguinte:
+Por este Instrumento Particular de Contrato de Prestação de Serviços, de um lado, TEEN SPEECH, pessoa jurídica de direito privado, com sede na Avenida Armando Bei, nº 465, Vila Nova Bonsucesso, Guarulhos/SP, inscrita no CNPJ nº 30.857.093/0001-36, doravante denominada CONTRATADA, e de outro lado, o tomador de serviço identificado no Quadro 01 e ao final assinado, doravante denominado CONTRATANTE, ajustam entre si o que segue, obrigando-se a cumprir as cláusulas abaixo:
 
 <div style="text-align: center; font-weight: bold; margin-top: 20px; margin-bottom: 15px;">01. Identificação do CONTRATANTE:</div>
 
@@ -433,21 +455,31 @@ ${generateResponsavelSection()}
   <table style="width: 100%; border-collapse: collapse;">
     <tr>
       <td style="width: 30%; padding: 5px; font-weight: bold;">Valores do Curso e Condições de Pagamento:</td>
-      <td style="width: 70%; padding: 5px; border-bottom: 1px solid #000;">Semestral: R$ ${planData?.valor_total ? planData.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor semestral</span>'} / Mensal: R$ ${(() => {
-  if (!selectedStudent?.financeiro_alunos || selectedStudent.financeiro_alunos.length === 0) {
-    return financialData?.valor_plano ? financialData.valor_plano.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor mensal</span>';
-  }
-  
-  const parcelasPlano = selectedStudent.financeiro_alunos
-    .flatMap(f => f.parcelas_alunos || [])
-    .filter(p => p.tipo_item === 'plano')
-    .sort((a, b) => a.numero_parcela - b.numero_parcela);
-  
-  if (parcelasPlano.length > 0) {
-    return parcelasPlano[0].valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-  }
-  
-  return financialData?.valor_plano ? financialData.valor_plano.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor mensal</span>';
+      <td style="width: 70%; padding: 5px; border-bottom: 1px solid #000;">${(() => {
+  const fmt = (v: number | null, placeholder: string) =>
+    typeof v === 'number' ? v.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : `<span class=\"placeholder-text\">${placeholder}</span>`;
+  const numOrNull = (v: any): number | null => (typeof v === 'number' ? v : null);
+  const numOrZero = (v: any): number => (typeof v === 'number' ? v : 0);
+
+  const totalRaw = numOrNull(financialData?.valor_total);
+  const planoRaw = numOrNull(financialData?.valor_plano);
+  const materialRaw = numOrNull(financialData?.valor_material);
+  const matriculaRaw = numOrNull(financialData?.valor_matricula);
+  const descontoRaw = numOrNull(financialData?.desconto_total);
+
+  // Fallback: se valor_total estiver ausente ou zero, calcular pelo somatório dos componentes menos o desconto
+  const totalCalc = (typeof totalRaw === 'number' && totalRaw > 0)
+    ? totalRaw
+    : numOrZero(planoRaw) + numOrZero(materialRaw) + numOrZero(matriculaRaw) - numOrZero(descontoRaw);
+
+  const linhas = [
+    `Valor Total do Plano (material + matrícula + plano): R$ ${totalCalc.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+    `Material: R$ ${fmt(materialRaw, 'valor material')} | Matrícula: R$ ${fmt(matriculaRaw, 'valor matrícula')} | Plano: R$ ${fmt(planoRaw, 'valor plano')}`,
+    `${typeof descontoRaw === 'number' ? `Desconto total: R$ ${descontoRaw.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}`,
+    `Semestre: R$ ${totalCalc.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+  ].filter(Boolean);
+
+  return linhas.join('<br>');
 })()}</td>
     </tr>
 
@@ -485,7 +517,94 @@ ${generateResponsavelSection()}
   </table>
 </div>
 
-<p style="text-align: justify; margin-bottom: 15px;">Por este Instrumento Particular de Contrato de Prestação de Serviços, de um lado TEEN SPEECH, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 30.857.093/0001-36, com sede na Avenida Armando Bei, nº 465, Vila Nova Bonsucesso, Guarulhos/SP, doravante denominada CONTRATADA, e, de outro lado, o(a) aluno(a) acima qualificado(a), doravante denominado(a) CONTRATANTE, têm entre si justo e contratado o seguinte:</p>
+<h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">1. CLÁUSULA PRIMEIRA – DO OBJETO DO CONTRATO</h4>
+<p style="text-align: justify; margin-bottom: 10px;">1.1. O presente Instrumento Particular tem como objeto a prestação de serviços educacionais de ensino do idioma Inglês pela TEEN SPEECH (doravante CONTRATADA) em favor do tomador de serviços (doravante CONTRATANTE ou ESTUDANTE), conforme turma e horário específicos definidos no momento da contratação e descritos no Quadro 01.</p>
+<p style="text-align: justify; margin-bottom: 15px;">1.2. Os serviços educacionais mencionados no item 1.1 incluem a participação do ESTUDANTE na turma escolhida, com garantia de vaga limitada à capacidade de 10 (dez) alunos por turma, e o usufruto de 36 (trinta e seis) aulas do idioma Inglês, a serem ministradas durante o semestre letivo vigente.</p>
+
+<h4 style="text-align: center; margin: 10px 0; font-size: 14px; font-weight: bold;">2. CLÁUSULA SEGUNDA – DA DECLARAÇÃO E ATUALIZAÇÃO CADASTRAL</h4>
+<p style="text-align: justify; margin-bottom: 10px;">2.1. O CONTRATANTE declara, para todos os fins de direito, que os dados cadastrais fornecidos e constantes no Quadro 01 deste instrumento são exatos e verdadeiros.</p>
+<p style="text-align: justify; margin-bottom: 15px;">2.2. O CONTRATANTE assume o compromisso de manter seus dados cadastrais, em especial o endereço e os meios de contato (telefone e e-mail), permanentemente atualizados junto à CONTRATADA. Qualquer alteração deverá ser comunicada imediatamente e por escrito, sob pena de serem reputadas válidas todas as comunicações e notificações encaminhadas para os dados anteriormente fornecidos. Essa atualização é essencial para que o CONTRATANTE possa ser localizado pela CONTRATADA ou por qualquer autoridade competente, quando necessário.</p>
+
+<h4 style="text-align: center; margin: 10px 0; font-size: 14px; font-weight: bold;">3. CLÁUSULA TERCEIRA – DAS INFORMAÇÕES DO CURSO E ALTERAÇÕES</h4>
+<p style="text-align: justify; margin-bottom: 10px;">3.1. A carga horária, distribuição semanal, horário das aulas e prazo de duração do treinamento estão detalhadamente especificados no Quadro 02 deste instrumento.</p>
+<p style="text-align: justify; margin-bottom: 15px;">3.2. Qualquer solicitação de alteração nos dias e horários da turma escolhida pelo CONTRATANTE deverá ser formalizada por escrito à CONTRATADA com, no mínimo, 30 (trinta) dias de antecedência ao início das aulas. A efetivação de tal alteração estará sujeita à exclusiva disponibilidade de vagas em outras turmas já formadas e à conveniência administrativa da CONTRATADA, não gerando para o CONTRATANTE o direito a ressarcimento ou compensação em caso de impossibilidade.</p>
+
+<h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">4. CLÁUSULA QUARTA – DOS VALORES CONTRATUAIS</h4>
+<p style="text-align: justify; margin-bottom: 10px;">4.1. Todas as informações financeiras relativas à presente contratação, incluindo o valor da participação nas aulas, a taxa de matrícula, o número de parcelas, as condições para aplicação de descontos, e o valor correspondente ao material didático, encontram-se pormenorizadas no Quadro 03 integrante deste Contrato.</p>
+<p style="text-align: justify; margin-bottom: 15px;">4.2. O CONTRATANTE declara-se ciente e de acordo com os valores e condições de pagamento ali estabelecidos, os quais fazem parte indissociável deste instrumento.</p>
+
+<h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">5. CLÁUSULA QUINTA – DO MATERIAL DIDÁTICO</h4>
+<p style="text-align: justify; margin-bottom: 10px;">5.1. A TEEN SPEECH (doravante CONTRATADA) informa que o material didático utilizado nos cursos é de sua exclusiva propriedade intelectual, desenvolvido internamente e não comercializado em outros estabelecimentos. Este material é produzido sob demanda, visando à sustentabilidade e eficiência, e passa por revisões semestrais para garantir sua qualidade e atualização.</p>
+<p style="text-align: justify; margin-bottom: 10px;">5.2. O fornecimento do material didático ao CONTRATANTE ocorrerá somente após a confirmação do pagamento integral ou da primeira parcela, conforme acordado, e mediante a expressa autorização do CONTRATANTE para a sua produção.</p>
+<p style="text-align: justify; margin-bottom: 10px;">5.3. Ao assinar o presente Contrato, o CONTRATANTE declara-se ciente da natureza exclusiva do material didático da CONTRATADA e, por este ato, AUTORIZA a CONTRATADA a produzir sua apostila e demais materiais necessários ao curso contratado.</p>
+<div class="signature-block" style="margin: 15px 0; page-break-inside: avoid;">
+  <p style="text-align: center;">Autorizo o CONTRATADO a produzir minha apostila.</p>
+  <div style="height: 70px; border-bottom: 1px solid #000; margin: 0 auto 5px; width: 60%;"></div>
+  <div style="text-align: center; font-size: 12px;">ASSINATURA</div>
+</div>
+
+<h4 style="text-align: center; margin: 10px 0; font-size: 14px; font-weight: bold;">6. CLÁUSULA SEXTA – DAS CONDIÇÕES EM CASO DE PANDEMIA OU FORÇA MAIOR</h4>
+<p style="text-align: justify; margin-bottom: 10px;">6.1. O CONTRATANTE declara-se ciente de que, em observância a quaisquer determinações de órgãos governamentais ou em virtude de situações imprevisíveis e inevitáveis caracterizadas como força maior (tais como pandemias, epidemias, calamidades públicas, etc.), que impossibilitem ou restrinjam a realização de aulas presenciais, a TEEN SPEECH (doravante CONTRATADA) poderá, a seu exclusivo critério, realizar a transição das aulas para o formato online (à distância), total ou parcialmente.</p>
+<p style="text-align: justify; margin-bottom: 10px;">6.2. Nessas circunstâncias excepcionais, a modalidade de ensino será adaptada para garantir a continuidade do aprendizado, mantendo-se a qualidade pedagógica, a carga horária e o conteúdo programático previstos.</p>
+<p style="text-align: justify; margin-bottom: 15px;">6.3. Fica expressamente acordado que a alteração da modalidade de ensino de presencial para online, em decorrência dos motivos expostos nesta cláusula, não implicará em alteração dos valores pactuados no Quadro 03, nem ensejará direito a qualquer tipo de ressarcimento, abatimento ou rescisão contratual sem ônus para o CONTRATANTE, uma vez que tais eventos são alheios à vontade e controle da CONTRATADA.</p>
+
+<h4 style="text-align: center; margin: 10px 0; font-size: 14px; font-weight: bold;">7. CLÁUSULA SÉTIMA – DO PERÍODO LETIVO E FÉRIAS</h4>
+<p style="text-align: justify; margin-bottom: 10px;">7.1. A CONTRATADA se compromete a ministrar 36 (trinta e seis) aulas por semestre letivo, compreendendo os períodos de fevereiro a junho (primeiro semestre) e de agosto a dezembro (segundo semestre), conforme detalhamento específico constante no Quadro 02 deste instrumento. A contagem das aulas terá início a partir da data da primeira aula ministrada.</p>
+<p style="text-align: justify; margin-bottom: 15px;">7.2. O período compreendido entre o término das 36 aulas de um semestre e o início das aulas do semestre subsequente é considerado recesso escolar (férias), sendo este um período sem aulas presenciais ou online. O CONTRATANTE declara-se ciente de que a existência e duração desses recessos estão previamente estabelecidas no calendário da CONTRATADA e não o eximem da obrigação de efetuar o pagamento das parcelas contratadas, que continuarão a ser devidas conforme o cronograma financeiro do Quadro 03.</p>
+
+<h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">8. CLÁUSULA OITAVA – DA FREQUÊNCIA E REPOSIÇÃO DE AULAS</h4>
+<p style="text-align: justify; margin-bottom: 10px;">8.1. O CONTRATANTE tem plena ciência de que o objeto do presente contrato é a participação do ESTUDANTE em 36 (trinta e seis) aulas em TURMA, conforme calendário letivo previamente estabelecido pela CONTRATADA e disponível para consulta. As aulas serão ministradas para a TURMA independentemente da presença do ESTUDANTE, não havendo responsabilidade da CONTRATADA pela ausência.</p>
+<p style="text-align: justify; margin-bottom: 10px;">8.2. Para fins de aproveitamento e aprovação, o CONTRATANTE compromete-se a garantir a presença do ESTUDANTE em, no mínimo, 27 (vinte e sete) aulas durante o semestre letivo. O não cumprimento desta frequência mínima resultará na reprovação automática do ESTUDANTE.</p>
+<p style="text-align: justify; margin-bottom: 15px;">8.3. Em caráter excepcional e visando auxiliar na recuperação de conteúdo, a CONTRATADA disponibiliza 1 (uma) aula de reposição gratuita por mês, limitada a uma por mês. Esta aula de reposição será realizada de forma individual, terá duração de 45 (quarenta e cinco) minutos e só poderá ser agendada e usufruída dentro do semestre letivo contratado. A disponibilidade de horários para reposição será definida pela CONTRATADA.</p>
+
+<h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">9. CLÁUSULA NONA – DAS MODALIDADES DE REPOSIÇÃO DE AULAS</h4>
+<p style="text-align: justify; margin-bottom: 10px;">9.1. Adicionalmente à aula de reposição individual gratuita mencionada na Cláusula Oitava, o ESTUDANTE poderá tentar repor aulas perdidas por meio de sua inserção temporária em outras turmas da CONTRATADA, sem custo adicional, desde que haja vagas disponíveis e que o conteúdo da aula seja compatível com o material que o ESTUDANTE precisa revisar. A elegibilidade e o agendamento dessa reposição estarão sujeitos à análise e disponibilidade da CONTRATADA.</p>
+<p style="text-align: justify; margin-bottom: 15px;">9.2. Caso as opções gratuitas de reposição (aula individual mensal e/ou participação em outra turma) não sejam viáveis ou já tenham sido esgotadas pelo ESTUDANTE, o CONTRATANTE terá a faculdade de contratar aulas particulares de reposição. Cada aula particular terá o custo de R$ 40,00 (quarenta reais) e duração de 45 (quarenta e cinco) minutos, devendo ser agendada conforme a disponibilidade de horários da CONTRATADA.</p>
+
+<h4 style="text-align: center; margin: 10px 0; font-size: 14px; font-weight: bold;">10. CLÁUSULA DÉCIMA – DO COMPROMISSO DO ESTUDANTE COM O APRENDIZADO</h4>
+<p style="text-align: justify; margin-bottom: 10px;">10.1. O CONTRATANTE e o ESTUDANTE reconhecem que o sucesso no aprendizado do idioma Inglês depende significativamente do esforço ativo e da dedicação contínua do ESTUDANTE, bem como da estrita observância às orientações pedagógicas fornecidas pela TEEN SPEECH (doravante CONTRATADA).</p>
+<p style="text-align: justify; margin-bottom: 10px;">10.2. Ciente da natureza do aprendizado de idiomas, que exige contato e prática regulares, o ESTUDANTE compromete-se a seguir as diretrizes de estudo dos professores da CONTRATADA, incluindo a prática e revisão do conteúdo de forma espaçada e consistente, evitando acumular o estudo para um único dia. Recomenda-se e espera-se uma dedicação de ao menos 20 (vinte) minutos diários aos estudos e o esforço para assimilar o conteúdo da aula antes da aula seguinte.</p>
+<p style="text-align: justify; margin-bottom: 15px;">10.3. O CONTRATANTE declara-se ciente e concorda que a CONTRATADA envidará todos os esforços didáticos e pedagógicos para o ensino. No entanto, o aproveitamento e o resultado final do curso são de responsabilidade intrínseca do ESTUDANTE, complementados pelo acompanhamento do CONTRATANTE. A CONTRATADA não poderá ser responsabilizada pelo não aprendizado ou aproveitamento insatisfatório do curso que decorra da falta de dedicação, da ausência de frequência mínima (conforme Cláusula Oitava) ou do não seguimento das orientações de estudo por parte do ESTUDANTE.</p>
+
+<h4 style="text-align: center; margin: 10px 0; font-size: 14px; font-weight: bold;">11. CLÁUSULA DÉCIMA PRIMEIRA – DOS CRITÉRIOS DE APROVAÇÃO E REPROVAÇÃO</h4>
+<p style="text-align: justify; margin-bottom: 10px;">11.1. Para que o ESTUDANTE seja considerado aprovado no módulo ou semestre letivo, é indispensável que cumpra, cumulativamente, os seguintes critérios:</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">a) Obtenha nota final mínima de 7,0 (sete) pontos nas avaliações pedagógicas da CONTRATADA; e</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 15px;">b) Registre frequência mínima de 27 (vinte e sete) aulas ao longo do semestre vigente, conforme previsto na Cláusula Oitava deste instrumento.</p>
+<p style="text-align: justify; margin-bottom: 15px;">11.2. O não atendimento a qualquer um dos critérios estabelecidos no item 11.1 implicará na reprovação automática do ESTUDANTE no módulo ou semestre.</p>
+
+<h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">12. CLÁUSULA DÉCIMA SEGUNDA – DA INADIMPLÊNCIA</h4>
+<p style="text-align: justify; margin-bottom: 10px;">12.1. Em caso de não pagamento de qualquer valor devido pelo CONTRATANTE conforme o presente contrato e o Quadro 03, incidirão sobre o montante em atraso, a partir da data de seu vencimento até a efetiva quitação:</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">a) Multa de 2% (dois por cento) sobre o valor principal devido;</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">b) Juros de mora de 1% (um por cento) ao mês; e</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 15px;">c) Atualização monetária com base no índice IGP-M/FGV (ou outro índice aplicável).</p>
+<p style="text-align: justify; margin-bottom: 15px;">12.2. O atraso no pagamento poderá, após notificação, implicar na suspensão dos serviços educacionais ao ESTUDANTE e, persistindo a inadimplência, na rescisão do presente contrato, nos termos da Cláusula Décima Terceira.</p>
+
+<h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">13. CLÁUSULA DÉCIMA QUARTA – DO DIREITO DE ARREPENDIMENTO E DA RESCISÃO ANTECIPADA</h4>
+<p style="text-align: justify; margin-bottom: 10px;">13.1. Do Direito de Arrependimento (Contratação Fora do Estabelecimento Comercial):</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">a) Em observância ao disposto no art. 49 do Código de Defesa do Consumidor (Lei nº 8.078/90), o CONTRATANTE terá o prazo improrrogável de 7 (sete) dias corridos, contados a partir da data de assinatura do presente contrato ou da efetivação da primeira aquisição do pacote de aulas, para exercer seu direito de arrependimento.</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">b) Este direito é aplicável exclusivamente às contratações realizadas fora do estabelecimento comercial físico da CONTRATADA (por exemplo, via internet, telefone, e-mail ou domicílio).</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 15px;">c) Caso o direito de arrependimento seja exercido dentro do prazo legal, a CONTRATADA restituirá ao CONTRATANTE a integralidade dos valores eventualmente pagos (tais como Matrícula, Material Didático e/ou parcelas do Pacote de Aulas), desde que não tenha havido a utilização de qualquer aula ou serviço por parte do ESTUDANTE e o material didático seja devolvido em perfeito estado, sem indícios de uso.</p>
+
+<p style="text-align: justify; margin-bottom: 10px;">13.2. Da Rescisão Antecipada por Iniciativa do CONTRATANTE (Após 7 dias):</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">a) Decorrido o prazo de 7 (sete) dias para o direito de arrependimento ou nos casos de contratação diretamente no estabelecimento comercial, a manifestação de vontade do CONTRATANTE em rescindir o presente contrato e/ou cancelar a utilização do pacote de aulas deverá ser formalizada por comunicação escrita à CONTRATADA.</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 15px;">b) Nesta hipótese de rescisão antecipada, serão devidos pelo CONTRATANTE os seguintes valores: i. O valor correspondente às aulas já usufruídas ou disponibilizadas ao ESTUDANTE até a data da solicitação formal de cancelamento, calculadas pro rata die ou por aula, conforme valor unitário previsto no Quadro 02 ou proporcional ao valor total do pacote. ii. Multa Rescisória: Sobre o saldo remanescente do contrato (correspondente às parcelas vincendas e aulas não utilizadas), será aplicada uma multa compensatória equivalente a 10% (dez por cento). O saldo remanescente será calculado pela diferença entre o valor total do curso (conforme Quadro 03) e o valor das aulas já utilizadas/disponibilizadas.</p>
+
+<p style="text-align: justify; margin-bottom: 10px;">13.3. Da Não Restituição de Matrícula e Material Didático:</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">a) A Taxa de Matrícula e o valor referente ao Material Didático, uma vez pagos e entregues, não serão passíveis de restituição, salvo na estrita hipótese de exercício do direito de arrependimento dentro do prazo legal de 7 (sete) dias, conforme detalhado no item 14.1 desta Cláusula.</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 15px;">b) A natureza do material didático, conforme Cláusula Quinta, e o serviço de matrícula (que envolve custos administrativos de processamento) justificam sua não restituição após o prazo legal de arrependimento.</p>
+
+<h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">14. CLÁUSULA DÉCIMA QUINTA – DA PROTEÇÃO DE DADOS PESSOAIS</h4>
+<p style="text-align: justify; margin-bottom: 10px;">14.1. A TEEN SPEECH (doravante CONTRATADA) compromete-se a realizar o tratamento dos dados pessoais e dados pessoais sensíveis do CONTRATANTE e do ESTUDANTE em estrita conformidade com a Lei Geral de Proteção de Dados Pessoais (LGPD - Lei nº 13.709/2018) e demais legislações aplicáveis do ordenamento jurídico brasileiro.</p>
+<p style="text-align: justify; margin-bottom: 15px;">14.2. O tratamento de dados ocorrerá exclusivamente para as finalidades específicas para as quais foram coletados (como a prestação de serviços educacionais, gestão de matrículas, comunicação e cumprimento de obrigações legais), utilizando-se apenas os dados estritamente necessários para tais fins.</p>
+
+<h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">15. CLÁUSULA DÉCIMA SEXTA – DAS DESPESAS COM A COBRANÇA E EXECUÇÃO</h4>
+<p style="text-align: justify; margin-bottom: 10px;">Em caso de inadimplemento contratual que enseje a necessidade de cobrança (judicial ou extrajudicial) ou a execução do presente contrato, a parte que deu causa ao inadimplemento será responsável por arcar com todas as despesas decorrentes, incluindo, mas não se limitando a:</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">a) Custas processuais e taxas judiciárias;</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">b) Despesas com notificações extrajudiciais e protestos;</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">c) Honorários advocatícios, arbitrados em 20% (vinte por cento) sobre o valor total do débito (principal, juros, multa e atualização monetária), caso seja necessária a atuação de advogado para a cobrança ou defesa dos direitos da parte contrária; e</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 15px;">d) Outras despesas comprovadamente realizadas para a recuperação do crédito ou a defesa do cumprimento do contrato.</p>
+
+<p style="text-align: justify; margin-bottom: 15px;">16. As partes elegem o foro da COMARCA de Guarulhos, como único competente para decidir qualquer questão oriunda do presente contrato, em detrimento de qualquer outro por mais privilegiado que possa ser.</p>
 
 <h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">1. CLÁUSULA PRIMEIRA - DA IDENTIFICAÇÃO DAS PARTES E DO OBJETO</h4>
 
@@ -509,30 +628,44 @@ ${generateResponsavelSection()}
 
 <p style="text-align: justify; margin-bottom: 10px;"><strong>3.2</strong> O pagamento será efetuado da seguinte forma:</p>
 <p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">${(() => {
-  // Buscar valor da primeira parcela
-  const getFirstParcelaValue = () => {
-    if (!selectedStudent?.financeiro_alunos || selectedStudent.financeiro_alunos.length === 0) {
-      return financialData?.valor_plano ? financialData.valor_plano.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor da parcela</span>';
-    }
-    
-    const parcelasPlano = selectedStudent.financeiro_alunos
-      .flatMap(f => f.parcelas_alunos || [])
-      .filter(p => p.tipo_item === 'plano')
-      .sort((a, b) => a.numero_parcela - b.numero_parcela);
-    
-    if (parcelasPlano.length > 0) {
-      return parcelasPlano[0].valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-    }
-    
-    return financialData?.valor_plano ? financialData.valor_plano.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '<span class="placeholder-text">valor da parcela</span>';
-  };
-  
-  return financialData?.numero_parcelas_plano && financialData.numero_parcelas_plano > 1 
-    ? `- Parcelado em ${financialData.numero_parcelas_plano} (${financialData.numero_parcelas_plano === 2 ? 'duas' : financialData.numero_parcelas_plano === 3 ? 'três' : financialData.numero_parcelas_plano === 4 ? 'quatro' : financialData.numero_parcelas_plano === 5 ? 'cinco' : financialData.numero_parcelas_plano === 6 ? 'seis' : 'várias'}) parcelas mensais de R$ ${getFirstParcelaValue()}` 
-    : `- Pagamento mensal de R$ ${getFirstParcelaValue()}`;
+  const parcelasPlano = selectedStudent?.alunos_financeiro
+    ? selectedStudent.alunos_financeiro
+        .flatMap(f => f.parcelas_alunos || [])
+        .sort((a, b) => a.numero_parcela - b.numero_parcela)
+    : [];
+  const parcelasCount = parcelasPlano.length;
+  const firstParcelaValue = parcelasPlano.length > 0
+    ? parcelasPlano[0].valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+    : financialData?.valor_plano
+      ? financialData.valor_plano.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+      : '<span class="placeholder-text">valor da parcela</span>';
+
+  return parcelasCount > 1 
+    ? `- Parcelado em ${parcelasCount} (${parcelasCount === 2 ? 'duas' : parcelasCount === 3 ? 'três' : parcelasCount === 4 ? 'quatro' : parcelasCount === 5 ? 'cinco' : parcelasCount === 6 ? 'seis' : 'várias'}) parcelas mensais de R$ ${firstParcelaValue}` 
+    : `- Pagamento mensal de R$ ${firstParcelaValue}`;
 })()}</p>
-<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">- Vencimento: todo dia ${financialData?.data_primeiro_vencimento ? new Date(financialData.data_primeiro_vencimento).getDate() : '<span class="placeholder-text">dia do vencimento</span>'} de cada mês</p>
-<p style="text-align: justify; margin-left: 20px; margin-bottom: 10px;">- Primeira parcela: ${financialData?.data_primeiro_vencimento ? new Date(financialData.data_primeiro_vencimento).toLocaleDateString('pt-BR') : '<span class="placeholder-text">data da primeira parcela</span>'}</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">- Vencimento: todo dia ${(() => {
+  const parcelasPlano = selectedStudent?.alunos_financeiro
+    ? selectedStudent.alunos_financeiro
+        .flatMap(f => f.parcelas_alunos || [])
+        .sort((a, b) => a.numero_parcela - b.numero_parcela)
+    : [];
+  const firstVencimento = parcelasPlano.length > 0
+    ? parcelasPlano[0]?.data_vencimento
+    : financialData?.data_primeiro_vencimento || null;
+  return firstVencimento ? new Date(firstVencimento).getDate() : '<span class="placeholder-text">dia do vencimento</span>';
+})()} de cada mês</p>
+<p style="text-align: justify; margin-left: 20px; margin-bottom: 10px;">- Primeira parcela: ${(() => {
+  const parcelasPlano = selectedStudent?.alunos_financeiro
+    ? selectedStudent.alunos_financeiro
+        .flatMap(f => f.parcelas_alunos || [])
+        .sort((a, b) => a.numero_parcela - b.numero_parcela)
+    : [];
+  const firstVencimento = parcelasPlano.length > 0
+    ? parcelasPlano[0]?.data_vencimento
+    : financialData?.data_primeiro_vencimento || null;
+  return firstVencimento ? new Date(firstVencimento).toLocaleDateString('pt-BR') : '<span class="placeholder-text">data da primeira parcela</span>';
+})()}</p>
 
 <p style="text-align: justify; margin-bottom: 10px;"><strong>3.3</strong> O não pagamento na data do vencimento implicará em:</p>
 <p style="text-align: justify; margin-left: 20px; margin-bottom: 5px;">a) Multa de 2% (dois por cento) sobre o valor da parcela;</p>
@@ -604,7 +737,7 @@ ${generateResponsavelSection()}
 
 <p style="text-align: justify; margin-bottom: 15px;"><strong>10.2</strong> O tratamento de dados ocorrerá exclusivamente para as finalidades específicas para as quais foram coletados (como a prestação de serviços educacionais, gestão de matrículas, comunicação e cumprimento de obrigações legais), utilizando-se apenas os dados estritamente necessários para tais fins.</p>
 
-<div style="margin-top: 8cm;"></div>
+
 <h4 style="text-align: center; margin: 20px 0; font-size: 14px; font-weight: bold;">11. CLÁUSULA DÉCIMA PRIMEIRA - DAS DESPESAS COM A COBRANÇA E EXECUÇÃO</h4>
 
 <p style="text-align: justify; margin-bottom: 10px;">Em caso de inadimplemento contratual que enseje a necessidade de cobrança (judicial ou extrajudicial) ou a execução do presente contrato, a parte que deu causa ao inadimplemento será responsável por arcar com todas as despesas decorrentes, incluindo, mas não se limitando a:</p>
@@ -703,142 +836,61 @@ TESTEMUNHAS:
 
   const handlePrint = async () => {
     if (!selectedStudent) return;
-    
-    try {
-      // Importar jsPDF dinamicamente
-      const { jsPDF } = await import('jspdf');
-      const html2canvas = (await import('html2canvas')).default;
-      
-      // Criar um elemento temporário com o conteúdo do contrato
-      const contentToPrint = isEditing ? editableContent : (savedContent || generateContractContent());
-      
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = contentToPrint;
-      tempDiv.style.position = 'absolute';
-      tempDiv.style.left = '-9999px';
-      tempDiv.style.top = '0';
-      tempDiv.style.width = '800px';
-      tempDiv.style.fontFamily = 'Arial, sans-serif';
-      tempDiv.style.fontSize = '14px';
-      tempDiv.style.lineHeight = '1.5';
-      tempDiv.style.color = '#000';
-      tempDiv.style.backgroundColor = '#fff';
-      tempDiv.style.padding = '20px';
-      
-      document.body.appendChild(tempDiv);
-      
-      // Aguardar um pouco para as imagens carregarem
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Adicionar estilos CSS para quebras de página inteligentes
-      const style = document.createElement('style');
-      style.textContent = `
-        .page-break-avoid {
-          page-break-inside: avoid !important;
-          break-inside: avoid !important;
-        }
-        p, div {
-          page-break-inside: avoid !important;
-          break-inside: avoid !important;
-        }
-        h1, h2, h3, h4, h5, h6 {
-          page-break-after: avoid !important;
-          break-after: avoid !important;
-        }
-      `;
-      tempDiv.appendChild(style);
-      
-      // Converter para canvas
-      const canvas = await html2canvas(tempDiv, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        width: 800,
-        height: tempDiv.scrollHeight,
-        logging: false,
-        useCORS: true
-      });
-      
-      // Remover elemento temporário
-      document.body.removeChild(tempDiv);
-      
-      // Criar PDF
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-      
-      const imgData = canvas.toDataURL('image/png');
-      const imgWidth = 210; // A4 width in mm
-      const pageHeight = 295; // A4 height in mm
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      
-      let position = 0;
-      const margin = 10; // Margem para evitar corte de texto
-      
-      // Adicionar primeira página
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= (pageHeight - margin);
-      
-      // Adicionar páginas adicionais com margem para evitar corte
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= (pageHeight - margin);
-      }
-      
-      // Salvar o PDF
-      const fileName = `Contrato_${selectedStudent.nome.replace(/\s+/g, '_')}_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`;
-      pdf.save(fileName);
-      
-      toast({
-        title: "PDF gerado com sucesso!",
-        description: `O arquivo ${fileName} foi baixado.`,
-      });
-      
-    } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
-      toast({
-        title: "Erro ao gerar PDF",
-        description: "Não foi possível gerar o PDF. Tente novamente.",
-        variant: "destructive",
-      });
-      
-      // Fallback para impressão tradicional
-      const contentToPrint = isEditing ? editableContent : (savedContent || generateContractContent());
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) return;
 
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Contrato - ${selectedStudent.nome}</title>
-            <style>
-              body { font-family: Arial, sans-serif; margin: 20px; }
-              .contract { max-width: 800px; margin: 0 auto; }
-              img { max-width: 100%; height: auto; }
-              @media print {
-                body { margin: 0; }
-                .no-print { display: none; }
-                img { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-              }
-            </style>
-          </head>
-          <body>
-            <div class="contract">
-              ${contentToPrint}
-            </div>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.print();
-    }
+    const contentToPrint = isEditing ? editableContent : (savedContent || generateContractContent());
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Contrato - ${selectedStudent.nome}</title>
+          <style>
+            body { font-family: Garamond, serif; margin: 0; }
+            img { max-width: 100%; height: auto; }
+            @page { size: A4; margin: 12mm 8mm; }
+            @media print {
+              * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+              body { margin: 0; }
+              h1, h2, h3 { page-break-after: avoid !important; break-after: avoid !important; }
+              table, tr, td, div, section { page-break-inside: avoid !important; break-inside: avoid !important; }
+              img[alt*="Assinatura"], img[alt*="Signature"], img[alt*="Testemunha"], .signature, .sign-area, figure { page-break-inside: avoid !important; break-inside: avoid !important; }
+            }
+            .container-pdf { width: 100%; background: white; padding: 0; box-sizing: border-box; }
+          </style>
+        </head>
+        <body>
+          <div id="contrato" class="container-pdf contract-preview">
+            ${contentToPrint}
+          </div>
+          <script>
+            (function() {
+              const waitImages = () => {
+                const imgs = Array.from(document.images);
+                if (imgs.length === 0) return Promise.resolve();
+                return Promise.all(imgs.map(img => img.complete ? Promise.resolve() : new Promise(res => {
+                  img.addEventListener('load', res, { once: true });
+                  img.addEventListener('error', res, { once: true });
+                })));
+              };
+              window.addEventListener('afterprint', () => { try { window.close(); } catch(e){} });
+              waitImages().then(() => {
+                setTimeout(() => { try { window.print(); } catch(e){} }, 150);
+              });
+            })();
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    try { printWindow.focus(); } catch {}
+    // A impressão será disparada pela janela após carregar imagens
+
+    toast({
+      title: "Impressão pronta",
+      description: "A janela de impressão foi aberta.",
+    });
   };
 
   const handleCancelEdit = () => {
@@ -1128,7 +1180,8 @@ TESTEMUNHAS:
               {isEditing ? (
                 <div 
                   ref={editableRef}
-                  className="min-h-[600px] text-sm p-4 border rounded-lg bg-white editable-contract"
+                  id="contrato"
+                  className="container-pdf min-h-[600px] text-sm p-4 border rounded-lg bg-white editable-contract"
                   style={{ 
                     fontFamily: 'Garamond, serif', 
                     fontSize: '14pt', 

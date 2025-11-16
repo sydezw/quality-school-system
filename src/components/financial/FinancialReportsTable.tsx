@@ -20,8 +20,6 @@ import {
   Search,
   TrendingUp,
   BarChart3,
-  Download,
-  RefreshCw,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
@@ -1246,28 +1244,13 @@ const FinancialReportsTable = () => {
             <p className="text-gray-600">Visão completa das finanças da TS School</p>
           </div>
           
-          {/* Botão Exportar PDF */}
           <div className="flex items-center gap-3">
-            {/* Indicador do filtro de ano */}
             {anoFiltro !== 'todos' && (
               <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
                 <CalendarDays className="h-4 w-4 text-blue-600" />
                 <span className="text-sm font-medium text-blue-700">PDF: {anoFiltro}</span>
               </div>
             )}
-            
-            <Button 
-              onClick={exportarDados}
-              disabled={exportandoPDF}
-              className={`flex items-center gap-2 text-white shadow-lg hover:shadow-xl transition-all duration-300 bg-[#D90429] hover:bg-[#1F2937] ${exportandoPDF ? "animate-pulse" : ""}`}
-            >
-              {exportandoPDF ? (
-                <RefreshCw className="h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4" />
-              )}
-              {exportandoPDF ? 'Gerando PDF...' : `Exportar PDF${anoFiltro !== 'todos' ? ` (${anoFiltro})` : ''}`}
-            </Button>
           </div>
         </div>
       </motion.div>
