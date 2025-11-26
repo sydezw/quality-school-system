@@ -1,0 +1,144 @@
+/* Estilos para o contrato */
+.contract-preview {
+  font-family: 'Garamond', serif;
+  font-size: 12.5pt;
+  line-height: 1.6;
+  color: #333;
+}
+
+/* Estilos para campos editáveis */
+.editable-contract {
+  position: relative;
+}
+
+/* Estilo para placeholders transparentes */
+.placeholder-text {
+  color: rgba(0,0,0,0.3) !important;
+  font-style: italic !important;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Transição suave para os placeholders */
+.placeholder-text {
+  transition: opacity 0.2s ease;
+}
+
+/* Estilo específico para impressão - placeholders menores */
+@media print {
+  .placeholder-text {
+    font-size: 6pt !important;
+    color: rgba(0,0,0,0.3) !important;
+    background-color: white !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+}
+
+.contract-preview table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.contract-preview td {
+  padding: 5px;
+}
+
+.contract-preview h1 {
+  font-size: 18px;
+  font-weight: bold;
+  margin: 0;
+}
+
+/* Estilo para a logo TS */
+.logo-ts {
+  width: 80px;
+  height: 80px;
+  background-image: url('/ts-logo.svg');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes shine {
+  0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+  50% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+  100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+}
+
+/* Estilos específicos para impressão */
+@media print {
+  /* Configurações gerais para impressão */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  .contract-preview {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background: white !important;
+  }
+  
+  /* Força a exibição de todas as imagens na impressão */
+  .contract-preview img,
+  img {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+  }
+  
+  /* Força especificamente imagens base64 */
+  img[src^="data:"],
+  .contract-preview img[src^="data:"] {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: auto !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    filter: none !important;
+    transform: none !important;
+    page-break-inside: avoid !important;
+  }
+  
+  /* Remove transformações que podem afetar a impressão */
+  .contract-preview *,
+  * {
+    -webkit-filter: none !important;
+    filter: none !important;
+    -webkit-transform: none !important;
+    transform: none !important;
+    transition: none !important;
+    animation: none !important;
+  }
+  
+  /* Garante que o conteúdo seja visível */
+  .contract-preview {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+}

@@ -1,0 +1,174 @@
+/* Animações para a página de aniversariantes */
+
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-100px) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100px) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+@keyframes confetti-sparkle {
+  0%, 100% {
+    transform: scale(0.8) rotate(0deg);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.2) rotate(180deg);
+    opacity: 1;
+  }
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(215, 38, 56, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(215, 38, 56, 0.6), 0 0 30px rgba(215, 38, 56, 0.4);
+  }
+}
+
+/* Classes utilitárias para animações */
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s ease-out forwards;
+}
+
+.animate-bounce-in {
+  animation: bounceIn 0.8s ease-out forwards;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200px 100%;
+  animation: shimmer 2s infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-glow {
+  animation: glow 2s ease-in-out infinite;
+}
+
+/* Efeitos de hover especiais */
+.birthday-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.birthday-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+}
+
+.birthday-card:hover .birthday-icon {
+  transform: rotate(15deg) scale(1.1);
+}
+
+/* Gradientes especiais */
+.gradient-birthday {
+  background: linear-gradient(135deg, #D72638 0%, #FF6B8A 50%, #FFB3C6 100%);
+}
+
+.gradient-celebration {
+  background: linear-gradient(135deg, #FFE5E5 0%, #FFB3C6 50%, #FF8FA3 100%);
+}
+
+/* Efeito de confete */
+.confetti-bg {
+  position: relative;
+  overflow: hidden;
+}
+
+.confetti-bg::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background-image: 
+    radial-gradient(circle at 20% 80%, #D72638 2px, transparent 2px),
+    radial-gradient(circle at 80% 20%, #FFB3C6 2px, transparent 2px),
+    radial-gradient(circle at 40% 40%, #FF6B8A 2px, transparent 2px);
+  background-size: 50px 50px;
+  opacity: 0.1;
+  animation: float 6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Responsividade das animações */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in-up,
+  .animate-bounce-in,
+  .animate-shimmer,
+  .animate-float,
+  .animate-glow {
+    animation: none;
+  }
+  
+  .birthday-card {
+    transition: none;
+  }
+  
+  .birthday-card:hover {
+    transform: none;
+  }
+}
+
+/* Melhorias para dispositivos móveis */
+@media (max-width: 768px) {
+  .birthday-card:hover {
+    transform: translateY(-4px) scale(1.01);
+  }
+}
