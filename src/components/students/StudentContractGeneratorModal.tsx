@@ -14,6 +14,28 @@ import testemunha1Signature from '@/assets/signatures/testemunha1.png';
 import testemunha2Signature from '@/assets/signatures/testemunha2.png';
 import '@/pages/app/contract-styles.css';
 
+// Função para converter imagem em base64
+const imageToBase64 = (url: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      } else {
+        reject(new Error('Failed to get canvas context'));
+      }
+    };
+    img.onerror = () => reject(new Error('Failed to load image'));
+    img.src = url;
+  });
+};
+
 type StudentContractGeneratorModalProps = { isOpen: boolean; onClose: () => void; student: any };
 const StudentContractGeneratorModal: React.FC<StudentContractGeneratorModalProps> = ({ isOpen, onClose, student }) => {
   const { toast } = useToast();
@@ -23,6 +45,11 @@ const StudentContractGeneratorModal: React.FC<StudentContractGeneratorModalProps
   const [selectedContract, setSelectedContract] = useState<string>('contrato1');
   const editableRef = useRef<HTMLDivElement>(null);
   const [contratanteResponsavel, setContratanteResponsavel] = useState<boolean>(false);
+  const [signatureImages, setSignatureImages] = useState({
+    teenSpeech: '',
+    testemunha1: '',
+    testemunha2: ''
+  });
   useEffect(() => {
     if (student?.data_nascimento) {
       const age = calculateAge(student.data_nascimento);
@@ -31,6 +58,37 @@ const StudentContractGeneratorModal: React.FC<StudentContractGeneratorModalProps
       setContratanteResponsavel(false);
     }
   }, [student, isOpen]);
+
+  // Carregar imagens em base64
+  useEffect(() => {
+    const loadSignatureImages = async () => {
+      try {
+        const [teenSpeech, testemunha1, testemunha2] = await Promise.all([
+          imageToBase64(teenSpeechSignature),
+          imageToBase64(testemunha1Signature),
+          imageToBase64(testemunha2Signature)
+        ]);
+        
+        setSignatureImages({
+          teenSpeech,
+          testemunha1,
+          testemunha2
+        });
+      } catch (error) {
+        console.error('Erro ao carregar imagens de assinatura:', error);
+        // Fallback: usar os caminhos originais se a conversão falhar
+        setSignatureImages({
+          teenSpeech: teenSpeechSignature,
+          testemunha1: testemunha1Signature,
+          testemunha2: testemunha2Signature
+        });
+      }
+    };
+
+    if (isOpen) {
+      loadSignatureImages();
+    }
+  }, [isOpen]);
   const planData = (student as any)?.planData || (student as any)?.plano || null;
   const financialData = (student as any)?.financialData || (student as any)?.financeiro || null;
   const contractData = (student as any)?.contractData || null;
@@ -630,7 +688,7 @@ ${selectedContract === 'contrato_particulares'
       <p style="text-align: center; margin-bottom: 10px;">Ciente e de acordo,</p>
 
       <div style="text-align: center; margin: 30px 0 10px;">
-        <img src="${teenSpeechSignature}" alt="Assinatura TS SCHOOL" style="display: block; margin: 0 auto; max-width: 280px; max-height: 70px;" />
+        <img src="${signatureImages.teenSpeech}" alt="Assinatura TS SCHOOL" style="display: block; margin: 0 auto; max-width: 280px; max-height: 70px;" />
         <p style="text-align: center; margin: 2px 0 0; line-height: 1;">_________________________________________________________</p>
       </div>
       <p style="text-align: center; margin-bottom: 20px;">TS SCHOOL</p>
@@ -648,14 +706,14 @@ ${selectedContract === 'contrato_particulares'
       </p>
 
       <div style="text-align: center; margin-top: 20px;">
-        <img src="${testemunha1Signature}" alt="Assinatura Testemunha 1" style="display: block; margin: 0 auto; max-height: 70px; max-width: 180px; object-fit: contain;" />
+        <img src="${signatureImages.testemunha1}" alt="Assinatura Testemunha 1" style="display: block; margin: 0 auto; max-height: 70px; max-width: 180px; object-fit: contain;" />
         <p style="text-align: center; margin: 2px 0 4px; line-height: 1;">_________________________________________________________</p>
         <p style="text-align: center; margin: 4px 0;">Testemunha</p>
         <p style="text-align: center;">CPF: 567641218-69</p>
       </div>
 
       <div style="text-align: center; margin-top: 20px;">
-        <img src="${testemunha2Signature}" alt="Assinatura Testemunha 2" style="display: block; margin: 0 auto; max-height: 70px; max-width: 180px; object-fit: contain;" />
+        <img src="${signatureImages.testemunha2}" alt="Assinatura Testemunha 2" style="display: block; margin: 0 auto; max-height: 70px; max-width: 180px; object-fit: contain;" />
         <p style="text-align: center; margin: 2px 0 4px; line-height: 1;">_________________________________________________________</p>
         <p style="text-align: center; margin: 4px 0;">Testemunha 2</p>
         <p style="text-align: center;">RG: 34.537.017-X</p>
@@ -1050,7 +1108,7 @@ ${generateResponsavelSection()}
   
   <div style="margin-bottom: 10px;">
     <div style="border-bottom: 1px solid #000; width: 300px; margin: 0 auto 10px; height: 80px; display: flex; align-items: end; justify-content: center;">
-      <img src="${teenSpeechSignature}" alt="Assinatura Teen Speech" style="max-width: 280px; max-height: 70px;" />
+      <img src="${signatureImages.teenSpeech}" alt="Assinatura Teen Speech" style="max-width: 280px; max-height: 70px;" />
     </div>
     <div style="font-size: 14pt;">TEEN SPEECH</div>
     <div style="font-size: 14pt;">CONTRATADA</div>
@@ -1060,7 +1118,7 @@ ${generateResponsavelSection()}
 <div style="display: flex; justify-content: space-between; gap: 60px;">
   <div style="flex: 1; text-align: center;">
     <div style="height: 80px; border-bottom: 1px solid #000; margin-bottom: 8px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 5px;">
-      <img src="/src/assets/signatures/testemunha1.png" alt="Testemunha 1" style="max-height: 70px; max-width: 180px; object-fit: contain;">
+      <img src="${signatureImages.testemunha1}" alt="Testemunha 1" style="max-height: 70px; max-width: 180px; object-fit: contain;">
     </div>
     <div style="font-weight: bold; font-size: 10pt; margin-bottom: 5px;">Testemunha 1</div>
     <div style="font-size: 10pt; color: #666;">CPF: 567.641.218-69</div>
@@ -1068,7 +1126,7 @@ ${generateResponsavelSection()}
   
   <div style="flex: 1; text-align: center;">
     <div style="height: 80px; border-bottom: 1px solid #000; margin-bottom: 8px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 5px;">
-      <img src="/src/assets/signatures/testemunha2.png" alt="Testemunha 2" style="max-height: 70px; max-width: 180px; object-fit: contain;">
+      <img src="${signatureImages.testemunha2}" alt="Testemunha 2" style="max-height: 70px; max-width: 180px; object-fit: contain;">
     </div>
     <div style="font-weight: bold; font-size: 10pt; margin-bottom: 5px;">Testemunha 2</div>
     <div style="font-size: 10pt; color: #666;">RG: 34.537.017-X</div>
@@ -1144,7 +1202,7 @@ ${generateResponsavelSection()}
   
   <div style="margin-bottom: 30px;">
     <div style="border-bottom: 1px solid #000; width: 300px; margin: 0 auto 10px; height: 80px; display: flex; align-items: end; justify-content: center;">
-      <img src="${teenSpeechSignature}" alt="Assinatura Teen Speech" style="max-width: 280px; max-height: 70px;" />
+      <img src="${signatureImages.teenSpeech}" alt="Assinatura Teen Speech" style="max-width: 280px; max-height: 70px;" />
     </div>
     <div style="font-size: 14pt;">TEEN SPEECH</div>
     <div style="font-size: 14pt;">CONTRATADA</div>
@@ -1156,7 +1214,7 @@ ${generateResponsavelSection()}
   <div style="display: flex; justify-content: space-between; gap: 60px; margin-bottom: 30px;">
     <div style="flex: 1; text-align: center;">
       <div style="height: 80px; border-bottom: 1px solid #000; margin-bottom: 15px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 5px;">
-        <img src="${testemunha1Signature}" alt="Testemunha 1" style="max-height: 70px; max-width: 180px; object-fit: contain;" />
+        <img src="${signatureImages.testemunha1}" alt="Testemunha 1" style="max-height: 70px; max-width: 180px; object-fit: contain;" />
       </div>
       <div style="font-weight: bold; font-size: 10pt; margin-bottom: 5px;">Testemunha 1</div>
       <div style="font-size: 10pt; color: #666;">CPF: 567.641.218-69</div>
@@ -1164,7 +1222,7 @@ ${generateResponsavelSection()}
     
     <div style="flex: 1; text-align: center;">
       <div style="height: 80px; border-bottom: 1px solid #000; margin-bottom: 15px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 5px;">
-        <img src="${testemunha2Signature}" alt="Testemunha 2" style="max-height: 70px; max-width: 180px; object-fit: contain;" />
+        <img src="${signatureImages.testemunha2}" alt="Testemunha 2" style="max-height: 70px; max-width: 180px; object-fit: contain;" />
       </div>
       <div style="font-weight: bold; font-size: 10pt; margin-bottom: 5px;">Testemunha 2</div>
       <div style="font-size: 10pt; color: #666;">RG: 34.537.017-X</div>
