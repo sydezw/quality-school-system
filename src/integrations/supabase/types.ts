@@ -489,31 +489,58 @@ export type Database = {
       }
       alunos_parcelas: {
         Row: {
+          id: number
           alunos_financeiro_id: string
-          data_vencimento: string
-          historico: boolean
-          id: string
-          nome_aluno: string | null
           numero_parcela: number
           valor: number
+          data_vencimento: string
+          data_pagamento: string | null
+          historico: boolean
+          nome_aluno: string | null
+          descricao_item: string | null
+          forma_pagamento: string | null
+          observacoes: string | null
+          idioma_registro: Database["public"]["Enums"]["idioma_registro_financeiro"]
+          status_pagamento: Database["public"]["Enums"]["status_pagamento"]
+          tipo_item: Database["public"]["Enums"]["tipo_item"]
+          inicio_ciclo: string | null
+          final_ciclo: string | null
         }
         Insert: {
+          id?: number
           alunos_financeiro_id: string
-          data_vencimento: string
-          historico?: boolean
-          id?: string
-          nome_aluno?: string | null
           numero_parcela: number
           valor: number
+          data_vencimento: string
+          data_pagamento?: string | null
+          historico?: boolean
+          nome_aluno?: string | null
+          descricao_item?: string | null
+          forma_pagamento?: string | null
+          observacoes?: string | null
+          idioma_registro: Database["public"]["Enums"]["idioma_registro_financeiro"]
+          status_pagamento?: Database["public"]["Enums"]["status_pagamento"]
+          tipo_item: Database["public"]["Enums"]["tipo_item"]
+          inicio_ciclo?: string | null
+          final_ciclo?: string | null
         }
         Update: {
+          id?: number
           alunos_financeiro_id?: string
-          data_vencimento?: string
-          historico?: boolean
-          id?: string
-          nome_aluno?: string | null
           numero_parcela?: number
           valor?: number
+          data_vencimento?: string
+          data_pagamento?: string | null
+          historico?: boolean
+          nome_aluno?: string | null
+          descricao_item?: string | null
+          forma_pagamento?: string | null
+          observacoes?: string | null
+          idioma_registro?: Database["public"]["Enums"]["idioma_registro_financeiro"]
+          status_pagamento?: Database["public"]["Enums"]["status_pagamento"]
+          tipo_item?: Database["public"]["Enums"]["tipo_item"]
+          inicio_ciclo?: string | null
+          final_ciclo?: string | null
         }
         Relationships: [
           {

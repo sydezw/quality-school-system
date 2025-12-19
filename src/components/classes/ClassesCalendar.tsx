@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Calendar, Plus, Filter, Search, Eye, Edit, Users, ChevronDown, Clock, MapPin, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,9 @@ import { cn } from '@/lib/utils';
 import { useMultipleSelection } from '@/hooks/useMultipleSelection';
 import { MultipleSelectionBar } from '@/components/shared/MultipleSelectionBar';
 import { useAulas } from '@/hooks/useAulas';
+import { useAuth } from '@/hooks/useAuth';
 import { AulaDetailsModal } from './AulaDetailsModal';
+import { NewLessonDialog } from './NewLessonDialog';
 
 // FullCalendar imports
 import FullCalendar from '@fullcalendar/react';
@@ -35,15 +37,16 @@ interface TurmaSimplificada {
   cor_calendario: string;
   professor_id: string;
   total_aulas: number | null;
+  tipo_turma?: "Turma" | "Turma particular" | null;
   professores: {
     id: string;
     nome: string;
   } | null;
 }
 
-interface AulaComTurma extends Aula {
-  turmas: TurmaSimplificada | null;
-}
+  interface AulaComTurma extends Aula {
+    turmas: TurmaSimplificada | null;
+  }
 
 /**
  * Componente de Calendário das Aulas
@@ -75,6 +78,9 @@ const ClassesCalendar = () => {
   // Estados do modal
   const [selectedAula, setSelectedAula] = useState<AulaComTurma | null>(null);
   const [showAulaModal, setShowAulaModal] = useState(false);
+  
+  // Estado para controlar o NewLessonDialog
+  const [showNewLessonDialog, setShowNewLessonDialog] = useState(false);
 
   // Estado para controlar o toggle dos filtros
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -89,6 +95,33 @@ const ClassesCalendar = () => {
 
   // Hook para gerenciar aulas
   const { excluirMultiplasAulas } = useAulas();
+  const { user } = useAuth();
+  const isProfessor = user?.cargo === 'Professor';
+
+  const numeroAulaPorId = useMemo(() => {
+    const seq = new Map<string, number>();
+    const porTurma = new Map<string, AulaComTurma[]>();
+    const sorted = [...aulas].sort((a, b) => {
+      const da = a.data.localeCompare(b.data);
+      if (da !== 0) return da;
+      const ha = (a.horario_inicio || '').localeCompare(b.horario_inicio || '');
+      return ha;
+    });
+    for (const aula of sorted) {
+      if (!porTurma.has(aula.turma_id)) porTurma.set(aula.turma_id, []);
+      porTurma.get(aula.turma_id)!.push(aula);
+    }
+    for (const [, lista] of porTurma.entries()) {
+      let idx = 1;
+      for (const aula of lista) {
+        if (aula.status !== 'cancelada') {
+          seq.set(aula.id, idx);
+          idx += 1;
+        }
+      }
+    }
+    return seq;
+  }, [aulas]);
 
   /**
    * Filtra as aulas baseado nos critérios selecionados
@@ -124,12 +157,11 @@ const ClassesCalendar = () => {
   /**
    * Carrega as aulas do banco de dados
    * Inclui relacionamento com turmas para obter informações de cor
-   */
+  */
   const loadAulas = async () => {
     try {
       setLoading(true);
-      
-      const { data, error } = await supabase
+      let aulasQuery = supabase
         .from('aulas')
         .select(`
           *,
@@ -141,6 +173,7 @@ const ClassesCalendar = () => {
             cor_calendario,
             professor_id,
             total_aulas,
+            tipo_turma,
             professores (
               id,
               nome
@@ -149,6 +182,23 @@ const ClassesCalendar = () => {
         `)
         .order('data', { ascending: true })
         .order('horario_inicio', { ascending: true });
+
+      if (isProfessor) {
+        const { data: minhasTurmas, error: turmasError } = await supabase
+          .from('turmas')
+          .select('id')
+          .eq('professor_id', user.id);
+        if (turmasError) throw turmasError;
+        const turmaIds = (minhasTurmas || []).map(t => t.id);
+        if (turmaIds.length === 0) {
+          setAulas([]);
+          setLoading(false);
+          return;
+        }
+        aulasQuery = aulasQuery.in('turma_id', turmaIds);
+      }
+
+      const { data, error } = await aulasQuery;
 
       if (error) throw error;
 
@@ -172,7 +222,7 @@ const ClassesCalendar = () => {
    */
   const loadTurmas = async () => {
     try {
-      const { data, error } = await supabase
+      let turmasQuery = supabase
         .from('turmas')
         .select(`
           *,
@@ -181,8 +231,14 @@ const ClassesCalendar = () => {
             nome
           )
         `)
-        .eq('status', 'ativo')
+        .eq('status', 'ativa')
         .order('nome');
+
+      if (isProfessor) {
+        turmasQuery = turmasQuery.eq('professor_id', user.id);
+      }
+
+      const { data, error } = await turmasQuery;
 
       if (error) throw error;
 
@@ -196,7 +252,7 @@ const ClassesCalendar = () => {
   useEffect(() => {
     loadAulas();
     loadTurmas();
-  }, []);
+  }, [user?.id]);
 
   console.log('Total de aulas:', aulas.length);
   console.log('Aulas filtradas:', filteredAulas.length);
@@ -223,19 +279,96 @@ const ClassesCalendar = () => {
           .trim();
       }
       
-      const tituloCompleto = `${isSelectedItem && isSelectionMode ? '✓ ' : ''}${nomeTurmaProcessado}`;
+      const iconeAula = '';
       
-      // Determinar cor baseada no tipo de aula
-      let backgroundColor = aula.turmas?.cor_calendario || '#6B7280';
-      let borderColor = aula.turmas?.cor_calendario || '#6B7280';
+      const numeroAula = numeroAulaPorId.get(aula.id);
+      let tituloCompleto = `${isSelectedItem && isSelectionMode ? '✓ ' : ''}${nomeTurmaProcessado}`;
       
-      if (aula.tipo_aula === 'avaliativa') {
-        backgroundColor = '#16A34A'; // Verde
-        borderColor = '#15803D';
-      } else if (aula.tipo_aula === 'prova_final') {
-        backgroundColor = '#2563EB'; // Azul
-        borderColor = '#1D4ED8';
+      // Sistema de cores simplificado baseado no idioma
+      let backgroundColor = '#6B7280'; // Cor padrão (cinza)
+      let borderColor = '#6B7280';
+      
+      // Definir cor base da turma
+       const idioma = aula.turmas?.idioma;
+       const tipoTurma = aula.turmas?.tipo_turma;
+       console.log('Debug - Aula:', aula.id, 'Idioma:', idioma, 'Turma:', aula.turmas?.nome);
+      // Detectar turma particular por tipo/idioma/nome
+      const isParticularByType = tipoTurma === 'Turma particular';
+      const isParticularByIdioma = idioma === 'particular';
+      const isParticularByNome = /(^|\s)particular\s*-\s*/i.test(nomeTurma);
+      const isParticular = isParticularByType || isParticularByIdioma || isParticularByNome;
+
+      // Caso seja turma particular (independente do idioma), ajustar título e cor
+      if (isParticular) {
+        const rawName = aula.turmas?.nome || nomeTurmaProcessado;
+        const pessoaNomeBase = rawName
+          .replace(/^(?:particular|turma\s*particular)\s*-\s*/i, '')
+          .trim() || rawName;
+        const pessoaNome = pessoaNomeBase
+          .replace(/,\s*das\s*\d{1,2}:\d{2}\s*às\s*\d{1,2}:\d{2}/i, '')
+          .replace(/\s*-\s*das\s*\d{1,2}:\d{2}\s*às\s*\d{1,2}:\d{2}/i, '')
+          .trim();
+        const diaSemana = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'][new Date(aula.data).getDay()];
+        const inicio = formatTime(aula.horario_inicio);
+        const fim = formatTime(aula.horario_fim);
+        tituloCompleto = `${isSelectedItem && isSelectionMode ? '✓ ' : ''}${pessoaNome} - ${diaSemana} - ${inicio} as ${fim}`;
+        backgroundColor = 'linear-gradient(145deg, #8B5CF6 0%, #7C3AED 60%, #6D28D9 100%)';
+        borderColor = '#7C3AED';
+      } else {
+        if (idioma === 'Inglês') {
+          backgroundColor = 'linear-gradient(145deg, #3B82F6 0%, #1E40AF 60%, #1E3A8A 100%)';
+          borderColor = '#1E40AF';
+        } else if (idioma === 'Japonês') {
+          backgroundColor = 'linear-gradient(145deg, #EF4444 0%, #DC2626 60%, #B91C1C 100%)';
+          borderColor = '#DC2626';
+        } else if (idioma === 'Inglês/Japonês') {
+          backgroundColor = 'linear-gradient(145deg, #3B82F6 0%, #8B5CF6 50%, #EF4444 100%)';
+          borderColor = '#8B5CF6';
+        } else if (idioma === 'particular') {
+          backgroundColor = 'linear-gradient(145deg, #8B5CF6 0%, #7C3AED 60%, #6D28D9 100%)';
+          borderColor = '#7C3AED';
+          const pessoaNome = nomeTurmaProcessado.replace(/^particular\s*-\s*/i, '').trim() || nomeTurmaProcessado;
+          const diaSemana = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'][new Date(aula.data).getDay()];
+          const inicio = formatTime(aula.horario_inicio);
+          const fim = formatTime(aula.horario_fim);
+          tituloCompleto = `${isSelectedItem && isSelectionMode ? '✓ ' : ''}${pessoaNome} - ${diaSemana} - ${inicio} as ${fim}`;
+        }
       }
+       
+       if (idioma === 'Inglês') {
+         backgroundColor = 'linear-gradient(145deg, #3B82F6 0%, #1E40AF 60%, #1E3A8A 100%)';
+         borderColor = '#1E40AF';
+       } else if (idioma === 'Japonês') {
+         backgroundColor = 'linear-gradient(145deg, #EF4444 0%, #DC2626 60%, #B91C1C 100%)';
+         borderColor = '#DC2626';
+       } else if (idioma === 'Inglês/Japonês') {
+         backgroundColor = 'linear-gradient(145deg, #3B82F6 0%, #8B5CF6 50%, #EF4444 100%)';
+         borderColor = '#8B5CF6';
+       } else if (idioma === 'particular') {
+         backgroundColor = 'linear-gradient(145deg, #8B5CF6 0%, #7C3AED 60%, #6D28D9 100%)';
+         borderColor = '#7C3AED';
+       }
+      
+      // Aplicar cores especiais para tipos de aula
+        if (aula.tipo_aula === 'avaliativa') {
+          if (idioma === 'Inglês') {
+            backgroundColor = 'linear-gradient(145deg, #10B981 0%, #059669 30%, #3B82F6 70%, #1E40AF 100%)';
+          } else if (idioma === 'Japonês') {
+            backgroundColor = 'linear-gradient(145deg, #10B981 0%, #059669 30%, #EF4444 70%, #DC2626 100%)';
+          } else {
+            backgroundColor = 'linear-gradient(145deg, #10B981 0%, #059669 60%, #6B7280 100%)';
+          }
+          borderColor = '#059669';
+        } else if (aula.tipo_aula === 'prova_final') {
+          if (idioma === 'Inglês') {
+            backgroundColor = 'linear-gradient(145deg, #F59E0B 0%, #D97706 30%, #3B82F6 70%, #1E40AF 100%)';
+          } else if (idioma === 'Japonês') {
+            backgroundColor = 'linear-gradient(145deg, #F59E0B 0%, #D97706 30%, #EF4444 70%, #DC2626 100%)';
+          } else {
+            backgroundColor = 'linear-gradient(145deg, #F59E0B 0%, #D97706 60%, #6B7280 100%)';
+          }
+          borderColor = '#D97706';
+        }
       
       // Se estiver selecionada no modo de seleção, usar cor vermelha
       if (isSelectedItem && isSelectionMode) {
@@ -243,7 +376,7 @@ const ClassesCalendar = () => {
         borderColor = '#B91C1C';
       }
       
-      return {
+      const eventObj = {
         id: aula.id,
         title: tituloCompleto,
         start: `${aula.data}${startTime}`,
@@ -251,16 +384,37 @@ const ClassesCalendar = () => {
         backgroundColor,
         borderColor,
         textColor: '#FFFFFF',
+        classNames: ['custom-event-style'],
         extendedProps: {
           aula: aula,
           turma: aula.turmas?.nome,
           idioma: aula.turmas?.idioma,
           nivel: aula.turmas?.nivel,
+          tipo_turma: aula.turmas?.tipo_turma,
+          is_particular: isParticularByType || isParticularByIdioma || isParticularByNome,
           status: aula.status,
           descricao: aula.descricao,
           tipo_aula: aula.tipo_aula
         }
       };
+      
+      // Adiciona atributo data-idioma para CSS
+      if (aula.turmas?.idioma) {
+        if (isParticular) {
+          eventObj.classNames.push('idioma-particular');
+        } else {
+          const idiomaClass = `idioma-${aula.turmas.idioma.replace('/', '-').toLowerCase()}`;
+          eventObj.classNames.push(idiomaClass);
+          console.log(`Evento ${aula.id}: idioma=${aula.turmas.idioma}, classe=${idiomaClass}, background=${backgroundColor}`);
+        }
+      }
+      if (aula.tipo_aula === 'avaliativa') {
+        eventObj.classNames.push('tipo-avaliativa');
+      } else if (aula.tipo_aula === 'prova_final') {
+        eventObj.classNames.push('tipo-prova-final');
+      }
+      
+      return eventObj;
     });
     
     console.log('Eventos convertidos para o calendário:', events.length);
@@ -436,6 +590,7 @@ const ClassesCalendar = () => {
           <Button
             variant="default"
             size={isMobile ? "default" : "sm"}
+            onClick={() => setShowNewLessonDialog(true)}
             className={cn(
               "bg-[#D90429] hover:bg-[#B8001F] text-white transition-all duration-200",
               isMobile ? "w-full h-12 text-base" : "h-9"
@@ -577,6 +732,56 @@ const ClassesCalendar = () => {
         </Collapsible>
       </Card>
 
+      {/* Legenda das cores */}
+      <Card className="shadow-sm border border-gray-200 mb-4">
+        <CardContent className="p-4">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Legenda das Cores</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+            {/* Idiomas */}
+            <div className="space-y-2">
+              <h4 className="font-medium text-gray-600">Idiomas:</h4>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded" style={{background: 'linear-gradient(135deg, #1E40AF 0%, #0F172A 50%, #000000 100%)'}}></div>
+                <span>Inglês</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded" style={{background: 'linear-gradient(135deg, #DC2626 0%, #991B1B 50%, #450A0A 100%)'}}></div>
+                <span>Japonês</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded" style={{background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)'}}></div>
+                <span>Particular</span>
+              </div>
+            </div>
+            
+            {/* Tipos de Aula */}
+            <div className="space-y-2">
+              <h4 className="font-medium text-gray-600">Tipos de Aula:</h4>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded" style={{background: 'linear-gradient(135deg, #3B82F6, #1E40AF)'}}></div>
+                <span>Normal</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded" style={{background: 'linear-gradient(90deg, #16A34A 50%, #3B82F6 50%)'}}></div>
+                <span>📝 Avaliativa</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded" style={{background: 'linear-gradient(90deg, #8B5CF6 50%, #3B82F6 50%)'}}></div>
+                <span>🎯 Prova Final</span>
+              </div>
+            </div>
+            
+            {/* Informações adicionais */}
+            <div className="space-y-2 md:col-span-2">
+              <h4 className="font-medium text-gray-600">Informações:</h4>
+              <p className="text-gray-500">• Aulas avaliativas e provas finais combinam a cor do tipo com a cor do idioma</p>
+              <p className="text-gray-500">• Máximo de 2 eventos por dia são exibidos diretamente</p>
+              <p className="text-gray-500">• Clique em "mais eventos" para ver aulas adicionais</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Calendário FullCalendar - Otimizado para mobile */}
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
@@ -595,8 +800,8 @@ const ClassesCalendar = () => {
             "w-full",
             isMobile ? "p-3" : "p-0"
           )}>
-            <style>{`
-              /* Customização do FullCalendar com tema - Largura total */
+            <style key={`calendar-styles-${Date.now()}`}>{`
+              /* Customização do FullCalendar com tema - Largura total - Updated */
               .fc {
                 font-family: inherit;
                 width: 100% !important;
@@ -736,29 +941,141 @@ const ClassesCalendar = () => {
               }
               
               /* Eventos */
-              .fc-event {
-                border-radius: ${isMobile ? '4px' : '8px'} !important;
-                border: none !important;
-                padding: ${isMobile ? '2px 4px' : '4px 8px'} !important;
+              .fc-event,
+              .custom-event-style {
+                border-radius: ${isMobile ? '10px' : '12px'} !important;
+                border: 2px solid rgba(255,255,255,0.2) !important;
+                padding: ${isMobile ? '6px 8px' : '8px 12px'} !important;
                 margin: ${isMobile ? '1px 0' : '2px 0'} !important;
-                font-weight: 500 !important;
-                font-size: ${isMobile ? '0.625rem' : '0.875rem'} !important;
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
-                transition: all 0.3s ease !important;
+                font-weight: 600 !important;
+                font-size: ${isMobile ? '0.6875rem' : '0.8125rem'} !important;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
                 cursor: pointer !important;
-                ${isMobile ? 'min-height: 16px !important;' : ''}
+                backdrop-filter: blur(8px) !important;
+                position: relative !important;
+                ${isMobile ? 'min-height: 42px !important;' : 'min-height: 48px !important;'}
+                overflow: visible !important;
               }
               
-              .fc-event:hover {
-                ${isMobile ? '' : 'transform: translateY(-2px) scale(1.02) !important;'}
-                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25) !important;
+              .fc-event:hover,
+              .custom-event-style:hover {
+                ${isMobile ? '' : 'transform: translateY(-3px) scale(1.02) !important;'}
+                box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2), 0 4px 10px rgba(0, 0, 0, 0.15) !important;
+                border: 2px solid rgba(255,255,255,0.4) !important;
                 z-index: 10 !important;
               }
+              
+              .fc-event::before,
+              .custom-event-style::before {
+                content: '' !important;
+                position: absolute !important;
+                top: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                bottom: 0 !important;
+                background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%) !important;
+                border-radius: inherit !important;
+                pointer-events: none !important;
+                z-index: 1 !important;
+              }
+              
+              .fc-event-title,
+               .fc-event-time {
+                 position: relative !important;
+                 z-index: 2 !important;
+               }
+               
+               /* Força aplicação dos backgrounds */
+               .fc-event[style*="background"] {
+                 background-image: var(--bg-gradient) !important;
+               }
+               
+               /* Estilos específicos por idioma */
+                .fc-event.idioma-inglês {
+                  background: linear-gradient(145deg, #3B82F6 0%, #1E40AF 60%, #1E3A8A 100%) !important;
+                  border-color: #1E40AF !important;
+                }
+                
+                .fc-event.idioma-japonês {
+                  background: linear-gradient(145deg, #EF4444 0%, #DC2626 60%, #B91C1C 100%) !important;
+                  border-color: #DC2626 !important;
+                }
+                
+                .fc-event.idioma-inglês-japonês {
+                  background: linear-gradient(145deg, #3B82F6 0%, #8B5CF6 50%, #EF4444 100%) !important;
+                  border-color: #8B5CF6 !important;
+                }
+                
+                .fc-event.idioma-particular {
+                  background: linear-gradient(145deg, #7C3AED 0%, #6D28D9 60%, #5B21B6 100%) !important;
+                  border-color: #5B21B6 !important;
+                }
               
               .fc-event-title {
                 font-weight: 600 !important;
                 font-size: ${isMobile ? '0.625rem' : '0.875rem'} !important;
                 line-height: ${isMobile ? '1.2' : '1.4'} !important;
+                padding-left: ${isMobile ? '36px' : '42px'} !important;
+              }
+              .custom-event-style .aula-numero-badge {
+                position: absolute !important;
+                left: 0 !important;
+                top: 50% !important;
+                transform: translate(-50%, -50%) !important;
+                width: ${isMobile ? '22px' : '24px'} !important;
+                height: ${isMobile ? '22px' : '24px'} !important;
+                border-radius: 9999px !important;
+                background: linear-gradient(135deg, #D90429 0%, #B8001F 100%) !important;
+                color: #fff !important;
+                font-weight: 700 !important;
+                font-size: ${isMobile ? '12px' : '12px'} !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                box-shadow: 0 3px 8px rgba(0,0,0,0.25) !important;
+                z-index: 4 !important;
+              }
+              .custom-event-style.edge-left .aula-numero-badge {
+                left: 6px !important;
+                right: auto !important;
+                top: -14px !important;
+                transform: none !important;
+              }
+              .custom-event-style.edge-left .fc-event-title {
+                padding-left: ${isMobile ? '8px' : '12px'} !important;
+              }
+              .custom-event-style .aula-numero-badge.badge-blue {
+                background: linear-gradient(145deg, #3B82F6 0%, #1E40AF 60%, #1E3A8A 100%) !important;
+                box-shadow: 0 3px 8px rgba(30,64,175,0.25) !important;
+              }
+              .custom-event-style.tipo-avaliativa::after {
+                content: 'Aula Avaliativa';
+                position: absolute;
+                top: -8px;
+                right: -8px;
+                background: #059669;
+                color: #fff;
+                font-weight: 700;
+                border-radius: 9999px;
+                font-size: 12px;
+                padding: 3px 10px;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+                z-index: 3;
+              }
+              .custom-event-style.tipo-prova-final::after {
+                content: 'Prova Final';
+                position: absolute;
+                top: -8px;
+                right: -8px;
+                background: #7C3AED;
+                color: #fff;
+                font-weight: 700;
+                border-radius: 9999px;
+                font-size: 12px;
+                padding: 3px 10px;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+                z-index: 3;
               }
               
               /* Bordas das células */
@@ -779,6 +1096,7 @@ const ClassesCalendar = () => {
                 border-radius: 4px !important;
                 padding: 2px 6px !important;
                 transition: all 0.3s ease !important;
+                font-size: ${isMobile ? '0.625rem' : '0.75rem'} !important;
               }
               
               .fc-daygrid-more-link:hover {
@@ -849,8 +1167,8 @@ const ClassesCalendar = () => {
                 font-weight: 500 !important;
                 font-size: ${isMobile ? '8px' : '9px'} !important;
                 line-height: 1.1 !important;
-                min-height: ${isMobile ? '22px' : '26px'} !important;
-                max-height: ${isMobile ? '40px' : '48px'} !important;
+                min-height: ${isMobile ? '30px' : '40px'} !important;
+                max-height: ${isMobile ? '45px' : '55px'} !important;
                 display: flex !important;
                 align-items: center !important;
                 justify-content: center !important;
@@ -910,7 +1228,7 @@ const ClassesCalendar = () => {
               select={handleDateSelect}
               selectable={true}
               selectMirror={true}
-              dayMaxEvents={3}
+              dayMaxEvents={2}
               weekends={true}
               height="auto"
               locale="pt-br"
@@ -927,18 +1245,27 @@ const ClassesCalendar = () => {
               displayEventTime={false}
               dayHeaderFormat={{ weekday: 'short' }}
               eventDidMount={(info) => {
-                // Adiciona tooltip aos eventos
                 const status = info.event.extendedProps.status;
-                info.el.setAttribute('title', 
-                  `${info.event.extendedProps.turma}\nStatus: ${status}\nIdioma: ${info.event.extendedProps.idioma}\nNível: ${info.event.extendedProps.nivel}`
-                );
-                
-                // Aplica opacidade baseada no status da aula
+                const numero = numeroAulaPorId.get(String(info.event.id));
+                const base = `${info.event.extendedProps.turma}\nStatus: ${status}\nIdioma: ${info.event.extendedProps.idioma}\nNível: ${info.event.extendedProps.nivel}`;
+                info.el.setAttribute('title', numero ? `${base}\nAula: ${numero}` : base);
+                const startDate = info.event.start;
+                if (startDate && startDate.getDay() === 0) {
+                  info.el.classList.add('edge-left');
+                }
+              if (numero) {
+                const badge = document.createElement('div');
+                badge.className = 'aula-numero-badge';
+                const idioma = info.event.extendedProps.idioma;
+                if (idioma === 'Japonês') {
+                  badge.classList.add('badge-blue');
+                }
+                badge.textContent = String(numero);
+                info.el.appendChild(badge);
+              }
                 if (status === 'concluida') {
-                  // Aulas concluídas: opacidade baixa (0.4)
                   info.el.style.opacity = '0.4';
                 } else {
-                  // Aulas não concluídas (agendada, em_andamento, cancelada): opacidade total
                   info.el.style.opacity = '1';
                 }
               }}
@@ -955,6 +1282,16 @@ const ClassesCalendar = () => {
         onEdit={(aula) => {
           // TODO: Implementar edição da aula
           console.log('Editar aula:', aula);
+        }}
+      />
+
+      {/* Dialog para criar nova aula */}
+      <NewLessonDialog 
+        isOpen={showNewLessonDialog}
+        onOpenChange={setShowNewLessonDialog}
+        onSuccess={() => {
+          loadAulas();
+          setShowNewLessonDialog(false);
         }}
       />
 

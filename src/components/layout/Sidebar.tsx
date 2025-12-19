@@ -44,6 +44,7 @@ const getAllMenuItems = (permissions: ReturnType<typeof usePermissions>) => {
   if (permissions.isProfessor) {
     return [
       { icon: BookCopy, label: 'Minhas Turmas', path: '/teacher-classes', visible: permissions.canAccessTeacherClasses },
+      { icon: Users, label: 'Meus Alunos', path: '/my-students', visible: true },
       { icon: BookOpen, label: 'Aulas', path: '/lessons', visible: permissions.canAccessLessons },
     ].filter(item => item.visible);
   }
@@ -87,7 +88,7 @@ export const Sidebar = () => {
   // Verificação adicional de segurança - se professor tentar acessar rota não permitida via sidebar
   const handleNavigation = (path: string) => {
     if (permissions.isProfessor) {
-      const allowedPaths = ['/teacher-classes', '/lessons'];
+      const allowedPaths = ['/teacher-classes', '/lessons', '/my-students'];
       if (!allowedPaths.includes(path)) {
         console.warn('Tentativa de acesso não autorizado bloqueada:', path);
         return '/teacher-classes';

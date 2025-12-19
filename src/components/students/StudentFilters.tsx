@@ -11,6 +11,7 @@ export interface StudentFilters {
 interface StudentFiltersProps {
   filters: StudentFilters;
   onFilterChange: (filters: StudentFilters) => void;
+  limitToTurmaIds?: string[];
 }
 
 interface FilterOption {
@@ -18,7 +19,7 @@ interface FilterOption {
   label: string;
 }
 
-export const StudentFilters = ({ filters, onFilterChange }: StudentFiltersProps) => {
+export const StudentFilters = ({ filters, onFilterChange, limitToTurmaIds }: StudentFiltersProps) => {
   const [statusOptions, setStatusOptions] = useState<FilterOption[]>([]);
   const [idiomaOptions, setIdiomaOptions] = useState<FilterOption[]>([]);
   const [turmaOptions, setTurmaOptions] = useState<FilterOption[]>([]);
@@ -62,7 +63,12 @@ export const StudentFilters = ({ filters, onFilterChange }: StudentFiltersProps)
 
       if (turmaError) throw turmaError;
 
-      setTurmaOptions(turmaData.map(turma => ({ value: turma.id, label: turma.nome })));
+      const turmasList = (turmaData || []).map(turma => ({ value: turma.id as string, label: turma.nome as string }));
+      setTurmaOptions(
+        limitToTurmaIds && limitToTurmaIds.length > 0
+          ? turmasList.filter(t => limitToTurmaIds.includes(t.value))
+          : turmasList
+      );
 
     } catch (error) {
       console.error('Erro ao buscar opções de filtro:', error);

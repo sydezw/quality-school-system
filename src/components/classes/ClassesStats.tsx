@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { Tables } from '@/integrations/supabase/types';
 import { motion } from 'framer-motion';
 import {
@@ -93,6 +94,8 @@ const ClassesStats = () => {
   
   const [competenciaProgress, setCompetenciaProgress] = useState<CompetenciaProgress[]>([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const isProfessor = user?.cargo === 'Professor';
   
   // Estados de filtros
   const [filters, setFilters] = useState({
@@ -110,6 +113,18 @@ const ClassesStats = () => {
   const loadAulaStats = async () => {
     try {
       let query = supabase.from('aulas').select('status');
+      if (isProfessor && user?.id) {
+        const { data: minhasTurmas } = await supabase
+          .from('turmas')
+          .select('id')
+          .eq('professor_id', user.id);
+        const turmaIds = (minhasTurmas || []).map(t => t.id);
+        if (turmaIds.length === 0) {
+          setAulaStats({ total: 0, agendadas: 0, concluidas: 0, canceladas: 0, emAndamento: 0 });
+          return;
+        }
+        query = query.in('turma_id', turmaIds);
+      }
       
       // Aplicar filtros de data se definidos
       if (filters.dataInicio) {
@@ -172,6 +187,18 @@ const ClassesStats = () => {
             cor_calendario
           )
         `);
+      if (isProfessor && user?.id) {
+        const { data: minhasTurmas } = await supabase
+          .from('turmas')
+          .select('id')
+          .eq('professor_id', user.id);
+        const turmaIds = (minhasTurmas || []).map(t => t.id);
+        if (turmaIds.length === 0) {
+          setTurmaStats([]);
+          return;
+        }
+        aulaQuery = aulaQuery.in('turma_id', turmaIds);
+      }
 
       // Aplicar filtros
       if (filters.dataInicio) {
@@ -188,10 +215,21 @@ const ClassesStats = () => {
       if (aulasError) throw aulasError;
 
       // Carregar dados de alunos por turma
-      const { data: alunosData, error: alunosError } = await supabase
+      let alunosQuery = supabase
         .from('alunos')
         .select('turma_id')
         .not('turma_id', 'is', null);
+      if (isProfessor && user?.id) {
+        const { data: minhasTurmas } = await supabase
+          .from('turmas')
+          .select('id')
+          .eq('professor_id', user.id);
+        const turmaIds = (minhasTurmas || []).map(t => t.id);
+        if (turmaIds.length > 0) {
+          alunosQuery = alunosQuery.in('turma_id', turmaIds);
+        }
+      }
+      const { data: alunosData, error: alunosError } = await alunosQuery;
       
       if (alunosError) throw alunosError;
 
@@ -300,7 +338,21 @@ const ClassesStats = () => {
         return matchesDataInicio && matchesDataFim;
       }) || [];
 
-      const stats = filteredData.reduce((acc, presenca) => {
+      let finalData = filteredData;
+      if (isProfessor && user?.id) {
+        const { data: minhasTurmas } = await supabase
+          .from('turmas')
+          .select('id')
+          .eq('professor_id', user.id);
+        const turmaIds = (minhasTurmas || []).map(t => t.id);
+        if (turmaIds.length > 0) {
+          finalData = filteredData.filter(p => turmaIds.includes(p.aulas?.turma_id));
+        } else {
+          finalData = [];
+        }
+      }
+
+      const stats = finalData.reduce((acc, presenca) => {
         acc.totalPresencas++;
         
         switch (presenca.status) {
@@ -351,10 +403,22 @@ const ClassesStats = () => {
 
       if (error) throw error;
 
-      // Agrupar por competência
       const competenciaMap = new Map<string, { notas: number[], count: number }>();
+      let dados = data || [];
+      if (isProfessor && user?.id) {
+        const { data: minhasTurmas } = await supabase
+          .from('turmas')
+          .select('id')
+          .eq('professor_id', user.id);
+        const turmaIds = (minhasTurmas || []).map(t => t.id);
+        if (turmaIds.length > 0) {
+          dados = dados.filter(av => turmaIds.includes(av.alunos?.turma_id));
+        } else {
+          dados = [];
+        }
+      }
 
-      data?.forEach(avaliacao => {
+      dados.forEach(avaliacao => {
         const competencia = avaliacao.competencia;
         if (!competenciaMap.has(competencia)) {
           competenciaMap.set(competencia, { notas: [], count: 0 });
