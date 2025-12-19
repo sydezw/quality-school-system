@@ -6,7 +6,8 @@ import { Loader2 } from 'lucide-react';
 // Listas estáticas para evitar recriação a cada render
 const PROFESSOR_ALLOWED_PATHS = [
   '/teacher-classes',
-  '/lessons'
+  '/lessons',
+  '/my-students'
 ];
 
 const PROFESSOR_RESTRICTED_PATHS = [

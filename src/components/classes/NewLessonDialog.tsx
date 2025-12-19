@@ -25,7 +25,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -33,7 +33,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import DatePicker from '@/components/shared/DatePicker';
+import { TipoAulaSelector } from './TipoAulaSelector';
 import { GraduationCap, Calendar, Clock, Edit2, Check, X } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
 
 // Schema para criação de aula única
 const singleLessonSchema = z.object({
@@ -41,7 +52,6 @@ const singleLessonSchema = z.object({
   data: z.date({
     required_error: "A data da aula é obrigatória.",
   }),
-  conteudo: z.string().min(1, "O conteúdo é obrigatório.").max(500, "O conteúdo pode ter no máximo 500 caracteres."),
   semestre: z.string().min(1, "O semestre é obrigatório."),
 });
 
@@ -70,6 +80,8 @@ interface Turma {
   horario: string;
   professor_id: string | null;
   status?: string;
+  data_inicio?: string | null;
+  data_fim?: string | null;
   professores?: {
     id: string;
     nome: string;
@@ -111,14 +123,17 @@ export function NewLessonDialog({
   const [searchTerm, setSearchTerm] = useState('');
   const [showAllResults, setShowAllResults] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [singleLessonType, setSingleLessonType] = useState<'normal' | 'avaliativa' | 'prova_final'>('normal');
+  const [dateWarningMessage, setDateWarningMessage] = useState<string>('');
   const { toast } = useToast();
+  const [confirmDuplicateOpen, setConfirmDuplicateOpen] = useState(false);
+  const [semesterDuplicateConfirmed, setSemesterDuplicateConfirmed] = useState(false);
   
   // Formulário para aula única
   const singleForm = useForm<z.infer<typeof singleLessonSchema>>({
     resolver: zodResolver(singleLessonSchema),
     defaultValues: {
       turma_id: turmaId || '',
-      conteudo: '',
       data: new Date(),
       semestre: '',
     },
@@ -156,6 +171,8 @@ export function NewLessonDialog({
           horario, 
           professor_id,
           status,
+          data_inicio,
+          data_fim,
           professores:professor_id(
             id,
             nome
@@ -185,6 +202,13 @@ export function NewLessonDialog({
       fetchTurmas();
     }
   }, [dialogOpen, toast]);
+
+  // Sincronizar turma inicial quando `turmaId` é fornecido
+  useEffect(() => {
+    if (turmaId && turmas.length > 0) {
+      handleTurmaSelect(turmaId);
+    }
+  }, [turmaId, turmas]);
 
   // Resetar showAllResults quando searchTerm mudar
   useEffect(() => {
@@ -251,12 +275,12 @@ export function NewLessonDialog({
     return !!existingLesson;
   };
 
-  // Função para verificar se já existem aulas para a turma
-  const checkSemesterLessonsDuplicate = async (turmaId: string) => {
+  const checkSemesterLessonsDuplicate = async (turmaId: string, semestre: string) => {
     const { data: existingLessons, error } = await supabase
       .from('aulas')
       .select('id')
       .eq('turma_id', turmaId)
+      .eq('semestre', semestre)
       .limit(1);
 
     if (error) {
@@ -295,6 +319,32 @@ export function NewLessonDialog({
       setSelectedTurma(turma);
       singleForm.setValue('turma_id', turmaId);
       allForm.setValue('turma_id', turmaId);
+      
+      // Preencher automaticamente as datas se disponíveis
+      if (turma.data_inicio && turma.data_fim) {
+        try {
+          const dataInicio = new Date(turma.data_inicio);
+          const dataFim = new Date(turma.data_fim);
+          
+          // Preencher campos de data no formulário "all"
+          allForm.setValue('data_inicio', dataInicio);
+          allForm.setValue('data_fim', dataFim);
+          
+          // Limpar mensagem de aviso
+          setDateWarningMessage('');
+          
+          toast({
+            title: "Datas preenchidas automaticamente",
+            description: `Data de início: ${format(dataInicio, 'dd/MM/yyyy')} - Data de fim: ${format(dataFim, 'dd/MM/yyyy')}`,
+          });
+        } catch (error) {
+          console.error('Erro ao processar datas da turma:', error);
+          setDateWarningMessage('As datas da turma estão em formato inválido. Por favor, defina as datas manualmente.');
+        }
+      } else {
+        // Mostrar mensagem de aviso se as datas não estiverem definidas
+        setDateWarningMessage('Esta turma não possui datas de início e fim definidas. Por favor, defina as datas manualmente.');
+      }
     }
   };
 
@@ -333,21 +383,35 @@ export function NewLessonDialog({
     return lessons;
   };
 
-  // Atualizar aulas geradas quando dados mudarem
+  // Atualizar aulas geradas quando dados mudarem (preservando tipo_aula)
+  const dataInicio = allForm.watch('data_inicio');
+  const dataFim = allForm.watch('data_fim');
+  const numeroAulas = allForm.watch('numero_aulas');
+
   useEffect(() => {
     if (creationMode === 'all' && selectedTurma) {
-      const formData = allForm.getValues();
-      if (formData.data_inicio && formData.data_fim && formData.numero_aulas) {
-        const lessons = generateLessons(
-          formData.data_inicio,
-          formData.data_fim,
+      if (dataInicio && dataFim && numeroAulas) {
+        const baseLessons = generateLessons(
+          dataInicio,
+          dataFim,
           selectedTurma.dias_da_semana,
-          formData.numero_aulas
+          numeroAulas
         );
-        setGeneratedLessons(lessons);
+        setGeneratedLessons(prev => {
+          if (!prev || prev.length === 0) return baseLessons;
+          // Preserva o tipo_aula previamente selecionado por id
+          return baseLessons.map(newL => {
+            const old = prev.find(p => p.id === newL.id);
+            return old ? { ...newL, tipo_aula: old.tipo_aula } : newL;
+          });
+        });
       }
     }
-  }, [creationMode, selectedTurma, allForm.watch(['data_inicio', 'data_fim', 'numero_aulas'])]);
+  }, [creationMode, selectedTurma, dataInicio, dataFim, numeroAulas]);
+
+  useEffect(() => {
+    setSemesterDuplicateConfirmed(false);
+  }, [selectedTurma?.id, numeroAulas]);
 
   // Função para editar data de uma aula específica
   const handleEditLessonDate = (lessonId: string, newDate: Date) => {
@@ -379,19 +443,16 @@ export function NewLessonDialog({
         return;
       }
 
-      const { error } = await supabase
-        .from('aulas')
-        .insert({
-          turma_id: values.turma_id,
-          professor_id: selectedTurma?.professor_id || null,
-          data: format(values.data, 'yyyy-MM-dd'),
-          titulo: `Aula - ${format(values.data, 'dd/MM/yyyy')}`,
-          conteudo: values.conteudo,
-          horario_inicio: selectedTurma?.horario.split('-')[0]?.trim() || '08:00:00',
-          horario_fim: selectedTurma?.horario.split('-')[1]?.trim() || '09:00:00',
-          semestre: values.semestre,
-          tipo_aula: 'normal',
-        });
+      const { error } = await supabase.from('aulas').insert({
+        turma_id: values.turma_id,
+        data: format(values.data, 'yyyy-MM-dd'),
+        semestre: values.semestre,
+        tipo_aula: singleLessonType,
+        professor_id: selectedTurma?.professor_id || null,
+        titulo: `Aula - ${format(values.data, 'dd/MM/yyyy')}`,
+        horario_inicio: selectedTurma?.horario.split('-')[0]?.trim() || '08:00:00',
+        horario_fim: selectedTurma?.horario.split('-')[1]?.trim() || '09:00:00',
+      });
 
       if (error) throw error;
 
@@ -418,15 +479,10 @@ export function NewLessonDialog({
   const onSubmitAll = async (values: z.infer<typeof allLessonsSchema>) => {
     setIsSubmitting(true);
     try {
-      // Verificar se já existem aulas para a turma no semestre
-      const hasSemesterLessons = await checkSemesterLessonsDuplicate(values.turma_id);
-      
-      if (hasSemesterLessons) {
-        toast({
-          title: "Aulas já existem",
-          description: `Já existem aulas cadastradas para esta turma no semestre ${values.semestre}.`,
-          variant: "destructive",
-        });
+      const hasSemesterLessons = await checkSemesterLessonsDuplicate(values.turma_id, values.semestre);
+      if (hasSemesterLessons && !semesterDuplicateConfirmed) {
+        setConfirmDuplicateOpen(true);
+        setIsSubmitting(false);
         return;
       }
 
@@ -477,6 +533,7 @@ export function NewLessonDialog({
     setGeneratedLessons([]);
     setSearchTerm('');
     setCreationMode('single');
+    setSingleLessonType('normal');
     if (onSuccess) onSuccess();
   };
 
@@ -641,6 +698,13 @@ export function NewLessonDialog({
                            </CardTitle>
                          </CardHeader>
                          <CardContent>
+                            <div className="space-y-2 mb-6">
+                              <Label>Tipo de Aula</Label>
+                              <TipoAulaSelector
+                                value={singleLessonType}
+                                onChange={setSingleLessonType}
+                              />
+                            </div>
                             <Form {...singleForm}>
                               <form onSubmit={singleForm.handleSubmit(onSubmitSingle)} className="space-y-6">
                                  <div className="grid grid-cols-2 gap-6">
@@ -666,7 +730,7 @@ export function NewLessonDialog({
                           name="semestre"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-sm font-medium text-gray-700">Semestre *</FormLabel>
+                                  <FormLabel className="text-sm font-medium text-gray-700">Semestre *</FormLabel>
                               <FormControl>
                                 <Select onValueChange={field.onChange} value={field.value}>
                                   <SelectTrigger className="h-10">
@@ -687,24 +751,9 @@ export function NewLessonDialog({
                         />
                       </div>
                       
-                      <FormField
-                        control={singleForm.control}
-                        name="conteudo"
-                        render={({ field }) => (
-                          <FormItem>
-                              <FormLabel className="text-sm font-medium text-gray-700">Conteúdo da Aula</FormLabel>
-                              <FormControl>
-                                <Textarea
-                                  placeholder="Descreva o que foi ensinado na aula..."
-                                  rows={4}
-                                  {...field}
-                                  className="resize-none"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                      
+                      
+
                   
                       
                       <div className="flex justify-end gap-3 pt-6 border-t">
@@ -732,6 +781,14 @@ export function NewLessonDialog({
                            Criar Todas as Aulas
                          </CardTitle>
                        </CardHeader>
+                       
+                       {/* Mensagem de aviso sobre datas da turma */}
+                       {dateWarningMessage && (
+                         <div className="mx-6 mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                           <p className="text-sm text-yellow-800">{dateWarningMessage}</p>
+                         </div>
+                       )}
+                       
                        <CardContent>
                           <Form {...allForm}>
                             <form onSubmit={allForm.handleSubmit(onSubmitAll)} className="space-y-6">
@@ -747,6 +804,7 @@ export function NewLessonDialog({
                                   value={field.value}
                                   onChange={field.onChange}
                                   placeholder="Data de início"
+                                  disabled={!!(selectedTurma?.data_inicio && selectedTurma?.data_fim)}
                                 />
                               </FormControl>
                               <FormMessage />
@@ -764,6 +822,7 @@ export function NewLessonDialog({
                                   value={field.value}
                                   onChange={field.onChange}
                                   placeholder="Data de fim"
+                                  disabled={!!(selectedTurma?.data_inicio && selectedTurma?.data_fim)}
                                 />
                               </FormControl>
                               <FormMessage />
@@ -797,9 +856,23 @@ export function NewLessonDialog({
                                   name="semestre"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-sm font-medium text-gray-700">Semestre *</FormLabel>
+                                  <FormLabel className="text-sm font-medium text-gray-700">Semestre *</FormLabel>
                               <FormControl>
-                                <Select onValueChange={field.onChange} value={field.value}>
+                                <Select
+                                  onValueChange={async (value) => {
+                                    field.onChange(value);
+                                    setSemesterDuplicateConfirmed(false);
+                                    const turmaAtual = selectedTurma?.id || allForm.getValues('turma_id');
+                                    const num = allForm.getValues('numero_aulas');
+                                    if (turmaAtual && num && num > 0) {
+                                      const exists = await checkSemesterLessonsDuplicate(turmaAtual, value);
+                                      if (exists) {
+                                        setConfirmDuplicateOpen(true);
+                                      }
+                                    }
+                                  }}
+                                  value={field.value}
+                                >
                                   <SelectTrigger className="h-10">
                                     <SelectValue placeholder="Selecione o semestre" />
                                   </SelectTrigger>
@@ -986,6 +1059,30 @@ export function NewLessonDialog({
             </div>
           </ScrollArea>
         </div>
+        <AlertDialog open={confirmDuplicateOpen} onOpenChange={setConfirmDuplicateOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Aulas já existentes no semestre</AlertDialogTitle>
+              <AlertDialogDescription>
+                {`Esta turma já possui aulas cadastradas no semestre ${allForm.getValues('semestre')}. Deseja criar as aulas mesmo assim?`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => {
+                setConfirmDuplicateOpen(false);
+                allForm.setValue('semestre', '');
+              }}>
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={() => {
+                setConfirmDuplicateOpen(false);
+                setSemesterDuplicateConfirmed(true);
+              }}>
+                Criar mesmo assim
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );

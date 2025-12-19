@@ -1,11 +1,46 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
 import { Tables } from '@/integrations/supabase/types';
+import { useAuth } from '@/hooks/useAuth';
 
 type Aula = Tables<'aulas'>;
 type Turma = Tables<'turmas'>;
 type Usuario = Tables<'usuarios'>;
+
+type TipoAula = 'normal' | 'avaliativa' | 'prova_final' | null;
+interface AulaRowMin {
+  id: string;
+  turma_id: string;
+  data: string;
+  tipo_aula: TipoAula;
+}
+
+type PFRow = {
+  id?: string;
+  aula_id: string;
+  turma_id: string;
+  aluno_id: string;
+  data_prova: string;
+  total_questoes: number;
+  acertos: number;
+  observacao: string | null;
+  aprovacao_status: 'aprovado' | 'reprovado';
+  aprovacao_manual: boolean;
+};
+type DatabaseExt = Database & {
+  public: {
+    Tables: Database['public']['Tables'] & {
+      avaliacoes_prova_final: {
+        Row: PFRow;
+        Insert: PFRow;
+        Update: Partial<PFRow>;
+      };
+    };
+  };
+};
 
 interface TurmaComProfessor {
   id: string;
@@ -60,6 +95,8 @@ export const useAulas = (): UseAulasReturn => {
   const [error, setError] = useState<string | null>(null);
   const [totalAulas, setTotalAulas] = useState(0);
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isProfessor = user?.cargo === 'Professor';
 
   /**
    * Busca aulas com filtros opcionais
@@ -91,6 +128,21 @@ export const useAulas = (): UseAulasReturn => {
         `)
         .order('data', { ascending: false })
         .order('horario_inicio', { ascending: true });
+
+      if (isProfessor && user?.id) {
+        const { data: minhasTurmas } = await supabase
+          .from('turmas')
+          .select('id')
+          .eq('professor_id', user.id);
+        const turmaIds = (minhasTurmas || []).map(t => t.id);
+        if (turmaIds.length === 0) {
+          setAulas([]);
+          setTotalAulas(0);
+          setLoading(false);
+          return;
+        }
+        query = query.in('turma_id', turmaIds);
+      }
 
       // Aplicar filtros
       if (filtros.turmaId) {
@@ -131,6 +183,10 @@ export const useAulas = (): UseAulasReturn => {
         );
       }
 
+      if (isProfessor && user?.id) {
+        aulasProcessadas = aulasProcessadas.filter(aula => aula.turmas?.professor_id === user.id);
+      }
+
       if (filtros.idioma) {
         aulasProcessadas = aulasProcessadas.filter(aula => 
           aula.turmas?.idioma === filtros.idioma
@@ -157,7 +213,7 @@ export const useAulas = (): UseAulasReturn => {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, user?.id, user?.cargo]);
 
   /**
    * Carrega dados para os filtros (turmas e professores)
@@ -165,10 +221,16 @@ export const useAulas = (): UseAulasReturn => {
   const carregarDadosFiltros = useCallback(async () => {
     try {
       // Carregar turmas
-      const { data: turmasData, error: turmasError } = await supabase
+      let turmasQuery = supabase
         .from('turmas')
         .select('*')
         .order('nome');
+
+      if (isProfessor && user?.id) {
+        turmasQuery = turmasQuery.eq('professor_id', user.id);
+      }
+
+      const { data: turmasData, error: turmasError } = await turmasQuery;
 
       if (turmasError) throw turmasError;
       setTurmas(turmasData || []);
@@ -191,7 +253,7 @@ export const useAulas = (): UseAulasReturn => {
         variant: 'destructive',
       });
     }
-  }, [toast]);
+  }, [toast, user?.id, user?.cargo]);
 
   /**
    * Recarrega a lista de aulas
@@ -205,6 +267,43 @@ export const useAulas = (): UseAulasReturn => {
    */
   const excluirAula = useCallback(async (id: string) => {
     try {
+      const { data: aulaRow, error: aulaError } = await supabase
+        .from('aulas')
+        .select('id, turma_id, data, tipo_aula')
+        .eq('id', id)
+        .single();
+      if (aulaError) throw aulaError;
+
+      const { turma_id: turmaId, data: dataAula, tipo_aula: tipoAula } = aulaRow as AulaRowMin;
+
+      await supabase
+        .from('presencas')
+        .delete()
+        .eq('aula_id', id);
+
+      if (tipoAula === 'avaliativa' && turmaId && dataAula) {
+        await supabase
+          .from('avaliacoes_competencia')
+          .delete()
+          .eq('turma_id', turmaId)
+          .eq('data', dataAula);
+      }
+
+      if (tipoAula === 'prova_final') {
+        const sp = supabase as unknown as SupabaseClient<DatabaseExt>;
+        await sp
+          .from('avaliacoes_prova_final')
+          .delete()
+          .eq('aula_id', id);
+        if (turmaId && dataAula) {
+          await sp
+            .from('avaliacoes_prova_final')
+            .delete()
+            .eq('turma_id', turmaId)
+            .eq('data_prova', dataAula);
+        }
+      }
+
       const { error } = await supabase
         .from('aulas')
         .delete()
@@ -238,6 +337,50 @@ export const useAulas = (): UseAulasReturn => {
     if (ids.length === 0) return;
 
     try {
+      const { data: aulasRows, error: aulasSelError } = await supabase
+        .from('aulas')
+        .select('id, turma_id, data, tipo_aula')
+        .in('id', ids);
+      if (aulasSelError) throw aulasSelError;
+
+      await supabase
+        .from('presencas')
+        .delete()
+        .in('aula_id', ids);
+
+      const avaliativas = (aulasRows || []).filter((a) => (a as AulaRowMin).tipo_aula === 'avaliativa');
+      for (const a of avaliativas as AulaRowMin[]) {
+        const turmaId = a.turma_id;
+        const dataAula = a.data;
+        if (turmaId && dataAula) {
+          await supabase
+            .from('avaliacoes_competencia')
+            .delete()
+            .eq('turma_id', turmaId)
+            .eq('data', dataAula);
+        }
+      }
+
+      const provas = (aulasRows || []).filter((a) => (a as AulaRowMin).tipo_aula === 'prova_final') as AulaRowMin[];
+      if (provas.length > 0) {
+        const sp = supabase as unknown as SupabaseClient<DatabaseExt>;
+        await sp
+          .from('avaliacoes_prova_final')
+          .delete()
+          .in('aula_id', provas.map((p) => p.id));
+        for (const p of provas) {
+          const turmaId = p.turma_id;
+          const dataAula = p.data;
+          if (turmaId && dataAula) {
+            await sp
+              .from('avaliacoes_prova_final')
+              .delete()
+              .eq('turma_id', turmaId)
+              .eq('data_prova', dataAula);
+          }
+        }
+      }
+
       const { error } = await supabase
         .from('aulas')
         .delete()

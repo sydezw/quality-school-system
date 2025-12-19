@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Users, Edit, BookOpen, CheckCircle, X, UserCheck, UserX, RotateCcw, Save } from 'lucide-react';
+import { Calendar, Clock, Users, Edit, BookOpen, CheckCircle, X, UserCheck, UserX, RotateCcw, Save, Eraser } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -14,6 +14,8 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { AulaAvaliativaModal } from '@/components/classes/AulaAvaliativaModal';
+import { AulaProvaFinalModal } from '@/components/classes/AulaProvaFinalModal';
 
 // Tipos simplificados para evitar recursão
 interface AulaType {
@@ -95,258 +97,309 @@ const AulaDetailsModal: React.FC<AulaDetailsModalProps> = ({
   onClose,
   onEdit
 }) => {
+  // Guard: don't render modal content if no aula or not open
+  if (!isOpen || !aula) {
+    return null;
+  }
   const [activeTab, setActiveTab] = useState('detalhes');
   const [alunosTurma, setAlunosTurma] = useState<AlunoTurma[]>([]);
   const [presencas, setPresencas] = useState<PresencaRecord[]>([]);
-  const [presencasPendentes, setPresencasPendentes] = useState<{[alunoId: string]: 'Presente' | 'Falta' | 'Reposta'}>({});
+  const [presencasPendentes, setPresencasPendentes] = useState<{[alunoId: string]: 'Presente' | 'Falta' | 'Reposta' | null}>({});
   const [loading, setLoading] = useState(false);
   const [salvandoPresenca, setSalvandoPresenca] = useState(false);
   const [salvandoAlteracoes, setSalvandoAlteracoes] = useState(false);
+  const [tipoAulaAtual, setTipoAulaAtual] = useState<'normal' | 'avaliativa' | 'prova_final'>('normal');
+  const [alterandoTipoAula, setAlterandoTipoAula] = useState(false);
   const { toast } = useToast();
+
+  // Estado derivado: há mudanças pendentes?
+  const temAlteracoesPendentes = Object.keys(presencasPendentes).length > 0;
+
+  // Inicializa tipo de aula atual a partir da aula recebida
+  useEffect(() => {
+    if (aula?.tipo_aula) {
+      setTipoAulaAtual(aula.tipo_aula as 'normal' | 'avaliativa' | 'prova_final');
+    } else {
+      setTipoAulaAtual('normal');
+    }
+  }, [aula?.tipo_aula]);
+
+  // Carregar alunos e presenças quando abrir o modal
+  useEffect(() => {
+    const loadData = async () => {
+      if (!aula?.id || !aula?.turma_id) return;
+      setLoading(true);
+      await Promise.all([fetchAlunosTurma(), fetchPresencas()]);
+      setLoading(false);
+    };
+    if (isOpen && aula) {
+      loadData();
+    }
+  }, [isOpen, aula?.id, aula?.turma_id]);
+
+  // Buscar alunos da turma com estratégia robusta (RPC -> View -> Tabela antiga)
+  const fetchAlunosTurma = async () => {
+    if (!aula?.turma_id) return;
+    try {
+      // 1) Tenta RPC dedicada
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_turma_alunos', { turma_uuid: aula.turma_id });
+      let lista: AlunoTurma[] = [];
+      if (!rpcError && rpcData && rpcData.length > 0) {
+        lista = rpcData.map((d: any) => ({
+          id: d.aluno_turma_id || d.matricula_id || d.aluno_id,
+          aluno_id: d.aluno_id,
+          turma_id: aula.turma_id,
+          alunos: { id: d.aluno_id, nome: d.aluno_nome, cpf: d.aluno_cpf ?? null }
+        }));
+      }
+
+      // 2) Fallback: view de matrículas
+      if (lista.length === 0) {
+        const { data: viewData, error: viewError } = await supabase
+          .from('view_alunos_turmas')
+          .select('aluno_id, aluno_nome, aluno_cpf')
+          .eq('turma_id', aula.turma_id);
+        if (!viewError && viewData) {
+          lista = viewData.map((d: any) => ({
+            id: d.aluno_id,
+            aluno_id: d.aluno_id,
+            turma_id: aula.turma_id,
+            alunos: { id: d.aluno_id, nome: d.aluno_nome, cpf: d.aluno_cpf ?? null }
+          }));
+        }
+      }
+
+      // 3) Fallback: tabela antiga aluno_turma
+      if (lista.length === 0) {
+        const { data: legacyData, error: legacyError } = await supabase
+          .from('aluno_turma')
+          .select('id, aluno_id, turma_id, alunos(id, nome, cpf)')
+          .eq('turma_id', aula.turma_id);
+        if (!legacyError && legacyData) {
+          lista = (legacyData as any[]).map((d) => ({
+            id: d.id,
+            aluno_id: d.aluno_id,
+            turma_id: d.turma_id,
+            alunos: d.alunos
+          }));
+        }
+      }
+
+      // 4) Fallback final: buscar diretamente na tabela alunos usando campos turma_id/turma_particular_id
+      if (lista.length === 0) {
+        const { data: turmaInfo, error: turmaError } = await supabase
+          .from('turmas')
+          .select('tipo_turma')
+          .eq('id', aula.turma_id)
+          .single();
+        if (!turmaError && turmaInfo) {
+          const isParticular = turmaInfo.tipo_turma === 'Turma particular';
+          const { data: alunosDiretos, error: alunosError } = await supabase
+            .from('alunos')
+            .select('id, nome, cpf')
+            .or(isParticular ? `turma_particular_id.eq.${aula.turma_id}` : `turma_id.eq.${aula.turma_id}`);
+          if (!alunosError && alunosDiretos) {
+            lista = (alunosDiretos as any[]).map((aluno) => ({
+              id: aluno.id,
+              aluno_id: aluno.id,
+              turma_id: aula.turma_id,
+              alunos: { id: aluno.id, nome: aluno.nome, cpf: aluno.cpf ?? null }
+            }));
+          }
+        }
+      }
+
+      setAlunosTurma(lista);
+    } catch (err) {
+      console.error('Erro ao carregar alunos da turma:', err);
+      toast({ title: 'Erro', description: 'Falha ao carregar alunos da turma', variant: 'destructive' });
+    }
+  };
+
+  // Buscar presenças já registradas
+  const fetchPresencas = async () => {
+    if (!aula?.id) return;
+    const { data, error } = await supabase
+      .from('presencas')
+      .select('*')
+      .eq('aula_id', aula.id);
+
+    if (error) {
+      toast({ title: 'Erro', description: 'Falha ao carregar presenças', variant: 'destructive' });
+      return;
+    }
+    setPresencas((data || []) as unknown as PresencaRecord[]);
+  };
+
+  // Formatação de data
+  const formatDate = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr);
+      return format(d, 'dd/MM/yyyy', { locale: ptBR });
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  // Formatação de hora
+  const formatTime = (timeStr: string | null) => {
+    if (!timeStr) return '-';
+    const match = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (match) {
+      const hh = match[1].padStart(2, '0');
+      const mm = match[2].padStart(2, '0');
+      return `${hh}:${mm}`;
+    }
+    return '-';
+  };
+
+  // Alterar tipo de aula no Supabase
+  const alterarTipoAula = async (novoTipo: 'normal' | 'avaliativa' | 'prova_final') => {
+    if (!aula?.id) return;
+    try {
+      setAlterandoTipoAula(true);
+      const { error } = await supabase
+        .from('aulas')
+        .update({ tipo_aula: novoTipo })
+        .eq('id', aula.id);
+      if (error) throw error;
+      setTipoAulaAtual(novoTipo);
+      toast({ title: 'Tipo de aula atualizado', description: `Tipo alterado para ${novoTipo}` });
+    } catch (e: any) {
+      toast({ title: 'Erro ao alterar tipo', description: e.message || 'Falha ao salvar no banco', variant: 'destructive' });
+    } finally {
+      setAlterandoTipoAula(false);
+    }
+  };
+
+  // Obter status de presença considerando alterações pendentes
+  const getPresencaStatus = (alunoId: string) => {
+    const pendente = presencasPendentes[alunoId];
+    if (pendente) return pendente;
+    const registro = presencas.find(p => p.aluno_id === alunoId);
+    return registro?.status || null;
+  };
+
+  // Classes visuais por status
+  const getStatusColor = (status: 'Presente' | 'Falta' | 'Reposta') => {
+    switch (status) {
+      case 'Presente':
+        return 'bg-green-100 text-green-700';
+      case 'Falta':
+        return 'bg-red-100 text-red-700';
+      case 'Reposta':
+        return 'bg-blue-100 text-blue-700';
+      default:
+        return '';
+    }
+  };
+
+  // Ícone por status
+  const getStatusIcon = (status: 'Presente' | 'Falta' | 'Reposta') => {
+    switch (status) {
+      case 'Presente':
+        return <UserCheck className="h-3 w-3" />;
+      case 'Falta':
+        return <UserX className="h-3 w-3" />;
+      case 'Reposta':
+        return <RotateCcw className="h-3 w-3" />;
+      default:
+        return null;
+    }
+  };
+
+  // Marcar presença localmente (pendente)
+  const marcarPresenca = (
+    alunoId: string,
+    alunoTurmaId: string,
+    status: 'Presente' | 'Falta' | 'Reposta'
+  ) => {
+    setPresencasPendentes(prev => ({ ...prev, [alunoId]: status }));
+  };
+
+  // Limpar presença (pendente)
+  const limparPresenca = (alunoId: string) => {
+    setPresencasPendentes(prev => {
+      const { [alunoId]: _, ...rest } = prev;
+      return rest;
+    });
+  };
+
+  // Persistir alterações de presença
+  const salvarAlteracoes = async () => {
+    if (!aula?.id) return;
+    try {
+      setSalvandoAlteracoes(true);
+      // Para cada aluno alterado, insere/atualiza o registro
+      for (const [alunoId, novoStatus] of Object.entries(presencasPendentes)) {
+        // Buscar registro existente
+        const { data: existentes, error: selectError } = await supabase
+          .from('presencas')
+          .select('*')
+          .eq('aula_id', aula.id)
+          .eq('aluno_id', alunoId)
+          .limit(1);
+        if (selectError) throw selectError;
+
+        const existente = existentes?.[0] as PresencaRecord | undefined;
+
+        if (!novoStatus) {
+          // Se for limpeza, remove registro se existir
+          if (existente?.id) {
+            const { error: deleteError } = await supabase
+              .from('presencas')
+              .delete()
+              .eq('id', existente.id);
+            if (deleteError) throw deleteError;
+          }
+          continue;
+        }
+
+        if (existente?.id) {
+          const { error: updateError } = await supabase
+            .from('presencas')
+            .update({ status: novoStatus })
+            .eq('id', existente.id);
+          if (updateError) throw updateError;
+        } else {
+          const { error: insertError } = await supabase
+            .from('presencas')
+            .insert({ aula_id: aula.id, aluno_id: alunoId, status: novoStatus });
+          if (insertError) throw insertError;
+        }
+      }
+
+      // Recarregar lista e limpar pendências
+      await fetchPresencas();
+      setPresencasPendentes({});
+      toast({ title: 'Presenças salvas', description: 'Alterações aplicadas com sucesso.' });
+    } catch (e: any) {
+      toast({ title: 'Erro ao salvar', description: e.message || 'Falha ao persistir presença', variant: 'destructive' });
+    } finally {
+      setSalvandoAlteracoes(false);
+    }
+  };
 
   // Verificar se é uma aula especial (avaliativa ou prova final)
   const isSpecialLesson = aula?.tipo_aula === 'avaliativa' || aula?.tipo_aula === 'prova_final';
   
   // Renderizar modal especial para aulas avaliativas e provas finais
   if (isSpecialLesson) {
-    const tipoAula = aula?.tipo_aula === 'avaliativa' ? 'Avaliativa' : 'Prova Final';
-    const corTema = aula?.tipo_aula === 'avaliativa' ? 'green' : 'blue';
-    
+    if (aula?.tipo_aula === 'avaliativa') {
+      return (
+        <AulaAvaliativaModal aula={aula} isOpen={isOpen} onClose={onClose} />
+      );
+    }
     return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-md mx-auto">
-          <DialogHeader>
-            <DialogTitle className={`text-center text-xl font-bold ${
-              aula?.tipo_aula === 'avaliativa' ? 'text-green-700' : 'text-blue-700'
-            }`}>
-              Aula {tipoAula}
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="flex flex-col items-center justify-center py-8 space-y-4">
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
-              aula?.tipo_aula === 'avaliativa' ? 'bg-green-100' : 'bg-blue-100'
-            }`}>
-              <BookOpen className={`w-8 h-8 ${
-                aula?.tipo_aula === 'avaliativa' ? 'text-green-600' : 'text-blue-600'
-              }`} />
-            </div>
-            
-            <div className="text-center space-y-2">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Modal em Desenvolvimento
-              </h3>
-              <p className="text-sm text-gray-600">
-                O modal específico para aulas {tipoAula.toLowerCase()}s ainda está em criação.
-              </p>
-              <p className="text-xs text-gray-500">
-                Rota futura: <code className={`px-2 py-1 rounded ${
-                  aula?.tipo_aula === 'avaliativa' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'
-                }`}>
-                  /components/classes/{aula?.tipo_aula === 'avaliativa' ? 'AulaAvaliativaModal.tsx' : 'AulaProvaFinalModal.tsx'}
-                </code>
-              </p>
-            </div>
-            
-            <Button 
-              onClick={onClose}
-              className={`mt-4 ${
-                aula?.tipo_aula === 'avaliativa' 
-                  ? 'bg-green-600 hover:bg-green-700' 
-                  : 'bg-blue-600 hover:bg-blue-700'
-              }`}
-            >
-              Fechar
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <AulaProvaFinalModal aula={aula} isOpen={isOpen} onClose={onClose} />
     );
   }
-
-  // Função para formatar data
-  const formatDate = (dateString: string) => {
-    return format(new Date(dateString), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
-  };
-
-  // Função para formatar horário
-  const formatTime = (timeString: string) => {
-    return timeString.slice(0, 5);
-  };
-
-  // Carregar alunos da turma e presenças existentes
-  useEffect(() => {
-    if (aula && isOpen) {
-      carregarDadosPresenca();
-    }
-  }, [aula, isOpen]);
-
-  const carregarDadosPresenca = async () => {
-    if (!aula?.turmas?.id) return;
-
-    setLoading(true);
-    try {
-      // Carregar alunos da turma
-      const { data: alunosData, error: alunosError } = await supabase
-        .from('aluno_turma')
-        .select(`
-          id,
-          aluno_id,
-          turma_id,
-          alunos (
-            id,
-            nome,
-            cpf
-          )
-        `)
-        .eq('turma_id', aula.turmas.id);
-
-      if (alunosError) throw alunosError;
-
-      setAlunosTurma(alunosData || []);
-
-      // Carregar presenças existentes para esta aula
-      const { data: presencasData, error: presencasError } = await supabase
-        .from('presencas')
-        .select('*')
-        .eq('aula_id', aula.id);
-
-      if (presencasError) throw presencasError;
-
-      setPresencas(presencasData || []);
-    } catch (error) {
-      console.error('Erro ao carregar dados de presença:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar dados de presença.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Função para obter status de presença de um aluno
-  const getPresencaStatus = (alunoId: string): 'Presente' | 'Falta' | 'Reposta' | null => {
-    // Verificar primeiro se há alteração pendente
-    if (presencasPendentes[alunoId]) {
-      return presencasPendentes[alunoId];
-    }
-    // Caso contrário, usar o status salvo
-    const presenca = presencas.find(p => p.aluno_id === alunoId);
-    return presenca?.status || null;
-  };
-
-  // Função para marcar presença (apenas localmente)
-  const marcarPresenca = (alunoId: string, alunoTurmaId: string, status: 'Presente' | 'Falta' | 'Reposta') => {
-    setPresencasPendentes(prev => ({
-      ...prev,
-      [alunoId]: status
-    }));
-  };
-
-  // Função para salvar todas as alterações
-  const salvarAlteracoes = async () => {
-    if (!aula || Object.keys(presencasPendentes).length === 0) return;
-
-    setSalvandoAlteracoes(true);
-    try {
-      const operacoes = [];
-
-      for (const [alunoId, status] of Object.entries(presencasPendentes)) {
-        const presencaExistente = presencas.find(p => p.aluno_id === alunoId);
-        const alunoTurma = alunosTurma.find(at => at.aluno_id === alunoId);
-
-        if (presencaExistente) {
-          // Atualizar presença existente
-          operacoes.push(
-            supabase
-              .from('presencas')
-              .update({ status })
-              .eq('id', presencaExistente.id)
-          );
-        } else if (alunoTurma) {
-          // Criar nova presença
-          operacoes.push(
-            supabase
-              .from('presencas')
-              .insert({
-                aula_id: aula.id,
-                aluno_id: alunoId,
-                aluno_turma_id: alunoTurma.id,
-                status
-              })
-          );
-        }
-      }
-
-      // Executar todas as operações
-      const resultados = await Promise.all(operacoes);
-      
-      // Verificar se houve erros
-      const erros = resultados.filter(r => r.error);
-      if (erros.length > 0) {
-        throw new Error('Erro ao salvar algumas presenças');
-      }
-
-      // Recarregar dados após salvar
-      await carregarDadosPresenca();
-      
-      // Limpar alterações pendentes
-      setPresencasPendentes({});
-
-      toast({
-        title: "Sucesso",
-        description: `${Object.keys(presencasPendentes).length} presença(s) salva(s) com sucesso.`,
-      });
-    } catch (error) {
-      console.error('Erro ao salvar alterações:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao salvar alterações de presença.",
-        variant: "destructive",
-      });
-    } finally {
-      setSalvandoAlteracoes(false);
-    }
-  };
-
-  // Verificar se há alterações pendentes
-  const temAlteracoesPendentes = Object.keys(presencasPendentes).length > 0;
-
-  // Função para obter cor do status
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Presente':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'Falta':
-        return 'bg-red-100 text-red-800 border-red-200';
-      case 'Reposta':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  // Função para obter ícone do status
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'Presente':
-        return <UserCheck className="h-4 w-4" />;
-      case 'Falta':
-        return <UserX className="h-4 w-4" />;
-      case 'Reposta':
-        return <RotateCcw className="h-4 w-4" />;
-      default:
-        return null;
-    }
-  };
-
-  if (!aula) return null;
-
+  const tipoAula = aula?.tipo_aula === 'avaliativa' ? 'Avaliativa' : 'Prova Final';
+  const corTema = aula?.tipo_aula === 'avaliativa' ? 'green' : 'blue';
+  
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden border-0 shadow-2xl bg-gradient-to-br from-white to-gray-50">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto border-0 shadow-2xl bg-gradient-to-br from-white to-gray-50">
         <TooltipProvider>
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -366,7 +419,7 @@ const AulaDetailsModal: React.FC<AulaDetailsModalProps> = ({
                   <Calendar className="h-5 w-5 text-white" />
                 </div>
                 <span className="bg-gradient-to-r from-[#D90429] to-[#B8001F] bg-clip-text text-transparent font-bold">
-                  {aula.titulo || 'Detalhes da Aula'}
+                  {aula?.titulo ?? 'Detalhes da Aula'}
                 </span>
               </DialogTitle>
             </motion.div>
@@ -377,7 +430,7 @@ const AulaDetailsModal: React.FC<AulaDetailsModalProps> = ({
               <TabsTrigger 
                 value="detalhes" 
                 className={cn(
-                   "flex items-center gap-2 px-3 py-2 rounded-lg font-semibold transition-all duration-300 ease-in-out transform",
+                   "flex items-center gap-2 px-3 py-2 rounded-lg font-semibold transition-all duração-300 ease-in-out transform",
                   "hover:scale-102 hover:shadow-md",
                   "data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#D90429] data-[state=active]:to-[#B8001F]",
                    "data-[state=active]:text-white data-[state=active]:shadow-2xl data-[state=active]:scale-102",
@@ -398,13 +451,13 @@ const AulaDetailsModal: React.FC<AulaDetailsModalProps> = ({
               <TabsTrigger 
                 value="presenca" 
                 className={cn(
-                   "flex items-center gap-2 px-3 py-2 rounded-lg font-semibold transition-all duration-300 ease-in-out transform",
+                   "flex items-center gap-2 px-3 py-2 rounded-lg font-semibold transition-all duração-300 ease-in-out transform",
                   "hover:scale-102 hover:shadow-md",
                   "data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#D90429] data-[state=active]:to-[#B8001F]",
                    "data-[state=active]:text-white data-[state=active]:shadow-2xl data-[state=active]:scale-102",
                    "data-[state=active]:ring-2 data-[state=active]:ring-[#D90429] data-[state=active]:ring-opacity-50",
                    "data-[state=active]:border data-[state=active]:border-[#B8001F]",
-                   "data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:text-[#D90429]",
+                  "data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:text-[#D90429]",
                   "data-[state=inactive]:hover:bg-white data-[state=inactive]:hover:shadow-sm"
                 )}
               >
@@ -441,34 +494,12 @@ const AulaDetailsModal: React.FC<AulaDetailsModalProps> = ({
                       whileHover={{ scale: 1.02 }}
                       transition={{ duration: 0.2 }}
                     >
-                      <label className="text-sm font-semibold text-[#D90429] uppercase tracking-wide">Status</label>
-                      <div className="p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
-                        <Badge 
-                          variant={aula.status === 'concluida' ? 'default' : 'secondary'}
-                          className={`${
-                            aula.status === 'concluida' 
-                              ? 'bg-gradient-to-r from-green-500 to-green-600 text-white' 
-                              : aula.status === 'cancelada'
-                              ? 'bg-gradient-to-r from-red-500 to-red-600 text-white'
-                              : 'bg-gradient-to-r from-[#D90429] to-[#B8001F] text-white'
-                          } font-medium px-3 py-1`}
-                        >
-                          {aula.status}
-                        </Badge>
-                      </div>
-                    </motion.div>
-                    
-                    <motion.div 
-                      className="space-y-2"
-                      whileHover={{ scale: 1.02 }}
-                      transition={{ duration: 0.2 }}
-                    >
                       <label className="text-sm font-semibold text-[#D90429] uppercase tracking-wide flex items-center gap-2">
                         <Calendar className="h-4 w-4" />
                         Data
                       </label>
                       <div className="p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
-                        <p className="text-gray-900 font-medium">{formatDate(aula.data)}</p>
+                        <p className="text-gray-900 font-medium">{aula?.data ? formatDate(aula.data) : '-'}</p>
                       </div>
                     </motion.div>
                     
@@ -483,7 +514,7 @@ const AulaDetailsModal: React.FC<AulaDetailsModalProps> = ({
                       </label>
                       <div className="p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
                         <p className="text-gray-900 font-medium">
-                          {formatTime(aula.horario_inicio)} - {formatTime(aula.horario_fim)}
+                          {formatTime(aula?.horario_inicio ?? null)} - {formatTime(aula?.horario_fim ?? null)}
                         </p>
                       </div>
                     </motion.div>
@@ -498,7 +529,7 @@ const AulaDetailsModal: React.FC<AulaDetailsModalProps> = ({
                         Turma
                       </label>
                       <div className="p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
-                        <p className="text-gray-900 font-medium">{aula.turmas?.nome}</p>
+                        <p className="text-gray-900 font-medium">{aula?.turmas?.nome ?? '-'}</p>
                       </div>
                     </motion.div>
                     
@@ -510,7 +541,7 @@ const AulaDetailsModal: React.FC<AulaDetailsModalProps> = ({
                       <label className="text-sm font-semibold text-[#D90429] uppercase tracking-wide">Idioma/Nível</label>
                       <div className="p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
                         <p className="text-gray-900 font-medium">
-                          {aula.turmas?.idioma} - {aula.turmas?.nivel}
+                          {aula?.turmas?.idioma ?? '-'} - {aula?.turmas?.nivel ?? '-'}
                         </p>
                       </div>
                     </motion.div>
@@ -523,27 +554,70 @@ const AulaDetailsModal: React.FC<AulaDetailsModalProps> = ({
                       <label className="text-sm font-semibold text-[#D90429] uppercase tracking-wide">Professor</label>
                       <div className="p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
                         <p className="text-gray-900 font-medium">
-                          {aula.turmas?.professores?.nome || 'Não definido'}
+                          {aula?.turmas?.professores?.nome || 'Não definido'}
                         </p>
                       </div>
                     </motion.div>
                   </div>
 
-                  {/* Conteúdo */}
-                  {aula.conteudo && (
-                    <motion.div 
-                      className="space-y-2"
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.4, delay: 0.4 }}
-                      whileHover={{ scale: 1.01 }}
-                    >
-                      <label className="text-sm font-semibold text-[#D90429] uppercase tracking-wide">Conteúdo</label>
-                      <div className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
-                        <p className="text-gray-900 leading-relaxed">{aula.conteudo}</p>
-                      </div>
-                    </motion.div>
-                  )}
+                  {/* Tipo de Aula */}
+                  <motion.div 
+                    className="space-y-4"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.3 }}
+                  >
+                    <label className="text-sm font-semibold text-[#D90429] uppercase tracking-wide">Tipo de Aula</label>
+                    <div className="flex flex-wrap gap-3">
+                      <Button
+                        variant={tipoAulaAtual === 'normal' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => alterarTipoAula('normal')}
+                        disabled={alterandoTipoAula}
+                        className={cn(
+                          "transition-all duration-200",
+                          tipoAulaAtual === 'normal' 
+                            ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg" 
+                            : "hover:bg-blue-50 hover:border-blue-300"
+                        )}
+                      >
+                        <BookOpen className="h-4 w-4 mr-2" />
+                        Normal
+                      </Button>
+                      <Button
+                        variant={tipoAulaAtual === 'avaliativa' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => alterarTipoAula('avaliativa')}
+                        disabled={alterandoTipoAula}
+                        className={cn(
+                          "transition-all duration-200",
+                          tipoAulaAtual === 'avaliativa' 
+                            ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg" 
+                            : "hover:bg-orange-50 hover:border-orange-300"
+                        )}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Avaliativa
+                      </Button>
+                      <Button
+                        variant={tipoAulaAtual === 'prova_final' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => alterarTipoAula('prova_final')}
+                        disabled={alterandoTipoAula}
+                        className={cn(
+                          "transition-all duration-200",
+                          tipoAulaAtual === 'prova_final' 
+                            ? "bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg" 
+                            : "hover:bg-red-50 hover:border-red-300"
+                        )}
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        Prova Final
+                      </Button>
+                    </div>
+                  </motion.div>
+
+                  {/* Conteúdo removido */}
 
                   {/* Descrição */}
                   {aula.descricao && (
@@ -591,134 +665,151 @@ const AulaDetailsModal: React.FC<AulaDetailsModalProps> = ({
                         </div>
                       ) : (
                         <div className="space-y-4">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Aluno</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Ações</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {alunosTurma.map((alunoTurma) => {
-                                const status = getPresencaStatus(alunoTurma.aluno_id);
-                                return (
-                                  <TableRow key={alunoTurma.id}>
-                                    <TableCell>
-                                      <div>
-                                        <p className="font-medium">{alunoTurma.alunos.nome}</p>
-                                        <p className="text-sm text-gray-500">{alunoTurma.alunos.cpf}</p>
-                                      </div>
-                                    </TableCell>
-                                    <TableCell>
-                                      {status ? (
-                                        <Badge className={cn(
-                                          "flex items-center gap-1 w-fit",
-                                          getStatusColor(status)
-                                        )}>
-                                          {getStatusIcon(status)}
-                                          {status}
-                                        </Badge>
-                                      ) : (
-                                        <Badge variant="outline">Não marcado</Badge>
-                                      )}
-                                    </TableCell>
-                                    <TableCell>
-                                      <div className="flex gap-1">
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button
-                                              size="sm"
-                                              variant={status === 'Presente' ? 'default' : 'outline'}
-                                              className={cn(
-                                                "h-8 px-2",
-                                                status === 'Presente' && "bg-green-600 hover:bg-green-700"
-                                              )}
-                                              onClick={() => marcarPresenca(alunoTurma.aluno_id, alunoTurma.id, 'Presente')}
-                                              disabled={salvandoAlteracoes}
-                                            >
-                                              <UserCheck className="h-3 w-3" />
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent>
-                                            <p>Marcar como presente</p>
-                                          </TooltipContent>
-                                        </Tooltip>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button
-                                              size="sm"
-                                              variant={status === 'Falta' ? 'default' : 'outline'}
-                                              className={cn(
-                                                "h-8 px-2",
-                                                status === 'Falta' && "bg-red-600 hover:bg-red-700"
-                                              )}
-                                              onClick={() => marcarPresenca(alunoTurma.aluno_id, alunoTurma.id, 'Falta')}
-                                              disabled={salvandoAlteracoes}
-                                            >
-                                              <UserX className="h-3 w-3" />
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent>
-                                            <p>Marcar como falta</p>
-                                          </TooltipContent>
-                                        </Tooltip>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button
-                                              size="sm"
-                                              variant={status === 'Reposta' ? 'default' : 'outline'}
-                                              className={cn(
-                                                "h-8 px-2",
-                                                status === 'Reposta' && "bg-blue-600 hover:bg-blue-700"
-                                              )}
-                                              onClick={() => marcarPresenca(alunoTurma.aluno_id, alunoTurma.id, 'Reposta')}
-                                              disabled={salvandoAlteracoes}
-                                            >
-                                              <RotateCcw className="h-3 w-3" />
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent>
-                                            <p>Marcar como reposta (falta justificada)</p>
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      </div>
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                            </TableBody>
-                          </Table>
+                          <div className="max-h-[60vh] overflow-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Aluno</TableHead>
+                                  <TableHead>Status</TableHead>
+                                  <TableHead>Ações</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {alunosTurma.map((alunoTurma) => {
+                                  const status = getPresencaStatus(alunoTurma.aluno_id);
+                                  return (
+                                    <TableRow key={alunoTurma.id}>
+                                      <TableCell>
+                                        <div>
+                                          <p className="font-medium">{alunoTurma.alunos.nome}</p>
+                                          <p className="text-sm text-gray-500">{alunoTurma.alunos.cpf}</p>
+                                        </div>
+                                      </TableCell>
+                                      <TableCell>
+                                        {status ? (
+                                          <Badge className={cn(
+                                            "flex items-center gap-1 w-fit",
+                                            getStatusColor(status)
+                                          )}>
+                                            {getStatusIcon(status)}
+                                            {status}
+                                          </Badge>
+                                        ) : (
+                                          <Badge variant="outline">Não marcado</Badge>
+                                        )}
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="flex gap-1">
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Button
+                                                size="sm"
+                                                variant={status === 'Presente' ? 'default' : 'outline'}
+                                                className={cn(
+                                                  "h-8 px-2",
+                                                  status === 'Presente' && "bg-green-600 hover:bg-green-700"
+                                                )}
+                                                onClick={() => marcarPresenca(alunoTurma.aluno_id, alunoTurma.id, 'Presente')}
+                                                disabled={salvandoAlteracoes}
+                                              >
+                                                <UserCheck className="h-3 w-3" />
+                                              </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              <p>Marcar como presente</p>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Button
+                                                size="sm"
+                                                variant={status === 'Falta' ? 'default' : 'outline'}
+                                                className={cn(
+                                                  "h-8 px-2",
+                                                  status === 'Falta' && "bg-red-600 hover:bg-red-700"
+                                                )}
+                                                onClick={() => marcarPresenca(alunoTurma.aluno_id, alunoTurma.id, 'Falta')}
+                                                disabled={salvandoAlteracoes}
+                                              >
+                                                <UserX className="h-3 w-3" />
+                                              </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              <p>Marcar como falta</p>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Button
+                                                size="sm"
+                                                variant={status === 'Reposta' ? 'default' : 'outline'}
+                                                className={cn(
+                                                  "h-8 px-2",
+                                                  status === 'Reposta' && "bg-blue-600 hover:bg-blue-700"
+                                                )}
+                                                onClick={() => marcarPresenca(alunoTurma.aluno_id, alunoTurma.id, 'Reposta')}
+                                                disabled={salvandoAlteracoes}
+                                              >
+                                                <RotateCcw className="h-3 w-3" />
+                                              </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              <p>Marcar como reposta (falta justificada)</p>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                          {status && (
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Button
+                                                  size="sm"
+                                                  variant="outline"
+                                                  className="h-8 px-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                                                  onClick={() => limparPresenca(alunoTurma.aluno_id)}
+                                                  disabled={salvandoAlteracoes}
+                                                >
+                                                  <Eraser className="h-3 w-3" />
+                                                </Button>
+                                              </TooltipTrigger>
+                                              <TooltipContent>
+                                                <p>Limpar presença</p>
+                                              </TooltipContent>
+                                            </Tooltip>
+                                          )}
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                          </div>
                           
-                          {/* Botão de Salvar Alterações */}
-                          {temAlteracoesPendentes && (
-                            <motion.div 
-                              className="flex justify-end mt-4"
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ duration: 0.3 }}
-                            >
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    onClick={salvarAlteracoes}
-                                    disabled={salvandoAlteracoes}
-                                    className="bg-[#D90429] hover:bg-[#B8001F] text-white flex items-center gap-2"
-                                  >
-                                    {salvandoAlteracoes ? (
-                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                    ) : (
-                                      <Save className="h-4 w-4" />
-                                    )}
-                                    {salvandoAlteracoes ? 'Salvando...' : `Salvar ${Object.keys(presencasPendentes).length} Alteração(ões)`}
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Salvar todas as alterações de presença</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </motion.div>
-                          )}
+                          <motion.div 
+                            className="sticky bottom-0 bg-white pt-3 border-t flex justify-end mt-4"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3 }}
+                          >
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  onClick={salvarAlteracoes}
+                                  disabled={salvandoAlteracoes || !temAlteracoesPendentes}
+                                  className="bg-[#D90429] hover:bg-[#B8001F] text-white flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {salvandoAlteracoes ? (
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                  ) : (
+                                    <Save className="h-4 w-4" />
+                                  )}
+                                  {salvandoAlteracoes ? 'Salvando...' : `Salvar ${Object.keys(presencasPendentes).length} Alteração(ões)`}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Salvar todas as alterações de presença</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </motion.div>
                         </div>
                       )}
                     </CardContent>
@@ -757,7 +848,7 @@ const AulaDetailsModal: React.FC<AulaDetailsModalProps> = ({
                 <Button 
                   variant="outline" 
                   onClick={() => onEdit(aula)}
-                  className="flex items-center gap-2 border-[#D90429] text-[#D90429] hover:bg-[#D90429] hover:text-white transition-all duration-300 shadow-lg hover:shadow-xl"
+                  className="flex items-center gap-2 border-[#D90429] text-[#D90429] hover:bg-[#D90429] hover:text-white transition-all duração-300 shadow-lg hover:shadow-xl"
                 >
                   <Edit className="h-4 w-4" />
                   Editar Aula

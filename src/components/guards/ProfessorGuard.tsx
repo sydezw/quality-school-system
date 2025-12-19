@@ -24,6 +24,7 @@ export interface PermissionsContextType {
   canAccessBirthdays: boolean;
   canAccessApproveLogins: boolean;
   canAccessTeacherClasses: boolean; // Específico para professores
+  canAccessMyStudents: boolean;
   isProfessor: boolean;
   isAdmin: boolean;
 }
@@ -69,6 +70,7 @@ export function ProfessorGuard({ children }: ProfessorGuardProps) {
       canAccessBirthdays: !isProfessor,
       canAccessApproveLogins: !isProfessor,
       canAccessTeacherClasses: isProfessor, // Apenas professores podem acessar "Minhas Turmas"
+      canAccessMyStudents: isProfessor,
       isProfessor,
       isAdmin
     };
