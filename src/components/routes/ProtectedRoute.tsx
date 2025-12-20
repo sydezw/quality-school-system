@@ -59,7 +59,7 @@ export function ProtectedRoute({ children, requiresProfessor = false }: Protecte
 
   const isProfessor = user.cargo === 'Professor';
   const isAdmin = user.cargo === 'Admin';
-  const currentPath = location.pathname;
+  const currentPath = (location.pathname.replace(/\/$/, '') || '/');
 
   // Se a rota requer professor e o usuário não é professor
   if (requiresProfessor && !isProfessor) {

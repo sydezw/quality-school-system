@@ -12,11 +12,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, BookCopy, Calendar, Clock, Globe, Book, Users, GraduationCap, AlertTriangle, CheckCircle, X, CalendarDays, Search, ChevronLeft, ChevronRight, Lock, Unlock } from 'lucide-react';
+import { Plus, Edit, Trash2, BookCopy, Calendar, Clock, Globe, Book, Users, GraduationCap, AlertTriangle, CheckCircle, X, CalendarDays, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { getIdiomaColor } from '@/utils/idiomaColors';
 import { calculateEndDate, calculateEndDateWithHolidays, parseDaysOfWeek, formatDateForDisplay, isHoliday } from '@/utils/dateCalculations';
 import HolidayModal from '@/components/classes/HolidayModal';
+import DatePicker from '@/components/shared/DatePicker';
+import { formatarDataParaISO, criarDataDeString } from '@/utils/dateUtils';
 
 interface Class {
   id: string;
@@ -83,8 +85,6 @@ const Classes = () => {
   const [classDataInicio, setClassDataInicio] = useState<string>('');
   const [classDataFim, setClassDataFim] = useState<string>('');
   
-  // Estado para controlar se a data de fim está travada
-  const [isDataFimLocked, setIsDataFimLocked] = useState<boolean>(false);
   const { toast } = useToast();
 
   const { register, handleSubmit, reset, setValue, watch, getValues, control, formState: { errors } } = useForm({
@@ -316,12 +316,6 @@ const Classes = () => {
       
       setCalculatedEndDate(result.endDate);
       setDetectedHolidays(result.holidaysFound);
-      
-      // Atualizar o campo data_fim apenas se não foi editado manualmente e não está travado
-      if (!isDataFimLocked && (!watchedDataFim || watchedDataFim === calculatedEndDate)) {
-        setValue('data_fim', result.endDate);
-      }
-      
       // Mostrar modal se feriados foram detectados
       if (result.holidaysFound.length > 0) {
         setIsHolidayModalOpen(true);
@@ -329,9 +323,6 @@ const Classes = () => {
     } else {
       setCalculatedEndDate('');
       setDetectedHolidays([]);
-      if (!isDataFimLocked && !watchedDataFim) {
-        setValue('data_fim', '');
-      }
     }
   }, [watchedDataInicio, watchedTotalAulas, selectedDays, selectedClassForStudents, watchedDataFim, calculatedEndDate, setValue]);
 
@@ -793,8 +784,11 @@ const Classes = () => {
           materiais_ids: selectedMaterials.length > 0 ? selectedMaterials : [],
           nivel: data.nivel,
           tipo_turma: data.tipo_turma || 'Turma',
-          status: 'ativa'
-          // Campos ignorados: data_inicio, data_fim, total_aulas, plano_id
+          status: 'ativa',
+          data_inicio: data.data_inicio || null,
+          data_fim: data.data_fim || null,
+          total_aulas: data.total_aulas ? parseInt(data.total_aulas) : null,
+          plano_id: selectedPlan && selectedPlan !== 'none' ? selectedPlan : null
         };
 
         const { error } = await supabase
@@ -823,7 +817,6 @@ const Classes = () => {
       setSelectedPlan('');
       setClassDataInicio('');
       setClassDataFim('');
-      setIsDataFimLocked(false); // Reset do estado de trava
       
       // Recarregar lista de turmas
       await fetchClasses();
@@ -930,9 +923,7 @@ const Classes = () => {
       data_fim: classItem.data_fim || ''
     });
     
-    // Determinar estado de trava baseado se a turma tem data_fim definida
-    const hasExistingEndDate = classItem.data_fim && classItem.data_fim.trim() !== '';
-    setIsDataFimLocked(hasExistingEndDate);
+    // Removido sistema de trava automática da data de fim
     
     setIsStudentsDialogOpen(true);
     await fetchClassStudents(classItem.id);
@@ -1367,10 +1358,7 @@ const Classes = () => {
       setCalculatedEndDate(endDate);
     }
     
-    // Determinar estado de trava baseado se a turma tem data_fim definida no banco
-    // Se a turma já tem data_fim salva, inicia como travada para preservar o valor manual
-    const hasExistingEndDate = classItem.data_fim && classItem.data_fim.trim() !== '';
-    setIsDataFimLocked(hasExistingEndDate);
+    // Removido sistema de trava automática da data de fim
     
     setIsDialogOpen(true);
   };
@@ -1400,7 +1388,7 @@ const Classes = () => {
     setSelectedPlan('');
     setClassDataInicio('');
     setClassDataFim('');
-    setIsDataFimLocked(false); // Reset do estado de trava
+    // Removido sistema de trava automática da data de fim
     
     // Abrir o modal
     setIsDialogOpen(true);
@@ -1882,6 +1870,109 @@ const Classes = () => {
                 </div>
               </div>
               
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Configurações da Turma</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="total_aulas" className="text-sm font-medium text-gray-700">
+                      Total de Aulas *
+                      {selectedPlan && selectedPlan !== 'none' && (
+                        <span className="text-xs text-green-600 ml-1">(Do plano selecionado)</span>
+                      )}
+                    </Label>
+                    <Input
+                      id="total_aulas"
+                      type="number"
+                      min="0"
+                      max="100"
+                      {...register('total_aulas', {
+                        required: 'Total de aulas é obrigatório',
+                        min: { value: 0, message: 'Mínimo 0 aulas' },
+                        max: { value: 100, message: 'Máximo 100 aulas' }
+                      })}
+                      className="mt-1"
+                      placeholder="Ex: 20"
+                      readOnly={selectedPlan && selectedPlan !== 'none'}
+                    />
+                    {selectedPlan && selectedPlan !== 'none' && (
+                      <div className="mt-1 flex items-center gap-1">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <p className="text-xs text-green-600">
+                          Valor obtido do plano selecionado
+                        </p>
+                      </div>
+                    )}
+                    {errors.total_aulas && (
+                      <div className="mt-1 flex items-center gap-1">
+                        <AlertTriangle className="h-4 w-4 text-red-500" />
+                        <p className="text-sm text-red-600">{errors.total_aulas.message}</p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="data_inicio" className="text-sm font-medium text-gray-700">
+                      Data de Início *
+                    </Label>
+                    <Controller
+                      name="data_inicio"
+                      control={control}
+                      rules={{ required: 'Data de início é obrigatória' }}
+                      render={({ field }) => (
+                        <DatePicker
+                          value={field.value ? criarDataDeString(field.value) : null}
+                          onChange={(date) => field.onChange(date ? formatarDataParaISO(date) : '')}
+                          placeholder="dd/mm/aaaa"
+                          className="mt-1"
+                        />
+                      )}
+                    />
+                    {errors.data_inicio && (
+                      <div className="mt-1 flex items-center gap-1">
+                        <AlertTriangle className="h-4 w-4 text-red-500" />
+                        <p className="text-sm text-red-600">{errors.data_inicio.message}</p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <div className="mb-1">
+                      <Label htmlFor="data_fim" className="text-sm font-medium text-gray-700">
+                        Data de Fim
+                      </Label>
+                    </div>
+                    <Controller
+                      name="data_fim"
+                      control={control}
+                      render={({ field }) => (
+                        <DatePicker
+                          value={field.value ? criarDataDeString(field.value) : null}
+                          onChange={(date) => field.onChange(date ? formatarDataParaISO(date) : '')}
+                          placeholder="dd/mm/aaaa"
+                          className="mt-1"
+                        />
+                      )}
+                    />
+                    {calculatedEndDate && (
+                      <div className="mt-1 flex items-center gap-1">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <p className="text-xs text-green-600">
+                          Calculada: {formatDateForDisplay(calculatedEndDate)}
+                        </p>
+                      </div>
+                    )}
+                    {detectedHolidays.length > 0 && (
+                      <div className="mt-1 flex items-center gap-1">
+                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                        <p className="text-xs text-amber-600">
+                          {detectedHolidays.length} feriado(s) detectado(s)
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
               {/* Seção: Recursos */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900 border-b pb-2">Recursos</h3>
@@ -1940,7 +2031,7 @@ const Classes = () => {
                     reset();
                     setSelectedMaterials([]);
                     setSelectedDays([]);
-                    setIsDataFimLocked(false); // Reset do estado de trava
+                    // Removido sistema de trava automática da data de fim
                   }}
                   className="px-6 flex items-center gap-2"
                   disabled={loading}
@@ -2430,9 +2521,9 @@ const Classes = () => {
                
                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                  {/* Total de Aulas */}
-                  <div>
-                    <Label htmlFor="total_aulas" className="text-sm font-medium text-gray-700">
-                      Total de Aulas *
+                 <div>
+                   <Label htmlFor="total_aulas" className="text-sm font-medium text-gray-700">
+                     Total de Aulas *
                       {selectedPlan && selectedPlan !== 'none' && (
                         <span className="text-xs text-green-600 ml-1">(Do plano selecionado)</span>
                       )}
@@ -2446,7 +2537,7 @@ const Classes = () => {
                         required: 'Total de aulas é obrigatório',
                         min: { value: 0, message: 'Mínimo 0 aulas' },
                         max: { value: 100, message: 'Máximo 100 aulas' }
-                      })}
+                       })}
                       className="mt-1"
                       placeholder="Ex: 20"
                       readOnly={selectedPlan && selectedPlan !== 'none'}
@@ -2472,13 +2563,18 @@ const Classes = () => {
                    <Label htmlFor="data_inicio" className="text-sm font-medium text-gray-700">
                      Data de Início *
                    </Label>
-                   <Input
-                     id="data_inicio"
-                     type="date"
-                     {...register('data_inicio', {
-                       required: 'Data de início é obrigatória'
-                     })}
-                     className="mt-1"
+                   <Controller
+                     name="data_inicio"
+                     control={control}
+                     rules={{ required: 'Data de início é obrigatória' }}
+                     render={({ field }) => (
+                       <DatePicker
+                         value={field.value ? criarDataDeString(field.value) : null}
+                         onChange={(date) => field.onChange(date ? formatarDataParaISO(date) : '')}
+                         placeholder="dd/mm/aaaa"
+                         className="mt-1"
+                       />
+                     )}
                    />
                    {errors.data_inicio && (
                      <div className="mt-1 flex items-center gap-1">
@@ -2490,54 +2586,23 @@ const Classes = () => {
 
                  {/* Data de Fim */}
                  <div>
-                   <div className="flex items-center justify-between mb-1">
-                     <Label htmlFor="data_fim" className="text-sm font-medium text-gray-700">
-                       Data de Fim
-                       {!isDataFimLocked && (
-                         <span className="text-xs text-gray-500 ml-1">(Automática)</span>
-                       )}
-                       {isDataFimLocked && (
-                         <span className="text-xs text-orange-600 ml-1">(Travada)</span>
-                       )}
-                     </Label>
-                     <Button
-                       type="button"
-                       variant="outline"
-                       size="sm"
-                       onClick={() => setIsDataFimLocked(!isDataFimLocked)}
-                       className={`h-7 px-2 flex items-center gap-1 ${
-                         isDataFimLocked 
-                           ? 'bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100' 
-                           : 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
-                       }`}
-                       title={isDataFimLocked ? 'Clique para destravar a data de fim' : 'Clique para travar a data de fim'}
-                     >
-                       {isDataFimLocked ? (
-                         <>
-                           <Lock className="h-3 w-3" />
-                           <span className="text-xs">Travada</span>
-                         </>
-                       ) : (
-                         <>
-                           <Unlock className="h-3 w-3" />
-                           <span className="text-xs">Automática</span>
-                         </>
-                       )}
-                     </Button>
-                   </div>
-                   <Input
-                      id="data_fim"
-                      type="date"
-                      {...register('data_fim')}
-                      className={`mt-1 ${
-                        isDataFimLocked 
-                          ? 'bg-gray-50 cursor-not-allowed' 
-                          : 'border-green-300 bg-white focus:border-green-500 focus:ring-green-500'
-                      }`}
-                      placeholder={isDataFimLocked ? "Será calculada automaticamente" : "Digite a data de fim"}
-                      disabled={isDataFimLocked}
-                      readOnly={isDataFimLocked}
-                    />
+                  <div className="mb-1">
+                    <Label htmlFor="data_fim" className="text-sm font-medium text-gray-700">
+                      Data de Fim
+                    </Label>
+                  </div>
+                  <Controller
+                    name="data_fim"
+                    control={control}
+                    render={({ field }) => (
+                      <DatePicker
+                        value={field.value ? criarDataDeString(field.value) : null}
+                        onChange={(date) => field.onChange(date ? formatarDataParaISO(date) : '')}
+                        placeholder="dd/mm/aaaa"
+                        className="mt-1"
+                      />
+                    )}
+                  />
                    {calculatedEndDate && (
                      <div className="mt-1 flex items-center gap-1">
                        <CheckCircle className="h-4 w-4 text-green-500" />

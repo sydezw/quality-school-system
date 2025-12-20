@@ -13,6 +13,7 @@ import { ProfessorGuard } from "./components/guards/ProfessorGuard";
 import Dashboard from "./pages/app/Dashboard";
 import Reports from "./pages/app/Reports";
 import Students from "./pages/app/Students";
+import MyStudents from "./pages/app/MyStudents";
 import Teachers from "./pages/app/Teachers";
 import Classes from "./pages/app/Classes";
 import TeacherClasses from "./pages/app/TeacherClasses";
@@ -89,10 +90,11 @@ const App = () => {
                                 <Route path="/dashboard" element={<Dashboard />} />
                                 <Route path="/reports" element={<Reports />} />
                                 <Route path="/students" element={<Students />} />
+                                <Route path="/my-students" element={<ErrorBoundary><MyStudents /></ErrorBoundary>} />
                                 <Route path="/teachers" element={<Teachers />} />
                                 <Route path="/classes" element={<Classes />} />
                                 <Route path="/teacher-classes" element={<TeacherClasses />} />
-                                <Route path="/lessons" element={<Lessons />} />
+                                <Route path="/lessons" element={<ErrorBoundary><Lessons /></ErrorBoundary>} />
                                 <Route path="/financial" element={
                                     <ErrorBoundary>
                                         <Financial />
