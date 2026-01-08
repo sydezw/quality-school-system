@@ -17,6 +17,7 @@ import { useAulas } from '@/hooks/useAulas';
 import { useAuth } from '@/hooks/useAuth';
 import { AulaDetailsModal } from './AulaDetailsModal';
 import { NewLessonDialog } from './NewLessonDialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 // FullCalendar imports
 import FullCalendar from '@fullcalendar/react';
@@ -24,6 +25,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { EventInput, EventClickArg, DateSelectArg } from '@fullcalendar/core';
+import { DateClickArg } from '@fullcalendar/interaction';
 
 // Tipos para melhor organização e reutilização
 type Turma = Tables<'turmas'>;
@@ -78,6 +80,9 @@ const ClassesCalendar = () => {
   // Estados do modal
   const [selectedAula, setSelectedAula] = useState<AulaComTurma | null>(null);
   const [showAulaModal, setShowAulaModal] = useState(false);
+  const [showDaySelector, setShowDaySelector] = useState(false);
+  const [dayAulas, setDayAulas] = useState<AulaComTurma[]>([]);
+  const [selectedDayStr, setSelectedDayStr] = useState<string | null>(null);
   
   // Estado para controlar o NewLessonDialog
   const [showNewLessonDialog, setShowNewLessonDialog] = useState(false);
@@ -458,6 +463,27 @@ const ClassesCalendar = () => {
         setShowAulaModal(true);
       }
     }
+  };
+
+  const handleDateClick = (arg: DateClickArg) => {
+    if (isSelectionMode) return;
+    const dateStr = arg.dateStr.slice(0, 10);
+    setSelectedDayStr(dateStr);
+    const sameDay = filteredAulas.filter(a => a.data === dateStr).sort((a, b) => {
+      const ha = (a.horario_inicio || '').localeCompare(b.horario_inicio || '');
+      if (ha !== 0) return ha;
+      return (a.horario_fim || '').localeCompare(b.horario_fim || '');
+    });
+    if (sameDay.length === 0) {
+      return;
+    }
+    if (sameDay.length === 1) {
+      setSelectedAula(sameDay[0]);
+      setShowAulaModal(true);
+      return;
+    }
+    setDayAulas(sameDay);
+    setShowDaySelector(true);
   };
 
   /**
@@ -1225,6 +1251,7 @@ const ClassesCalendar = () => {
               }}
               events={convertAulasToEvents()}
               eventClick={handleEventClick}
+              dateClick={handleDateClick}
               select={handleDateSelect}
               selectable={true}
               selectMirror={true}
@@ -1273,6 +1300,45 @@ const ClassesCalendar = () => {
           </CardContent>
         </Card>
       </motion.div>
+
+      <Dialog open={showDaySelector} onOpenChange={setShowDaySelector}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedDayStr ? `Aulas em ${formatDate(selectedDayStr)}` : 'Aulas do dia'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {dayAulas.map((a) => {
+              const tipo =
+                a.tipo_aula === 'avaliativa'
+                  ? 'Avaliativa'
+                  : a.tipo_aula === 'prova_final'
+                  ? 'Prova Final'
+                  : 'Normal';
+              const inicio = formatTime(a.horario_inicio);
+              const fim = formatTime(a.horario_fim);
+              return (
+                <button
+                  key={a.id}
+                  onClick={() => {
+                    setSelectedAula(a);
+                    setShowDaySelector(false);
+                    setShowAulaModal(true);
+                  }}
+                  className="w-full text-left p-3 rounded-md border hover:bg-gray-50 transition"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium">{a.turmas?.nome || a.titulo || 'Aula'}</div>
+                    <div className="text-sm text-gray-600">{inicio} - {fim}</div>
+                  </div>
+                  <div className="mt-1 text-sm text-gray-700">{tipo}</div>
+                </button>
+              );
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal unificado de detalhes da aula */}
       <AulaDetailsModal

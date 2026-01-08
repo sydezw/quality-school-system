@@ -39,7 +39,7 @@ export interface ContractStats {
   vencendo: number;
   vencidos: number;
   cancelados: number;
-  valorTotalMensal: number;
+  valorTotalContratos: number;
 }
 
 export interface ContractFilters {
@@ -74,7 +74,7 @@ export const useContracts = () => {
       vencendo: 0,
       vencidos: 0,
       cancelados: 0,
-      valorTotalMensal: 0
+      valorTotalContratos: 0
     },
     loading: true,
     error: null,
@@ -146,7 +146,7 @@ export const useContracts = () => {
       vencendo: contracts.filter(c => c.status_contrato === 'Vencendo').length,
       vencidos: contracts.filter(c => c.status_contrato === 'Vencido').length,
       cancelados: contracts.filter(c => c.status_contrato === 'Cancelado').length,
-      valorTotalMensal: contracts
+      valorTotalContratos: contracts
         .filter(c => c.status_contrato === 'Ativo' || c.status_contrato === 'Vencendo')
         .reduce((total, contract) => total + (contract.valor_mensalidade || 0), 0) // Tratamento para valor opcional
     };

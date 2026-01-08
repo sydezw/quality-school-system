@@ -264,7 +264,7 @@ export const useFinancial = () => {
     
     const totalParcelas = boletosAluno.length;
     const parcelasPagas = boletosAluno.filter(b => b.status === 'Pago').length;
-    const valorTotalPlano = contratoAluno ? contratoAluno.valor_mensalidade * totalParcelas : boletosAluno.reduce((sum, b) => sum + b.valor, 0);
+    const valorTotalPlano = contratoAluno ? contratoAluno.valor_mensalidade : boletosAluno.reduce((sum, b) => sum + b.valor, 0);
     const valorPago = boletosAluno.filter(b => b.status === 'Pago').reduce((sum, b) => sum + b.valor, 0);
     const percentualProgresso = totalParcelas > 0 ? (parcelasPagas / totalParcelas) * 100 : 0;
     
@@ -303,13 +303,6 @@ export const useFinancial = () => {
     const contratoAluno = state.contratos.find(c => c.aluno_id === alunoId);
     if (contratoAluno && contratoAluno.plano_nome) {
       return contratoAluno.plano_nome;
-    }
-    
-    if (contratoAluno) {
-      const valorMensal = contratoAluno.valor_mensalidade;
-      if (valorMensal <= 100) return 'Plano Básico';
-      if (valorMensal <= 150) return 'Plano Intermediário';
-      return 'Plano Avançado';
     }
     
     return 'Plano não definido';

@@ -84,6 +84,7 @@ const Classes = () => {
   const [selectedPlan, setSelectedPlan] = useState<string>('');
   const [classDataInicio, setClassDataInicio] = useState<string>('');
   const [classDataFim, setClassDataFim] = useState<string>('');
+  const [scheduleItems, setScheduleItems] = useState<Array<{ date: string; weekday: string; isHoliday: boolean; isClass: boolean }>>([]);
   
   const { toast } = useToast();
 
@@ -109,6 +110,7 @@ const Classes = () => {
   const watchedDiasSemana = watch('dias_da_semana');
   const watchedNivel = watch('nivel');
   const watchedHorario = watch('horario');
+  const watchedTipoTurma = watch('tipo_turma');
 
   // Função para gerar nome padrão da turma
   const generateStandardName = () => {
@@ -325,6 +327,76 @@ const Classes = () => {
       setDetectedHolidays([]);
     }
   }, [watchedDataInicio, watchedTotalAulas, selectedDays, selectedClassForStudents, watchedDataFim, calculatedEndDate, setValue]);
+
+  useEffect(() => {
+    const daysToUse = selectedClassForStudents && selectedClassForStudents.dias_da_semana 
+      ? selectedClassForStudents.dias_da_semana.split(' e ') 
+      : selectedDays;
+    if (!watchedDataInicio || !watchedTotalAulas || daysToUse.length === 0) {
+      setScheduleItems([]);
+      return;
+    }
+    const weekdayNames = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+    const mapDays: { [k: string]: number } = { 'Domingo': 0, 'Segunda': 1, 'Terça': 2, 'Quarta': 3, 'Quinta': 4, 'Sexta': 5, 'Sábado': 6 };
+    const classDays = daysToUse.map(d => mapDays[d]).filter(d => d !== undefined);
+    const isParticular = (selectedClassForStudents?.tipo_turma === 'Turma particular') || (watchedTipoTurma === 'Turma particular');
+    let isDuasHoras = false;
+    if (watchedHorario) {
+      let parts = watchedHorario.split('-');
+      if (parts.length === 1) parts = watchedHorario.split(' às ');
+      if (parts.length === 2) {
+        const [sh, sm] = parts[0].trim().split(':').map(Number);
+        const [eh, em] = parts[1].trim().split(':').map(Number);
+        const startMin = sh * 60 + (sm || 0);
+        const endMin = eh * 60 + (em || 0);
+        isDuasHoras = endMin - startMin === 120;
+      }
+    }
+    let aulasParaCalcular = watchedTotalAulas;
+    const [y, m, d] = watchedDataInicio.split('-').map(Number);
+    let current = new Date(y, m - 1, d);
+    while (!classDays.includes(current.getDay())) {
+      current.setDate(current.getDate() + 1);
+    }
+    const items: Array<{ date: string; weekday: string; isHoliday: boolean; isClass: boolean }> = [];
+    let classCount = 0;
+    if (classDays.includes(current.getDay()) && isHoliday(current)) {
+      items.push({ date: current.toISOString().split('T')[0], weekday: weekdayNames[current.getDay()], isHoliday: true, isClass: false });
+    } else {
+      const dateStr = current.toISOString().split('T')[0];
+      const weekdayStr = weekdayNames[current.getDay()];
+      const shouldDouble = isDuasHoras && !(isParticular && classDays.length > 1);
+      if (shouldDouble && aulasParaCalcular - classCount >= 2) {
+        items.push({ date: dateStr, weekday: weekdayStr, isHoliday: false, isClass: true });
+        items.push({ date: dateStr, weekday: weekdayStr, isHoliday: false, isClass: true });
+        classCount += 2;
+      } else {
+        items.push({ date: dateStr, weekday: weekdayStr, isHoliday: false, isClass: true });
+        classCount += 1;
+      }
+    }
+    while (classCount < aulasParaCalcular) {
+      current.setDate(current.getDate() + 1);
+      if (classDays.includes(current.getDay())) {
+        if (isHoliday(current)) {
+          items.push({ date: current.toISOString().split('T')[0], weekday: weekdayNames[current.getDay()], isHoliday: true, isClass: false });
+        } else {
+          const dateStr = current.toISOString().split('T')[0];
+          const weekdayStr = weekdayNames[current.getDay()];
+          const shouldDouble = isDuasHoras && !(isParticular && classDays.length > 1);
+          if (shouldDouble && aulasParaCalcular - classCount >= 2) {
+            items.push({ date: dateStr, weekday: weekdayStr, isHoliday: false, isClass: true });
+            items.push({ date: dateStr, weekday: weekdayStr, isHoliday: false, isClass: true });
+            classCount += 2;
+          } else {
+            items.push({ date: dateStr, weekday: weekdayStr, isHoliday: false, isClass: true });
+            classCount += 1;
+          }
+        }
+      }
+    }
+    setScheduleItems(items);
+  }, [watchedDataInicio, watchedTotalAulas, selectedDays, selectedClassForStudents, watchedHorario, watchedTipoTurma]);
 
   // Função para gerenciar seleção de dias
   const handleDayToggle = (day: string) => {
@@ -1971,6 +2043,50 @@ const Classes = () => {
                     )}
                   </div>
                 </div>
+                {scheduleItems.length > 0 && (
+                  <div className="mt-4 border rounded-lg p-3 bg-gray-50">
+                    <div className="flex items-center gap-2 mb-2 text-sm text-gray-700">
+                      <CalendarDays className="h-4 w-4" />
+                      Cronograma de Aulas
+                    </div>
+                    <div className="max-h-64 overflow-y-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-24">Aula nº</TableHead>
+                            <TableHead>Data</TableHead>
+                            <TableHead>Dia da Semana</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {(() => {
+                            let counter = 0;
+                            return scheduleItems.map((item, idx) => {
+                              const n = item.isClass ? ++counter : '—';
+                              const displayDate = formatDateForDisplay(item.date);
+                              const isHolidayRow = item.isHoliday;
+                              return (
+                                <TableRow key={`${item.date}-${idx}`}>
+                                  <TableCell className="text-sm">{n}</TableCell>
+                                  <TableCell className={`text-sm ${isHolidayRow ? 'line-through text-gray-400' : ''}`}>{displayDate}</TableCell>
+                                  <TableCell className={`text-sm ${isHolidayRow ? 'line-through text-gray-400' : ''}`}>{item.weekday}</TableCell>
+                                  <TableCell>
+                                    {isHolidayRow ? (
+                                      <Badge variant="secondary" className="bg-amber-100 text-amber-800">Feriado (compensado)</Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="text-green-700 border-green-200">Aula</Badge>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            });
+                          })()}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
               </div>
               
               {/* Seção: Recursos */}

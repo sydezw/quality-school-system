@@ -79,6 +79,7 @@ interface Turma {
   dias_da_semana: string;
   horario: string;
   professor_id: string | null;
+  tipo_turma?: string | null;
   status?: string;
   data_inicio?: string | null;
   data_fim?: string | null;
@@ -95,6 +96,8 @@ interface GeneratedLesson {
   numero: number;
   isEditing?: boolean;
   tipo_aula: 'normal' | 'avaliativa' | 'prova_final';
+  startTime?: string;
+  endTime?: string;
 }
 
 type CreationMode = 'single' | 'all';
@@ -170,6 +173,7 @@ export function NewLessonDialog({
           dias_da_semana, 
           horario, 
           professor_id,
+          tipo_turma,
           status,
           data_inicio,
           data_fim,
@@ -349,16 +353,26 @@ export function NewLessonDialog({
   };
 
   // Função para gerar aulas baseado nos dias da semana
-  const generateLessons = (startDate: Date, endDate: Date, diasSemana: string, numeroAulas: number): GeneratedLesson[] => {
+  const generateLessons = (startDate: Date, endDate: Date, turma: Turma, numeroAulas: number): GeneratedLesson[] => {
     const lessons: GeneratedLesson[] = [];
     const diasMap: { [key: string]: number } = {
       'domingo': 0, 'segunda': 1, 'terça': 2, 'quarta': 3, 
       'quinta': 4, 'sexta': 5, 'sábado': 6
     };
     
-    // Extrair dias da semana do string (ex: "Segunda, Quarta")
-    const diasArray = diasSemana.toLowerCase().split(',').map(d => d.trim());
+    const diasArray = turma.dias_da_semana.toLowerCase().split(',').map(d => d.trim());
     const diasNumeros = diasArray.map(dia => diasMap[dia]).filter(num => num !== undefined);
+    const isParticular = turma.tipo_turma === 'Turma particular';
+    let startStr = turma.horario.split('-')[0]?.trim() || '';
+    if (!startStr) startStr = turma.horario.split(' às ')[0]?.trim() || '';
+    let endStr = turma.horario.split('-')[1]?.trim() || '';
+    if (!endStr) endStr = turma.horario.split(' às ')[1]?.trim() || '';
+    const [sh, sm] = (startStr || '08:00').split(':').map(Number);
+    const [eh, em] = (endStr || '09:00').split(':').map(Number);
+    const startMin = sh * 60 + (sm || 0);
+    const endMin = eh * 60 + (em || 0);
+    const isTwoHours = (endMin - startMin) === 120;
+    const perDayClassCount = isTwoHours && !(isParticular && diasNumeros.length > 1) ? 2 : 1;
     
     let currentDate = new Date(startDate);
     let lessonCount = 0;
@@ -367,14 +381,27 @@ export function NewLessonDialog({
       const dayOfWeek = currentDate.getDay();
       
       if (diasNumeros.includes(dayOfWeek)) {
-        lessons.push({
-          id: `lesson-${lessonCount + 1}`,
-          data: new Date(currentDate),
-          diaSemana: currentDate.toLocaleDateString('pt-BR', { weekday: 'long' }),
-          numero: lessonCount + 1,
-          tipo_aula: 'normal',
-        });
-        lessonCount++;
+        const firstEndMin = startMin + 60;
+        const secondStartMin = firstEndMin;
+        const fmt = (m: number) => {
+          const h = Math.floor(m / 60);
+          const mm = m % 60;
+          return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00`;
+        };
+        for (let i = 0; i < perDayClassCount && lessonCount < numeroAulas; i++) {
+          const st = i === 0 ? startMin : secondStartMin;
+          const en = i === 0 ? firstEndMin : endMin;
+          lessons.push({
+            id: `lesson-${lessonCount + 1}`,
+            data: new Date(currentDate),
+            diaSemana: currentDate.toLocaleDateString('pt-BR', { weekday: 'long' }),
+            numero: lessonCount + 1,
+            tipo_aula: 'normal',
+            startTime: fmt(st),
+            endTime: fmt(en),
+          });
+          lessonCount++;
+        }
       }
       
       currentDate = addDays(currentDate, 1);
@@ -391,12 +418,7 @@ export function NewLessonDialog({
   useEffect(() => {
     if (creationMode === 'all' && selectedTurma) {
       if (dataInicio && dataFim && numeroAulas) {
-        const baseLessons = generateLessons(
-          dataInicio,
-          dataFim,
-          selectedTurma.dias_da_semana,
-          numeroAulas
-        );
+        const baseLessons = generateLessons(dataInicio, dataFim, selectedTurma, numeroAulas);
         setGeneratedLessons(prev => {
           if (!prev || prev.length === 0) return baseLessons;
           // Preserva o tipo_aula previamente selecionado por id
@@ -493,8 +515,8 @@ export function NewLessonDialog({
         data: format(lesson.data, 'yyyy-MM-dd'),
         titulo: `Aula ${lesson.numero} - ${format(lesson.data, 'dd/MM/yyyy')}`,
         conteudo: `Conteúdo da aula ${lesson.numero} - ${selectedTurma?.nome} - ${format(lesson.data, 'dd/MM/yyyy', { locale: ptBR })}. Adicione aqui o conteúdo específico desta aula.`,
-        horario_inicio: selectedTurma?.horario.split('-')[0]?.trim() || '08:00:00',
-        horario_fim: selectedTurma?.horario.split('-')[1]?.trim() || '09:00:00',
+        horario_inicio: lesson.startTime || selectedTurma?.horario.split('-')[0]?.trim() || '08:00:00',
+        horario_fim: lesson.endTime || selectedTurma?.horario.split('-')[1]?.trim() || '09:00:00',
         semestre: values.semestre,
         tipo_aula: lesson.tipo_aula,
       }));
