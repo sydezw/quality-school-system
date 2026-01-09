@@ -92,6 +92,8 @@ const ClassesCalendar = () => {
 
   // Referência do calendário
   const calendarRef = useRef<FullCalendar>(null);
+  const [currentViewType, setCurrentViewType] = useState<string>('dayGridMonth');
+  const [currentViewDateStr, setCurrentViewDateStr] = useState<string>('');
 
   // Hook para detectar mobile
   const isMobile = useIsMobile();
@@ -266,9 +268,13 @@ const ClassesCalendar = () => {
    * Converte aulas em eventos do FullCalendar
    */
   const convertAulasToEvents = (): EventInput[] => {
-    const events = filteredAulas.map(aula => {
-      const startTime = aula.horario_inicio ? `T${aula.horario_inicio}` : '';
-      const endTime = aula.horario_fim ? `T${aula.horario_fim}` : '';
+    const buildSingleEvent = (aula: AulaComTurma) => {
+      const startBase = aula.horario_inicio || null;
+      const endBase = aula.horario_fim || null;
+      const isDayView = currentViewType === 'timeGridDay';
+      const visualEnd = isDayView ? addMinutesToTimeStr(startBase, 3) : endBase;
+      const startTime = startBase ? `T${startBase}` : '';
+      const endTime = visualEnd ? `T${visualEnd}` : '';
       const isSelectedItem = isSelected(aula);
       
       // Usar o nome da turma como título principal (sem abreviações)
@@ -420,11 +426,53 @@ const ClassesCalendar = () => {
       }
       
       return eventObj;
-    });
+    };
+    const eventsSingle = filteredAulas.map(aula => buildSingleEvent(aula));
+    const viewType = calendarRef.current?.getApi()?.view?.type;
+    if (viewType === 'dayGridMonth') {
+      const groups = new Map<string, EventInput[]>();
+      for (const ev of eventsSingle) {
+        const a: AulaComTurma | undefined = (ev as any).extendedProps?.aula;
+        const dateStr = (ev.start as string).slice(0, 10);
+        const key = a ? `${a.turma_id}|${dateStr}` : `__noaula__|${dateStr}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(ev);
+      }
+      const aggregated: EventInput[] = [];
+      for (const [, list] of groups.entries()) {
+        if (list.length <= 1) {
+          aggregated.push(list[0]);
+        } else {
+          const first = list[0];
+          const a: AulaComTurma | undefined = (first as any).extendedProps?.aula;
+          const count = list.length;
+          const titleBase = first.title || (a?.turmas?.nome || 'Aulas');
+          const title = `${titleBase} • ${count} aulas`;
+          aggregated.push({
+            id: String((first as any).id) + '_group',
+            title,
+            start: (first.start as string).slice(0, 10),
+            end: (first.end as string).slice(0, 10),
+            backgroundColor: (first as any).backgroundColor,
+            borderColor: (first as any).borderColor,
+            textColor: '#FFFFFF',
+            classNames: ['custom-event-style'],
+            extendedProps: {
+              aulasList: list.map(ev => (ev as any).extendedProps?.aula),
+              turma: (first as any).extendedProps?.turma,
+              idioma: (first as any).extendedProps?.idioma,
+              nivel: (first as any).extendedProps?.nivel,
+              status: (first as any).extendedProps?.status
+            }
+          });
+        }
+      }
+      console.log('Eventos convertidos (agrupados mês):', aggregated.length);
+      return aggregated;
+    }
     
-    console.log('Eventos convertidos para o calendário:', events.length);
-    console.log('Eventos:', events);
-    return events;
+    console.log('Eventos convertidos para o calendário:', eventsSingle.length);
+    return eventsSingle;
   };
 
   /**
@@ -450,6 +498,20 @@ const ClassesCalendar = () => {
    * Handler para clique em evento (aula)
    */
   const handleEventClick = (clickInfo: EventClickArg) => {
+    const ext = clickInfo.event.extendedProps as any;
+    if (ext && ext.aulasList && Array.isArray(ext.aulasList)) {
+      if (isSelectionMode) return;
+      const dateStr = (clickInfo.event.startStr || '').slice(0, 10);
+      setSelectedDayStr(dateStr || null);
+      const sameDay = (ext.aulasList as AulaComTurma[]).slice().sort((a, b) => {
+        const ha = (a.horario_inicio || '').localeCompare(b.horario_inicio || '');
+        if (ha !== 0) return ha;
+        return (a.horario_fim || '').localeCompare(b.horario_fim || '');
+      });
+      setDayAulas(sameDay);
+      setShowDaySelector(true);
+      return;
+    }
     const aulaId = clickInfo.event.id;
     const aula = aulas.find(a => a.id === aulaId);
     
@@ -467,23 +529,25 @@ const ClassesCalendar = () => {
 
   const handleDateClick = (arg: DateClickArg) => {
     if (isSelectionMode) return;
-    const dateStr = arg.dateStr.slice(0, 10);
-    setSelectedDayStr(dateStr);
-    const sameDay = filteredAulas.filter(a => a.data === dateStr).sort((a, b) => {
-      const ha = (a.horario_inicio || '').localeCompare(b.horario_inicio || '');
-      if (ha !== 0) return ha;
-      return (a.horario_fim || '').localeCompare(b.horario_fim || '');
-    });
-    if (sameDay.length === 0) {
-      return;
+    const api = calendarRef.current?.getApi();
+    if (api) {
+      api.changeView('timeGridDay', arg.date);
+      const d = new Date(arg.date);
+      const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      setCurrentViewType('timeGridDay');
+      setCurrentViewDateStr(ds);
     }
-    if (sameDay.length === 1) {
-      setSelectedAula(sameDay[0]);
-      setShowAulaModal(true);
-      return;
+  };
+
+  const handleDatesSet = (arg: any) => {
+    const vt = arg?.view?.type || currentViewType;
+    setCurrentViewType(vt);
+    if (vt === 'timeGridDay') {
+      const ds = (arg?.startStr || '').slice(0, 10);
+      setCurrentViewDateStr(ds);
+    } else {
+      setCurrentViewDateStr('');
     }
-    setDayAulas(sameDay);
-    setShowDaySelector(true);
   };
 
   /**
@@ -515,6 +579,18 @@ const ClassesCalendar = () => {
   const formatTime = (time: string | null) => {
     if (!time) return '';
     return time.substring(0, 5); // Remove segundos se houver
+  };
+  const addMinutesToTimeStr = (time: string | null, minutes: number) => {
+    if (!time) return null;
+    const m = time.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (!m) return time;
+    const h = parseInt(m[1], 10);
+    const mm = parseInt(m[2], 10);
+    const ss = m[3] ? parseInt(m[3], 10) : 0;
+    const total = h * 60 + mm + minutes;
+    const nh = Math.floor(total / 60);
+    const nmm = total % 60;
+    return `${String(nh).padStart(2, '0')}:${String(nmm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
   };
 
   if (loading) {
@@ -1252,6 +1328,7 @@ const ClassesCalendar = () => {
               events={convertAulasToEvents()}
               eventClick={handleEventClick}
               dateClick={handleDateClick}
+              datesSet={handleDatesSet}
               select={handleDateSelect}
               selectable={true}
               selectMirror={true}
@@ -1270,24 +1347,44 @@ const ClassesCalendar = () => {
               allDaySlot={false}
               eventDisplay="block"
               displayEventTime={false}
+              slotEventOverlap={false}
               dayHeaderFormat={{ weekday: 'short' }}
               eventDidMount={(info) => {
                 const status = info.event.extendedProps.status;
-                const numero = numeroAulaPorId.get(String(info.event.id));
                 const base = `${info.event.extendedProps.turma}\nStatus: ${status}\nIdioma: ${info.event.extendedProps.idioma}\nNível: ${info.event.extendedProps.nivel}`;
-                info.el.setAttribute('title', numero ? `${base}\nAula: ${numero}` : base);
+                const ext: any = info.event.extendedProps || {};
+                let numero = numeroAulaPorId.get(String(info.event.id));
+                let aggregatedNums: string | null = null;
+                if (Array.isArray(ext.aulasList) && ext.aulasList.length > 1) {
+                  const nums = ext.aulasList
+                    .map((a: any) => numeroAulaPorId.get(String(a.id)))
+                    .filter((n: number | undefined) => typeof n === 'number')
+                    .sort((a: number, b: number) => a - b);
+                  if (nums.length > 0) {
+                    aggregatedNums = nums.join(' / ');
+                  }
+                }
+                info.el.setAttribute('title', aggregatedNums ? `${base}\nAulas: ${aggregatedNums}` : (numero ? `${base}\nAula: ${numero}` : base));
                 const startDate = info.event.start;
                 if (startDate && startDate.getDay() === 0) {
                   info.el.classList.add('edge-left');
                 }
-              if (numero) {
-                const badge = document.createElement('div');
-                badge.className = 'aula-numero-badge';
-                const idioma = info.event.extendedProps.idioma;
-                if (idioma === 'Japonês') {
-                  badge.classList.add('badge-blue');
+                if (startDate && startDate.getHours && startDate.getHours() === 7 && calendarRef.current?.getApi()?.view?.type === 'timeGridDay') {
+                  info.el.classList.add('start-first-hour');
                 }
+              const idioma = info.event.extendedProps.idioma;
+              const badge = document.createElement('div');
+              badge.className = 'aula-numero-badge';
+              if (idioma === 'Japonês') {
+                badge.classList.add('badge-blue');
+              }
+              if (aggregatedNums) {
+                badge.textContent = aggregatedNums;
+                badge.style.fontWeight = '700';
+              } else if (numero) {
                 badge.textContent = String(numero);
+              }
+              if (aggregatedNums || numero) {
                 info.el.appendChild(badge);
               }
                 if (status === 'concluida') {
@@ -1297,6 +1394,24 @@ const ClassesCalendar = () => {
                 }
               }}
             />
+            <style>{`
+              .fc-timegrid-event {
+                min-height: 28px !important;
+                margin: 2px 2px !important;
+              }
+              .fc-timegrid-event .fc-event-main {
+                padding: 4px 8px !important;
+                font-size: 13px !important;
+                line-height: 1.2 !important;
+              }
+              .fc-timegrid-event-harness {
+                margin-bottom: 3px !important;
+              }
+              .custom-event-style.start-first-hour .aula-numero-badge {
+                top: 8px !important;
+                transform: translate(-50%, 0) !important;
+              }
+            `}</style>
           </CardContent>
         </Card>
       </motion.div>
@@ -1339,6 +1454,31 @@ const ClassesCalendar = () => {
           </div>
         </DialogContent>
       </Dialog>
+      
+      {currentViewType === 'timeGridDay' && currentViewDateStr && (() => {
+        const count = filteredAulas.filter(a => a.data === currentViewDateStr).length;
+        if (count > 8) {
+          return (
+            <div className="flex justify-end mt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const sameDay = filteredAulas
+                    .filter(a => a.data === currentViewDateStr)
+                    .sort((a, b) => (a.horario_inicio || '').localeCompare(b.horario_inicio || ''));
+                  setSelectedDayStr(currentViewDateStr);
+                  setDayAulas(sameDay);
+                  setShowDaySelector(true);
+                }}
+              >
+                Mostrar todas as aulas ({count})
+              </Button>
+            </div>
+          );
+        }
+        return null;
+      })()}
 
       {/* Modal unificado de detalhes da aula */}
       <AulaDetailsModal

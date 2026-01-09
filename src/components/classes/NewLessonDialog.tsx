@@ -316,7 +316,6 @@ export function NewLessonDialog({
     selectedTurma: selectedTurma?.nome
   });
 
-  // Função para selecionar turma e preencher campos automaticamente
   const handleTurmaSelect = (turmaId: string) => {
     const turma = turmas.find(t => t.id === turmaId);
     if (turma) {
@@ -352,25 +351,50 @@ export function NewLessonDialog({
     }
   };
 
-  // Função para gerar aulas baseado nos dias da semana
+  const defaultTimesFromHorario = (h: string | undefined) => {
+    const m = (h || '').match(/(\d{1,2})(?::(\d{2}))?\s*(?:-|às|as|a)\s*(\d{1,2})(?::(\d{2}))?/i);
+    const fmt = (hh: number, mm: number) => `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00`;
+    if (!m) return { inicio: fmt(8, 0), fim: fmt(9, 0) };
+    const sh = parseInt(m[1], 10);
+    const sm = m[2] ? parseInt(m[2], 10) : 0;
+    const eh = parseInt(m[3], 10);
+    const em = m[4] ? parseInt(m[4], 10) : 0;
+    return { inicio: fmt(sh, sm), fim: fmt(eh, em) };
+  };
+
   const generateLessons = (startDate: Date, endDate: Date, turma: Turma, numeroAulas: number): GeneratedLesson[] => {
     const lessons: GeneratedLesson[] = [];
     const diasMap: { [key: string]: number } = {
       'domingo': 0, 'segunda': 1, 'terça': 2, 'quarta': 3, 
       'quinta': 4, 'sexta': 5, 'sábado': 6
     };
-    
-    const diasArray = turma.dias_da_semana.toLowerCase().split(',').map(d => d.trim());
-    const diasNumeros = diasArray.map(dia => diasMap[dia]).filter(num => num !== undefined);
+    const normalizeDias = (str: string) => {
+      const cleaned = (str || '').toLowerCase().replace(/\s+e\s+/g, ',').replace(/\s*\/\s*/g, ',');
+      const parts = cleaned.split(',').map(s => s.trim()).filter(Boolean);
+      const aliasMap: Record<string, string> = {
+        'domingo': 'domingo', 'dom': 'domingo',
+        'segunda': 'segunda', 'seg': 'segunda',
+        'terça': 'terça', 'terca': 'terça', 'ter': 'terça',
+        'quarta': 'quarta', 'qua': 'quarta',
+        'quinta': 'quinta', 'qui': 'quinta',
+        'sexta': 'sexta', 'sex': 'sexta',
+        'sábado': 'sábado', 'sabado': 'sábado', 'sab': 'sábado'
+      };
+      return parts.map(p => aliasMap[p]).filter(Boolean);
+    };
+    const diaKeys = normalizeDias(turma.dias_da_semana);
+    const diasNumeros = diaKeys.map(k => diasMap[k]).filter(num => num !== undefined);
     const isParticular = turma.tipo_turma === 'Turma particular';
-    let startStr = turma.horario.split('-')[0]?.trim() || '';
-    if (!startStr) startStr = turma.horario.split(' às ')[0]?.trim() || '';
-    let endStr = turma.horario.split('-')[1]?.trim() || '';
-    if (!endStr) endStr = turma.horario.split(' às ')[1]?.trim() || '';
-    const [sh, sm] = (startStr || '08:00').split(':').map(Number);
-    const [eh, em] = (endStr || '09:00').split(':').map(Number);
-    const startMin = sh * 60 + (sm || 0);
-    const endMin = eh * 60 + (em || 0);
+    const parseHorario = (h: string) => {
+      const m = (h || '').match(/(\d{1,2})(?::(\d{2}))?\s*(?:-|às|as|a)\s*(\d{1,2})(?::(\d{2}))?/i);
+      if (!m) return { startMin: 8 * 60, endMin: 9 * 60 };
+      const sh = parseInt(m[1], 10);
+      const sm = m[2] ? parseInt(m[2], 10) : 0;
+      const eh = parseInt(m[3], 10);
+      const em = m[4] ? parseInt(m[4], 10) : 0;
+      return { startMin: sh * 60 + sm, endMin: eh * 60 + em };
+    };
+    const { startMin, endMin } = parseHorario(turma.horario || '');
     const isTwoHours = (endMin - startMin) === 120;
     const perDayClassCount = isTwoHours && !(isParticular && diasNumeros.length > 1) ? 2 : 1;
     
@@ -383,12 +407,12 @@ export function NewLessonDialog({
       if (diasNumeros.includes(dayOfWeek)) {
         const firstEndMin = startMin + 60;
         const secondStartMin = firstEndMin;
-        const fmt = (m: number) => {
-          const h = Math.floor(m / 60);
-          const mm = m % 60;
-          return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00`;
-        };
-        for (let i = 0; i < perDayClassCount && lessonCount < numeroAulas; i++) {
+          const fmt = (m: number) => {
+            const h = Math.floor(m / 60);
+            const mm = m % 60;
+            return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00`;
+          };
+          for (let i = 0; i < perDayClassCount && lessonCount < numeroAulas; i++) {
           const st = i === 0 ? startMin : secondStartMin;
           const en = i === 0 ? firstEndMin : endMin;
           lessons.push({
@@ -472,8 +496,8 @@ export function NewLessonDialog({
         tipo_aula: singleLessonType,
         professor_id: selectedTurma?.professor_id || null,
         titulo: `Aula - ${format(values.data, 'dd/MM/yyyy')}`,
-        horario_inicio: selectedTurma?.horario.split('-')[0]?.trim() || '08:00:00',
-        horario_fim: selectedTurma?.horario.split('-')[1]?.trim() || '09:00:00',
+        horario_inicio: defaultTimesFromHorario(selectedTurma?.horario).inicio,
+        horario_fim: defaultTimesFromHorario(selectedTurma?.horario).fim,
       });
 
       if (error) throw error;
@@ -515,8 +539,8 @@ export function NewLessonDialog({
         data: format(lesson.data, 'yyyy-MM-dd'),
         titulo: `Aula ${lesson.numero} - ${format(lesson.data, 'dd/MM/yyyy')}`,
         conteudo: `Conteúdo da aula ${lesson.numero} - ${selectedTurma?.nome} - ${format(lesson.data, 'dd/MM/yyyy', { locale: ptBR })}. Adicione aqui o conteúdo específico desta aula.`,
-        horario_inicio: lesson.startTime || selectedTurma?.horario.split('-')[0]?.trim() || '08:00:00',
-        horario_fim: lesson.endTime || selectedTurma?.horario.split('-')[1]?.trim() || '09:00:00',
+        horario_inicio: lesson.startTime || defaultTimesFromHorario(selectedTurma?.horario).inicio,
+        horario_fim: lesson.endTime || defaultTimesFromHorario(selectedTurma?.horario).fim,
         semestre: values.semestre,
         tipo_aula: lesson.tipo_aula,
       }));
