@@ -64,22 +64,56 @@ const AulaProvaFinalModal: React.FC<AulaProvaFinalModalProps> = ({ aula, isOpen,
       if (!aula?.turma_id) return;
       setLoadingAlunos(true);
       try {
-        // Primeira tentativa: RPC dedicado
-        const { data, error } = await supabase.rpc('get_turma_alunos', { turma_uuid: aula.turma_id });
-        const raw = (data || []) as Array<{ aluno_id: string; aluno_nome: string }>;
-        let lista = raw.map((d) => ({ aluno_id: d.aluno_id, aluno_nome: d.aluno_nome }));
+        let lista: Array<{ aluno_id: string; aluno_nome: string }> = [];
 
-        // Fallback: usar view de matrículas caso RPC retorne vazio ou erro
-        if (error || lista.length === 0) {
+        const { data: rpcData, error: rpcError } = await supabase.rpc('get_turma_alunos', { turma_uuid: aula.turma_id });
+        if (!rpcError && rpcData && rpcData.length > 0) {
+          const rpcRows = (rpcData || []) as Array<{ aluno_id: string; aluno_nome: string }>;
+          lista = rpcRows.map(d => ({ aluno_id: d.aluno_id, aluno_nome: d.aluno_nome }));
+        }
+
+        if (lista.length === 0) {
           const { data: viewData, error: viewError } = await supabase
             .from('view_alunos_turmas')
-            .select('aluno_id, aluno_nome')
+            .select('aluno_id, aluno_nome, turma_id')
             .eq('turma_id', aula.turma_id);
-          if (!viewError) {
-            const vraw = (viewData || []) as Array<{ aluno_id: string; aluno_nome: string }>;
-            lista = vraw.map((d) => ({ aluno_id: d.aluno_id, aluno_nome: d.aluno_nome }));
-          } else {
-            throw viewError;
+          if (!viewError && viewData && viewData.length > 0) {
+            const viewRows = (viewData || []) as Array<{ aluno_id: string | null; aluno_nome: string | null; turma_id: string | null }>;
+            lista = viewRows
+              .filter(d => !!d.aluno_id && !!d.aluno_nome)
+              .map(d => ({ aluno_id: d.aluno_id as string, aluno_nome: d.aluno_nome as string }));
+          }
+        }
+
+        if (lista.length === 0) {
+          const { data: legacyData, error: legacyError } = await supabase
+            .from('aluno_turma')
+            .select('aluno_id, turma_id, alunos(nome)')
+            .eq('turma_id', aula.turma_id);
+          if (!legacyError && legacyData && legacyData.length > 0) {
+            const legacyRows = (legacyData || []) as Array<{ aluno_id: string; turma_id: string; alunos: { nome: string | null } | null }>;
+            lista = legacyRows
+              .filter(d => !!d.aluno_id && !!d.alunos?.nome)
+              .map(d => ({ aluno_id: d.aluno_id, aluno_nome: (d.alunos?.nome || '') as string }));
+          }
+        }
+
+        if (lista.length === 0) {
+          const { data: turmaInfo } = await supabase
+            .from('turmas')
+            .select('tipo_turma')
+            .eq('id', aula.turma_id)
+            .single();
+          const isParticular = ((turmaInfo as { tipo_turma: string | null } | null)?.tipo_turma ?? null) === 'Turma particular';
+          const { data: alunosDiretos, error: alunosError } = await supabase
+            .from('alunos')
+            .select('id, nome')
+            .or(isParticular ? `turma_particular_id.eq.${aula.turma_id}` : `turma_id.eq.${aula.turma_id}`);
+          if (!alunosError && alunosDiretos && alunosDiretos.length > 0) {
+            const alunosRows = (alunosDiretos || []) as Array<{ id: string; nome: string | null }>;
+            lista = alunosRows
+              .filter(a => !!a.nome)
+              .map(aluno => ({ aluno_id: aluno.id, aluno_nome: aluno.nome as string }));
           }
         }
 

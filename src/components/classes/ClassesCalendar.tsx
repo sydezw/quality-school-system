@@ -24,7 +24,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { EventInput, EventClickArg, DateSelectArg } from '@fullcalendar/core';
+import { EventInput, EventClickArg, DateSelectArg, DatesSetArg } from '@fullcalendar/core';
 import { DateClickArg } from '@fullcalendar/interaction';
 
 // Tipos para melhor organização e reutilização
@@ -44,6 +44,20 @@ interface TurmaSimplificada {
     id: string;
     nome: string;
   } | null;
+}
+
+interface CalendarEventExtProps {
+  aula?: AulaComTurma;
+  turma?: string;
+  idioma?: string;
+  nivel?: string;
+  tipo_turma?: string;
+  is_particular?: boolean;
+  status?: string;
+  descricao?: string;
+  tipo_aula?: string;
+  aulasList?: AulaComTurma[];
+  aulasIds?: string[];
 }
 
   interface AulaComTurma extends Aula {
@@ -432,8 +446,9 @@ const ClassesCalendar = () => {
     if (viewType === 'dayGridMonth') {
       const groups = new Map<string, EventInput[]>();
       for (const ev of eventsSingle) {
-        const a: AulaComTurma | undefined = (ev as any).extendedProps?.aula;
-        const dateStr = (ev.start as string).slice(0, 10);
+        const evExt = (ev.extendedProps ?? {}) as CalendarEventExtProps;
+        const a: AulaComTurma | undefined = evExt.aula;
+        const dateStr = String(ev.start).slice(0, 10);
         const key = a ? `${a.turma_id}|${dateStr}` : `__noaula__|${dateStr}`;
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key)!.push(ev);
@@ -444,25 +459,42 @@ const ClassesCalendar = () => {
           aggregated.push(list[0]);
         } else {
           const first = list[0];
-          const a: AulaComTurma | undefined = (first as any).extendedProps?.aula;
+          const firstExt = (first.extendedProps ?? {}) as CalendarEventExtProps;
+          const a: AulaComTurma | undefined = firstExt.aula;
           const count = list.length;
           const titleBase = first.title || (a?.turmas?.nome || 'Aulas');
           const title = `${titleBase} • ${count} aulas`;
+          const idiomaStr: string | undefined = firstExt.idioma;
+          const idiomaClass = idiomaStr ? `idioma-${String(idiomaStr).replace('/', '-').toLowerCase()}` : undefined;
+          const aulasListRaw: AulaComTurma[] = list
+            .map(ev => {
+              const eExt = (ev.extendedProps ?? {}) as CalendarEventExtProps;
+              return eExt.aula as AulaComTurma;
+            })
+            .filter(Boolean);
+          const aulasListSorted: AulaComTurma[] = aulasListRaw
+            .slice()
+            .sort((x, y) => {
+              const hx = (x.horario_inicio || '').localeCompare(y.horario_inicio || '');
+              if (hx !== 0) return hx;
+              return (x.horario_fim || '').localeCompare(y.horario_fim || '');
+            });
           aggregated.push({
-            id: String((first as any).id) + '_group',
+            id: String(first.id) + '_group',
             title,
-            start: (first.start as string).slice(0, 10),
-            end: (first.end as string).slice(0, 10),
-            backgroundColor: (first as any).backgroundColor,
-            borderColor: (first as any).borderColor,
+            start: String(first.start).slice(0, 10),
+            end: String(first.end).slice(0, 10),
+            backgroundColor: first.backgroundColor,
+            borderColor: first.borderColor,
             textColor: '#FFFFFF',
-            classNames: ['custom-event-style'],
+            classNames: idiomaClass ? ['custom-event-style', idiomaClass] : ['custom-event-style'],
             extendedProps: {
-              aulasList: list.map(ev => (ev as any).extendedProps?.aula),
-              turma: (first as any).extendedProps?.turma,
-              idioma: (first as any).extendedProps?.idioma,
-              nivel: (first as any).extendedProps?.nivel,
-              status: (first as any).extendedProps?.status
+              aulasList: aulasListSorted,
+              aulasIds: aulasListSorted.map(a => a.id),
+              turma: firstExt.turma,
+              idioma: firstExt.idioma,
+              nivel: firstExt.nivel,
+              status: firstExt.status
             }
           });
         }
@@ -498,22 +530,24 @@ const ClassesCalendar = () => {
    * Handler para clique em evento (aula)
    */
   const handleEventClick = (clickInfo: EventClickArg) => {
-    const ext = clickInfo.event.extendedProps as any;
+    const ext = clickInfo.event.extendedProps as CalendarEventExtProps;
     if (ext && ext.aulasList && Array.isArray(ext.aulasList)) {
-      if (isSelectionMode) return;
       const dateStr = (clickInfo.event.startStr || '').slice(0, 10);
       setSelectedDayStr(dateStr || null);
-      const sameDay = (ext.aulasList as AulaComTurma[]).slice().sort((a, b) => {
-        const ha = (a.horario_inicio || '').localeCompare(b.horario_inicio || '');
-        if (ha !== 0) return ha;
-        return (a.horario_fim || '').localeCompare(b.horario_fim || '');
-      });
+      const sameDay = (ext.aulasList as AulaComTurma[])
+        .slice()
+        .sort((a, b) => {
+          const ha = (a.horario_inicio || '').localeCompare(b.horario_inicio || '');
+          if (ha !== 0) return ha;
+          return (a.horario_fim || '').localeCompare(b.horario_fim || '');
+        });
       setDayAulas(sameDay);
       setShowDaySelector(true);
       return;
     }
+    const aulaExt: AulaComTurma | undefined = ext?.aula as AulaComTurma | undefined;
     const aulaId = clickInfo.event.id;
-    const aula = aulas.find(a => a.id === aulaId);
+    const aula = aulaExt || aulas.find(a => a.id === aulaId);
     
     if (aula) {
       if (isSelectionMode) {
@@ -539,7 +573,7 @@ const ClassesCalendar = () => {
     }
   };
 
-  const handleDatesSet = (arg: any) => {
+  const handleDatesSet = (arg: DatesSetArg) => {
     const vt = arg?.view?.type || currentViewType;
     setCurrentViewType(vt);
     if (vt === 'timeGridDay') {
@@ -1120,6 +1154,27 @@ const ClassesCalendar = () => {
                 line-height: ${isMobile ? '1.2' : '1.4'} !important;
                 padding-left: ${isMobile ? '36px' : '42px'} !important;
               }
+              .custom-event-style .aula-badges {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                transform: none !important;
+                z-index: 4 !important;
+              }
+              .custom-event-style .aula-badges .aula-numero-badge.badge-1 {
+                position: absolute !important;
+                left: 0 !important;
+                top: 50% !important;
+                transform: translate(-50%, -50%) !important;
+                z-index: 5 !important;
+              }
+              .custom-event-style .aula-badges .aula-numero-badge.badge-2 {
+                position: absolute !important;
+                left: ${isMobile ? '16px' : '17px'} !important;
+                top: 50% !important;
+                transform: translate(-50%, -50%) !important;
+                z-index: 6 !important;
+              }
               .custom-event-style .aula-numero-badge {
                 position: absolute !important;
                 left: 0 !important;
@@ -1138,14 +1193,21 @@ const ClassesCalendar = () => {
                 box-shadow: 0 3px 8px rgba(0,0,0,0.25) !important;
                 z-index: 4 !important;
               }
-              .custom-event-style.edge-left .aula-numero-badge {
+              .custom-event-style.edge-left .aula-badges .aula-numero-badge.badge-1 {
                 left: 6px !important;
-                right: auto !important;
+                top: -14px !important;
+                transform: none !important;
+              }
+              .custom-event-style.edge-left .aula-badges .aula-numero-badge.badge-2 {
+                left: ${isMobile ? '22px' : '23px'} !important;
                 top: -14px !important;
                 transform: none !important;
               }
               .custom-event-style.edge-left .fc-event-title {
                 padding-left: ${isMobile ? '8px' : '12px'} !important;
+              }
+              .custom-event-style.double-badge .fc-event-title {
+                padding-left: ${isMobile ? '54px' : '64px'} !important;
               }
               .custom-event-style .aula-numero-badge.badge-blue {
                 background: linear-gradient(145deg, #3B82F6 0%, #1E40AF 60%, #1E3A8A 100%) !important;
@@ -1350,21 +1412,30 @@ const ClassesCalendar = () => {
               slotEventOverlap={false}
               dayHeaderFormat={{ weekday: 'short' }}
               eventDidMount={(info) => {
-                const status = info.event.extendedProps.status;
-                const base = `${info.event.extendedProps.turma}\nStatus: ${status}\nIdioma: ${info.event.extendedProps.idioma}\nNível: ${info.event.extendedProps.nivel}`;
-                const ext: any = info.event.extendedProps || {};
-                let numero = numeroAulaPorId.get(String(info.event.id));
-                let aggregatedNums: string | null = null;
-                if (Array.isArray(ext.aulasList) && ext.aulasList.length > 1) {
-                  const nums = ext.aulasList
-                    .map((a: any) => numeroAulaPorId.get(String(a.id)))
-                    .filter((n: number | undefined) => typeof n === 'number')
-                    .sort((a: number, b: number) => a - b);
-                  if (nums.length > 0) {
-                    aggregatedNums = nums.join(' / ');
+                const ext = (info.event.extendedProps || {}) as CalendarEventExtProps;
+                const status = ext.status;
+                const base = `${ext.turma}\nStatus: ${status}\nIdioma: ${ext.idioma}\nNível: ${ext.nivel}`;
+                const numero = numeroAulaPorId.get(String(info.event.id));
+                let aggregatedNumsStr: string | null = null;
+                const aggregatedIsTwo = Array.isArray(ext.aulasList) && ext.aulasList.length === 2;
+                let aggregatedNumsArr: number[] = [];
+                if (Array.isArray(ext.aulasList) && ext.aulasList.length > 0) {
+                  const list: AulaComTurma[] = ext.aulasList as AulaComTurma[];
+                  const sortedList = list.slice().sort((a, b) => (a.horario_inicio || '').localeCompare(b.horario_inicio || ''));
+                  const numsRaw = sortedList.map(a => numeroAulaPorId.get(String(a.id)));
+                  const numsClean = numsRaw.filter((n): n is number => typeof n === 'number').sort((a, b) => a - b);
+                  if (aggregatedIsTwo) {
+                    const n1 = numsRaw[0];
+                    const n2 = numsRaw[1];
+                    if (typeof n1 === 'number' && typeof n2 === 'number') {
+                      aggregatedNumsArr = [n1, n2];
+                    }
+                  }
+                  if (numsClean.length > 0) {
+                    aggregatedNumsStr = numsClean.join(' / ');
                   }
                 }
-                info.el.setAttribute('title', aggregatedNums ? `${base}\nAulas: ${aggregatedNums}` : (numero ? `${base}\nAula: ${numero}` : base));
+                info.el.setAttribute('title', aggregatedNumsStr ? `${base}\nAulas: ${aggregatedNumsStr}` : (numero ? `${base}\nAula: ${numero}` : base));
                 const startDate = info.event.start;
                 if (startDate && startDate.getDay() === 0) {
                   info.el.classList.add('edge-left');
@@ -1373,19 +1444,53 @@ const ClassesCalendar = () => {
                   info.el.classList.add('start-first-hour');
                 }
               const idioma = info.event.extendedProps.idioma;
-              const badge = document.createElement('div');
-              badge.className = 'aula-numero-badge';
-              if (idioma === 'Japonês') {
-                badge.classList.add('badge-blue');
-              }
-              if (aggregatedNums) {
-                badge.textContent = aggregatedNums;
-                badge.style.fontWeight = '700';
-              } else if (numero) {
-                badge.textContent = String(numero);
-              }
-              if (aggregatedNums || numero) {
-                info.el.appendChild(badge);
+              const viewType = calendarRef.current?.getApi()?.view?.type;
+              if (aggregatedIsTwo && viewType === 'dayGridMonth') {
+                if (aggregatedNumsArr.length !== 2) {
+                  const listAulas = Array.isArray(ext.aulasList) ? (ext.aulasList as AulaComTurma[]) : [];
+                  const turmaId = listAulas[0]?.turma_id;
+                  const dateStr = (info.event.startStr || '').slice(0, 10);
+                  let base = 0;
+                  if (turmaId && dateStr) {
+                    const anteriores = aulas
+                      .filter(a => a.turma_id === turmaId && a.status !== 'cancelada' && a.data < dateStr);
+                    for (const a of anteriores) {
+                      const n = numeroAulaPorId.get(String(a.id)) || 0;
+                      if (n > base) base = n;
+                    }
+                  }
+                  aggregatedNumsArr = [base + 1, base + 2];
+                  aggregatedNumsStr = `${aggregatedNumsArr[0]} / ${aggregatedNumsArr[1]}`;
+                }
+                const wrap = document.createElement('div');
+                wrap.className = 'aula-badges';
+                const b1 = document.createElement('div');
+                b1.className = 'aula-numero-badge badge-1';
+                if (idioma === 'Japonês') b1.classList.add('badge-blue');
+                b1.textContent = String(aggregatedNumsArr[0]);
+                const b2 = document.createElement('div');
+                b2.className = 'aula-numero-badge badge-2';
+                if (idioma === 'Japonês') b2.classList.add('badge-blue');
+                b2.textContent = String(aggregatedNumsArr[1]);
+                wrap.appendChild(b1);
+                wrap.appendChild(b2);
+                info.el.classList.add('double-badge');
+                info.el.appendChild(wrap);
+              } else {
+                const badge = document.createElement('div');
+                badge.className = 'aula-numero-badge';
+                if (idioma === 'Japonês') {
+                  badge.classList.add('badge-blue');
+                }
+                if (aggregatedNumsStr) {
+                  badge.textContent = aggregatedNumsStr;
+                  badge.style.fontWeight = '700';
+                } else if (numero) {
+                  badge.textContent = String(numero);
+                }
+                if (aggregatedNumsStr || numero) {
+                  info.el.appendChild(badge);
+                }
               }
                 if (status === 'concluida') {
                   info.el.style.opacity = '0.4';
@@ -1433,22 +1538,37 @@ const ClassesCalendar = () => {
                   : 'Normal';
               const inicio = formatTime(a.horario_inicio);
               const fim = formatTime(a.horario_fim);
+              const selected = isSelected(a);
               return (
-                <button
-                  key={a.id}
-                  onClick={() => {
-                    setSelectedAula(a);
-                    setShowDaySelector(false);
-                    setShowAulaModal(true);
-                  }}
-                  className="w-full text-left p-3 rounded-md border hover:bg-gray-50 transition"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="font-medium">{a.turmas?.nome || a.titulo || 'Aula'}</div>
-                    <div className="text-sm text-gray-600">{inicio} - {fim}</div>
-                  </div>
-                  <div className="mt-1 text-sm text-gray-700">{tipo}</div>
-                </button>
+                <div key={a.id} className="w-full p-3 rounded-md border hover:bg-gray-50 transition flex items-center justify-between gap-3">
+                  <button
+                    onClick={() => {
+                      setSelectedAula(a);
+                      setShowDaySelector(false);
+                      setShowAulaModal(true);
+                    }}
+                    className="text-left flex-1"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium">{a.turmas?.nome || a.titulo || 'Aula'}</div>
+                      <div className="text-sm text-gray-600">{inicio} - {fim}</div>
+                    </div>
+                    <div className="mt-1 text-sm text-gray-700">{tipo}</div>
+                  </button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={`border ${selected ? 'bg-red-600 text-white border-red-600 hover:bg-red-700' : 'text-red-600 hover:text-red-700 hover:bg-red-50'}`}
+                    onClick={() => {
+                      if (!isSelectionMode) enterSelectionMode();
+                      toggleSelection(a);
+                    }}
+                    title={selected ? 'Selecionada para exclusão' : 'Marcar para exclusão'}
+                    aria-pressed={selected}
+                  >
+                    <Trash2 className={`h-4 w-4 ${selected ? 'text-white' : ''}`} />
+                  </Button>
+                </div>
               );
             })}
           </div>

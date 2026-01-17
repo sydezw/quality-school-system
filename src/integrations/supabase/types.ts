@@ -321,6 +321,224 @@ export type Database = {
           },
         ]
       }
+      alunos_financeiro: {
+        Row: {
+          aluno_id: string
+          ativo_ou_encerrado: boolean
+          aulas_pagas: number
+          created_at: string | null
+          data_primeiro_vencimento: string
+          desconto_total: number
+          forma_pagamento_material:
+            | Database["public"]["Enums"]["forma_pagamento"]
+            | null
+          forma_pagamento_matricula:
+            | Database["public"]["Enums"]["forma_pagamento"]
+            | null
+          forma_pagamento_plano:
+            | Database["public"]["Enums"]["forma_pagamento"]
+            | null
+          historico: boolean
+          id: string
+          idioma_registro: Database["public"]["Enums"]["idioma_registro_financeiro"]
+          migrado: boolean
+          numero_parcelas_material: number | null
+          numero_parcelas_matricula: number | null
+          numero_parcelas_plano: number | null
+          plano_id: string
+          porcentagem_progresso: number | null
+          porcentagem_total: number | null
+          status_geral: Database["public"]["Enums"]["status_geral_financeiro"]
+          updated_at: string | null
+          valor_material: number
+          valor_matricula: number
+          valor_plano: number
+          valor_total: number
+        }
+        Insert: {
+          aluno_id: string
+          ativo_ou_encerrado?: boolean
+          aulas_pagas?: number
+          created_at?: string | null
+          data_primeiro_vencimento: string
+          desconto_total?: number
+          forma_pagamento_material?:
+            | Database["public"]["Enums"]["forma_pagamento"]
+            | null
+          forma_pagamento_matricula?:
+            | Database["public"]["Enums"]["forma_pagamento"]
+            | null
+          forma_pagamento_plano?:
+            | Database["public"]["Enums"]["forma_pagamento"]
+            | null
+          historico?: boolean
+          id?: string
+          idioma_registro?: Database["public"]["Enums"]["idioma_registro_financeiro"]
+          migrado?: boolean
+          numero_parcelas_material?: number | null
+          numero_parcelas_matricula?: number | null
+          numero_parcelas_plano?: number | null
+          plano_id: string
+          porcentagem_progresso?: number | null
+          porcentagem_total?: number | null
+          status_geral?: Database["public"]["Enums"]["status_geral_financeiro"]
+          updated_at?: string | null
+          valor_material?: number
+          valor_matricula?: number
+          valor_plano?: number
+          valor_total: number
+        }
+        Update: {
+          aluno_id?: string
+          ativo_ou_encerrado?: boolean
+          aulas_pagas?: number
+          created_at?: string | null
+          data_primeiro_vencimento?: string
+          desconto_total?: number
+          forma_pagamento_material?:
+            | Database["public"]["Enums"]["forma_pagamento"]
+            | null
+          forma_pagamento_matricula?:
+            | Database["public"]["Enums"]["forma_pagamento"]
+            | null
+          forma_pagamento_plano?:
+            | Database["public"]["Enums"]["forma_pagamento"]
+            | null
+          historico?: boolean
+          id?: string
+          idioma_registro?: Database["public"]["Enums"]["idioma_registro_financeiro"]
+          migrado?: boolean
+          numero_parcelas_material?: number | null
+          numero_parcelas_matricula?: number | null
+          numero_parcelas_plano?: number | null
+          plano_id?: string
+          porcentagem_progresso?: number | null
+          porcentagem_total?: number | null
+          status_geral?: Database["public"]["Enums"]["status_geral_financeiro"]
+          updated_at?: string | null
+          valor_material?: number
+          valor_matricula?: number
+          valor_plano?: number
+          valor_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_alunos_financeiro_aluno_id"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "alunos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_alunos_financeiro_aluno_id"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "fk_alunos_financeiro_aluno_id"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "fk_alunos_financeiro_aluno_id"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "fk_alunos_financeiro_plano_id"
+            columns: ["plano_id"]
+            isOneToOne: false
+            referencedRelation: "planos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alunos_parcelas: {
+        Row: {
+          alunos_financeiro_id: string
+          atualizado_em: string | null
+          comprovante: string | null
+          criado_em: string | null
+          data_pagamento: string | null
+          data_vencimento: string
+          descricao_item: string | null
+          final_ciclo: string | null
+          forma_pagamento: string | null
+          historico: boolean
+          id: number
+          idioma_registro: Database["public"]["Enums"]["idioma_registro_financeiro"]
+          inicio_ciclo: string | null
+          nome_aluno: string | null
+          numero_parcela: number
+          observacoes: string | null
+          status_pagamento:
+            | Database["public"]["Enums"]["status_pagamento"]
+            | null
+          tipo_item: Database["public"]["Enums"]["tipo_item"]
+          valor: number
+        }
+        Insert: {
+          alunos_financeiro_id: string
+          atualizado_em?: string | null
+          comprovante?: string | null
+          criado_em?: string | null
+          data_pagamento?: string | null
+          data_vencimento: string
+          descricao_item?: string | null
+          final_ciclo?: string | null
+          forma_pagamento?: string | null
+          historico?: boolean
+          id?: number
+          idioma_registro: Database["public"]["Enums"]["idioma_registro_financeiro"]
+          inicio_ciclo?: string | null
+          nome_aluno?: string | null
+          numero_parcela: number
+          observacoes?: string | null
+          status_pagamento?:
+            | Database["public"]["Enums"]["status_pagamento"]
+            | null
+          tipo_item: Database["public"]["Enums"]["tipo_item"]
+          valor: number
+        }
+        Update: {
+          alunos_financeiro_id?: string
+          atualizado_em?: string | null
+          comprovante?: string | null
+          criado_em?: string | null
+          data_pagamento?: string | null
+          data_vencimento?: string
+          descricao_item?: string | null
+          final_ciclo?: string | null
+          forma_pagamento?: string | null
+          historico?: boolean
+          id?: number
+          idioma_registro?: Database["public"]["Enums"]["idioma_registro_financeiro"]
+          inicio_ciclo?: string | null
+          nome_aluno?: string | null
+          numero_parcela?: number
+          observacoes?: string | null
+          status_pagamento?:
+            | Database["public"]["Enums"]["status_pagamento"]
+            | null
+          tipo_item?: Database["public"]["Enums"]["tipo_item"]
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alunos_parcelas_alunos_financeiro_id_fkey"
+            columns: ["alunos_financeiro_id"]
+            isOneToOne: false
+            referencedRelation: "alunos_financeiro"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       aulas: {
         Row: {
           conteudo: string | null
@@ -414,140 +632,6 @@ export type Database = {
             columns: ["professor_id"]
             isOneToOne: false
             referencedRelation: "professores"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      alunos_financeiro: {
-        Row: {
-          aluno_id: string
-          created_at: string | null
-          data_contrato: string | null
-          data_inicio: string | null
-          desconto_total: number | null
-          id: string
-          observacoes: string | null
-          planos_id: string | null
-          status: string | null
-          tipo_valor: string | null
-          updated_at: string | null
-          valor_material: number | null
-          valor_matricula: number | null
-          valor_plano: number | null
-          valor_total: number | null
-        }
-        Insert: {
-          aluno_id: string
-          created_at?: string | null
-          data_contrato?: string | null
-          data_inicio?: string | null
-          desconto_total?: number | null
-          id?: string
-          observacoes?: string | null
-          planos_id?: string | null
-          status?: string | null
-          tipo_valor?: string | null
-          updated_at?: string | null
-          valor_material?: number | null
-          valor_matricula?: number | null
-          valor_plano?: number | null
-          valor_total?: number | null
-        }
-        Update: {
-          aluno_id?: string
-          created_at?: string | null
-          data_contrato?: string | null
-          data_inicio?: string | null
-          desconto_total?: number | null
-          id?: string
-          observacoes?: string | null
-          planos_id?: string | null
-          status?: string | null
-          tipo_valor?: string | null
-          updated_at?: string | null
-          valor_material?: number | null
-          valor_matricula?: number | null
-          valor_plano?: number | null
-          valor_total?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "alunos_financeiro_aluno_id_fkey"
-            columns: ["aluno_id"]
-            isOneToOne: false
-            referencedRelation: "alunos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "alunos_financeiro_planos_id_fkey"
-            columns: ["planos_id"]
-            isOneToOne: false
-            referencedRelation: "planos"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      alunos_parcelas: {
-        Row: {
-          id: number
-          alunos_financeiro_id: string
-          numero_parcela: number
-          valor: number
-          data_vencimento: string
-          data_pagamento: string | null
-          historico: boolean
-          nome_aluno: string | null
-          descricao_item: string | null
-          forma_pagamento: string | null
-          observacoes: string | null
-          idioma_registro: Database["public"]["Enums"]["idioma_registro_financeiro"]
-          status_pagamento: Database["public"]["Enums"]["status_pagamento"]
-          tipo_item: Database["public"]["Enums"]["tipo_item"]
-          inicio_ciclo: string | null
-          final_ciclo: string | null
-        }
-        Insert: {
-          id?: number
-          alunos_financeiro_id: string
-          numero_parcela: number
-          valor: number
-          data_vencimento: string
-          data_pagamento?: string | null
-          historico?: boolean
-          nome_aluno?: string | null
-          descricao_item?: string | null
-          forma_pagamento?: string | null
-          observacoes?: string | null
-          idioma_registro: Database["public"]["Enums"]["idioma_registro_financeiro"]
-          status_pagamento?: Database["public"]["Enums"]["status_pagamento"]
-          tipo_item: Database["public"]["Enums"]["tipo_item"]
-          inicio_ciclo?: string | null
-          final_ciclo?: string | null
-        }
-        Update: {
-          id?: number
-          alunos_financeiro_id?: string
-          numero_parcela?: number
-          valor?: number
-          data_vencimento?: string
-          data_pagamento?: string | null
-          historico?: boolean
-          nome_aluno?: string | null
-          descricao_item?: string | null
-          forma_pagamento?: string | null
-          observacoes?: string | null
-          idioma_registro?: Database["public"]["Enums"]["idioma_registro_financeiro"]
-          status_pagamento?: Database["public"]["Enums"]["status_pagamento"]
-          tipo_item?: Database["public"]["Enums"]["tipo_item"]
-          inicio_ciclo?: string | null
-          final_ciclo?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "alunos_parcelas_alunos_financeiro_id_fkey"
-            columns: ["alunos_financeiro_id"]
-            isOneToOne: false
-            referencedRelation: "alunos_financeiro"
             referencedColumns: ["id"]
           },
         ]
@@ -731,6 +815,8 @@ export type Database = {
         Row: {
           aluno_id: string
           aluno_turma_id: string | null
+          aula_id: string | null
+          book_snapshot: string | null
           competencia: Database["public"]["Enums"]["competencia"]
           created_at: string
           data: string
@@ -738,11 +824,16 @@ export type Database = {
           nota: number
           observacao: string | null
           turma_id: string
+          turma_idioma_snapshot: string | null
+          turma_nivel_snapshot: string | null
+          turma_nome_snapshot: string | null
           updated_at: string
         }
         Insert: {
           aluno_id: string
           aluno_turma_id?: string | null
+          aula_id?: string | null
+          book_snapshot?: string | null
           competencia: Database["public"]["Enums"]["competencia"]
           created_at?: string
           data: string
@@ -750,11 +841,16 @@ export type Database = {
           nota: number
           observacao?: string | null
           turma_id: string
+          turma_idioma_snapshot?: string | null
+          turma_nivel_snapshot?: string | null
+          turma_nome_snapshot?: string | null
           updated_at?: string
         }
         Update: {
           aluno_id?: string
           aluno_turma_id?: string | null
+          aula_id?: string | null
+          book_snapshot?: string | null
           competencia?: Database["public"]["Enums"]["competencia"]
           created_at?: string
           data?: string
@@ -762,6 +858,9 @@ export type Database = {
           nota?: number
           observacao?: string | null
           turma_id?: string
+          turma_idioma_snapshot?: string | null
+          turma_nivel_snapshot?: string | null
+          turma_nome_snapshot?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -801,6 +900,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "avaliacoes_competencia_aula_id_fkey"
+            columns: ["aula_id"]
+            isOneToOne: false
+            referencedRelation: "aulas"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "avaliacoes_competencia_turma_id_fkey"
             columns: ["turma_id"]
             isOneToOne: false
@@ -829,6 +935,133 @@ export type Database = {
             referencedColumns: ["turma_id"]
           },
         ]
+      }
+      avaliacoes_prova_final: {
+        Row: {
+          acertos: number
+          aluno_id: string
+          aprovacao_manual: boolean
+          aprovacao_status: string | null
+          aula_id: string
+          created_at: string
+          data_prova: string
+          id: string
+          observacao: string | null
+          total_questoes: number
+          turma_id: string
+          updated_at: string
+        }
+        Insert: {
+          acertos: number
+          aluno_id: string
+          aprovacao_manual?: boolean
+          aprovacao_status?: string | null
+          aula_id: string
+          created_at?: string
+          data_prova: string
+          id?: string
+          observacao?: string | null
+          total_questoes: number
+          turma_id: string
+          updated_at?: string
+        }
+        Update: {
+          acertos?: number
+          aluno_id?: string
+          aprovacao_manual?: boolean
+          aprovacao_status?: string | null
+          aula_id?: string
+          created_at?: string
+          data_prova?: string
+          id?: string
+          observacao?: string | null
+          total_questoes?: number
+          turma_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "avaliacoes_prova_final_aluno_fk"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "alunos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_prova_final_aluno_fk"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_prova_final_aluno_fk"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_prova_final_aluno_fk"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_prova_final_aula_fk"
+            columns: ["aula_id"]
+            isOneToOne: false
+            referencedRelation: "aulas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_prova_final_turma_fk"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["turma_id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_prova_final_turma_fk"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["turma_id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_prova_final_turma_fk"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "turmas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_prova_final_turma_fk"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["turma_id"]
+          },
+        ]
+      }
+      bd_ativo: {
+        Row: {
+          created_at: string
+          id: number
+          number: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          number?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          number?: number | null
+        }
+        Relationships: []
       }
       boletos: {
         Row: {
@@ -1553,47 +1786,6 @@ export type Database = {
           },
         ]
       }
-      logs: {
-        Row: {
-          acao: string
-          created_at: string
-          data: string
-          descricao: string | null
-          id: string
-          registro_id: string | null
-          tabela_afetada: string
-          usuario_id: string
-        }
-        Insert: {
-          acao: string
-          created_at?: string
-          data?: string
-          descricao?: string | null
-          id?: string
-          registro_id?: string | null
-          tabela_afetada: string
-          usuario_id: string
-        }
-        Update: {
-          acao?: string
-          created_at?: string
-          data?: string
-          descricao?: string | null
-          id?: string
-          registro_id?: string | null
-          tabela_afetada?: string
-          usuario_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "logs_usuario_id_fkey"
-            columns: ["usuario_id"]
-            isOneToOne: false
-            referencedRelation: "usuarios"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       materiais: {
         Row: {
           created_at: string
@@ -1627,131 +1819,6 @@ export type Database = {
         }
         Relationships: []
       }
-      materiais_entregues: {
-        Row: {
-          aluno_id: string | null
-          created_at: string
-          data_entrega: string
-          id: string
-          material_id: string
-          updated_at: string
-        }
-        Insert: {
-          aluno_id?: string | null
-          created_at?: string
-          data_entrega: string
-          id?: string
-          material_id: string
-          updated_at?: string
-        }
-        Update: {
-          aluno_id?: string | null
-          created_at?: string
-          data_entrega?: string
-          id?: string
-          material_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "materiais_entregues_aluno_id_fkey"
-            columns: ["aluno_id"]
-            isOneToOne: false
-            referencedRelation: "alunos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "materiais_entregues_aluno_id_fkey"
-            columns: ["aluno_id"]
-            isOneToOne: false
-            referencedRelation: "estatisticas_presenca_aluno"
-            referencedColumns: ["aluno_id"]
-          },
-          {
-            foreignKeyName: "materiais_entregues_aluno_id_fkey"
-            columns: ["aluno_id"]
-            isOneToOne: false
-            referencedRelation: "progresso_competencia_aluno"
-            referencedColumns: ["aluno_id"]
-          },
-          {
-            foreignKeyName: "materiais_entregues_aluno_id_fkey"
-            columns: ["aluno_id"]
-            isOneToOne: false
-            referencedRelation: "view_alunos_turmas"
-            referencedColumns: ["aluno_id"]
-          },
-          {
-            foreignKeyName: "materiais_entregues_material_id_fkey"
-            columns: ["material_id"]
-            isOneToOne: false
-            referencedRelation: "materiais"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      notificacoes: {
-        Row: {
-          created_at: string
-          data_envio: string
-          destinatario_id: string
-          id: string
-          mensagem: string
-          status: Database["public"]["Enums"]["status_notificacao"]
-          tipo: Database["public"]["Enums"]["tipo_notificacao"]
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          data_envio?: string
-          destinatario_id: string
-          id?: string
-          mensagem: string
-          status?: Database["public"]["Enums"]["status_notificacao"]
-          tipo: Database["public"]["Enums"]["tipo_notificacao"]
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          data_envio?: string
-          destinatario_id?: string
-          id?: string
-          mensagem?: string
-          status?: Database["public"]["Enums"]["status_notificacao"]
-          tipo?: Database["public"]["Enums"]["tipo_notificacao"]
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "notificacoes_destinatario_id_fkey"
-            columns: ["destinatario_id"]
-            isOneToOne: false
-            referencedRelation: "alunos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "notificacoes_destinatario_id_fkey"
-            columns: ["destinatario_id"]
-            isOneToOne: false
-            referencedRelation: "estatisticas_presenca_aluno"
-            referencedColumns: ["aluno_id"]
-          },
-          {
-            foreignKeyName: "notificacoes_destinatario_id_fkey"
-            columns: ["destinatario_id"]
-            isOneToOne: false
-            referencedRelation: "progresso_competencia_aluno"
-            referencedColumns: ["aluno_id"]
-          },
-          {
-            foreignKeyName: "notificacoes_destinatario_id_fkey"
-            columns: ["destinatario_id"]
-            isOneToOne: false
-            referencedRelation: "view_alunos_turmas"
-            referencedColumns: ["aluno_id"]
-          },
-        ]
-      }
       parcelas_alunos: {
         Row: {
           atualizado_em: string | null
@@ -1761,9 +1828,9 @@ export type Database = {
           data_vencimento: string
           descricao_item: string | null
           forma_pagamento: string | null
-          historico: boolean
           id: number
           idioma_registro: Database["public"]["Enums"]["idioma_registro_financeiro"]
+          nome_aluno: string | null
           numero_parcela: number
           observacoes: string | null
           registro_financeiro_id: string
@@ -1779,9 +1846,9 @@ export type Database = {
           data_vencimento: string
           descricao_item?: string | null
           forma_pagamento?: string | null
-          historico?: boolean
           id?: number
           idioma_registro: Database["public"]["Enums"]["idioma_registro_financeiro"]
+          nome_aluno?: string | null
           numero_parcela: number
           observacoes?: string | null
           registro_financeiro_id: string
@@ -1797,9 +1864,9 @@ export type Database = {
           data_vencimento?: string
           descricao_item?: string | null
           forma_pagamento?: string | null
-          historico?: boolean
           id?: number
           idioma_registro?: Database["public"]["Enums"]["idioma_registro_financeiro"]
+          nome_aluno?: string | null
           numero_parcela?: number
           observacoes?: string | null
           registro_financeiro_id?: string
@@ -1824,6 +1891,7 @@ export type Database = {
           data_vencimento: string
           descricao_item: string | null
           forma_pagamento: string
+          historico_migrados: boolean | null
           id: number
           idioma: Database["public"]["Enums"]["idioma_registro_financeiro"]
           observacoes: string | null
@@ -1837,6 +1905,7 @@ export type Database = {
           data_vencimento: string
           descricao_item?: string | null
           forma_pagamento: string
+          historico_migrados?: boolean | null
           id?: number
           idioma?: Database["public"]["Enums"]["idioma_registro_financeiro"]
           observacoes?: string | null
@@ -1850,6 +1919,7 @@ export type Database = {
           data_vencimento?: string
           descricao_item?: string | null
           forma_pagamento?: string
+          historico_migrados?: boolean | null
           id?: number
           idioma?: Database["public"]["Enums"]["idioma_registro_financeiro"]
           observacoes?: string | null
@@ -2439,6 +2509,7 @@ export type Database = {
       }
       turmas: {
         Row: {
+          aulas_por_semana: number | null
           cor_calendario: string | null
           cor_prova: string | null
           created_at: string
@@ -2460,6 +2531,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          aulas_por_semana?: number | null
           cor_calendario?: string | null
           cor_prova?: string | null
           created_at?: string
@@ -2481,6 +2553,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          aulas_por_semana?: number | null
           cor_calendario?: string | null
           cor_prova?: string | null
           created_at?: string
@@ -2695,6 +2768,58 @@ export type Database = {
         }
         Relationships: []
       }
+      view_avaliacoes_aula_historico: {
+        Row: {
+          aluno_id: string | null
+          aula_id: string | null
+          book: string | null
+          data: string | null
+          listening: number | null
+          reading: number | null
+          speaking: number | null
+          turma_idioma_snapshot: string | null
+          turma_nivel_snapshot: string | null
+          turma_nome_snapshot: string | null
+          writing: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "avaliacoes_competencia_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "alunos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_competencia_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "estatisticas_presenca_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_competencia_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "progresso_competencia_aluno"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_competencia_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "view_alunos_turmas"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_competencia_aula_id_fkey"
+            columns: ["aula_id"]
+            isOneToOne: false
+            referencedRelation: "aulas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       calcular_valor_total_correto: {
@@ -2707,10 +2832,11 @@ export type Database = {
         }
         Returns: number
       }
-      check_aluno_dependencies: {
-        Args: { p_aluno_id: string }
-        Returns: Json
+      calculate_aulas_por_semana: {
+        Args: { dias_da_semana_text: string }
+        Returns: number
       }
+      check_aluno_dependencies: { Args: { p_aluno_id: string }; Returns: Json }
       check_horario_conflito: {
         Args: { aluno_uuid: string; nova_turma_id: string }
         Returns: boolean
@@ -2740,6 +2866,7 @@ export type Database = {
           matricula_status: string
         }[]
       }
+      get_turma_book_nome: { Args: { p_turma_id: string }; Returns: string }
       get_turma_color: {
         Args: {
           p_idioma: Database["public"]["Enums"]["idioma"]
@@ -2747,10 +2874,8 @@ export type Database = {
         }
         Returns: string
       }
-      obter_permissoes_usuario: {
-        Args: { usuario_id: string }
-        Returns: Json
-      }
+      inserir_aluno_financeiro: { Args: { dados: Json }; Returns: undefined }
+      obter_permissoes_usuario: { Args: { usuario_id: string }; Returns: Json }
       verificar_permissao: {
         Args: { permissao: string; usuario_id: string }
         Returns: boolean
@@ -2761,6 +2886,14 @@ export type Database = {
       cargo_usuario: "Secretária" | "Gerente" | "Admin" | "Professor"
       categoria_despesa: "salário" | "aluguel" | "material" | "manutenção"
       competencia: "Listening" | "Speaking" | "Writing" | "Reading"
+      forma_pagamento:
+        | "boleto"
+        | "cartao_credito"
+        | "cartao_debito"
+        | "dinheiro"
+        | "pix"
+        | "transferencia"
+        | "outro"
       idioma: "Inglês" | "Japonês" | "Inglês/Japonês" | "particular"
       idioma_registro_financeiro: "Inglês" | "Japonês"
       migrado: "sim" | "nao"
@@ -2786,6 +2919,11 @@ export type Database = {
       status_despesa: "Pago" | "Pendente"
       status_documento: "gerado" | "assinado" | "cancelado"
       status_folha: "Pago" | "Pendente"
+      status_geral_financeiro:
+        | "Pago"
+        | "Parcialmente Pago"
+        | "Pendente"
+        | "Arquivado"
       status_material: "disponivel" | "indisponivel"
       status_notificacao: "enviada" | "pendente" | "erro"
       status_pagamento: "pago" | "pendente" | "vencido" | "cancelado"
@@ -2801,7 +2939,13 @@ export type Database = {
         | "diploma_professor"
         | "comprovante_experiencia"
         | "documento_pessoal"
-      tipo_item: "plano" | "material" | "matrícula" | "cancelamento" | "outros"
+      tipo_item:
+        | "plano"
+        | "material"
+        | "matrícula"
+        | "cancelamento"
+        | "outros"
+        | "avulso"
       tipo_notificacao: "boleto" | "presenca" | "lembrete" | "geral"
       tipo_turma: "Turma particular" | "Turma"
     }
@@ -2938,6 +3082,15 @@ export const Constants = {
       cargo_usuario: ["Secretária", "Gerente", "Admin", "Professor"],
       categoria_despesa: ["salário", "aluguel", "material", "manutenção"],
       competencia: ["Listening", "Speaking", "Writing", "Reading"],
+      forma_pagamento: [
+        "boleto",
+        "cartao_credito",
+        "cartao_debito",
+        "dinheiro",
+        "pix",
+        "transferencia",
+        "outro",
+      ],
       idioma: ["Inglês", "Japonês", "Inglês/Japonês", "particular"],
       idioma_registro_financeiro: ["Inglês", "Japonês"],
       migrado: ["sim", "nao"],
@@ -2965,6 +3118,12 @@ export const Constants = {
       status_despesa: ["Pago", "Pendente"],
       status_documento: ["gerado", "assinado", "cancelado"],
       status_folha: ["Pago", "Pendente"],
+      status_geral_financeiro: [
+        "Pago",
+        "Parcialmente Pago",
+        "Pendente",
+        "Arquivado",
+      ],
       status_material: ["disponivel", "indisponivel"],
       status_notificacao: ["enviada", "pendente", "erro"],
       status_pagamento: ["pago", "pendente", "vencido", "cancelado"],
@@ -2981,7 +3140,14 @@ export const Constants = {
         "comprovante_experiencia",
         "documento_pessoal",
       ],
-      tipo_item: ["plano", "material", "matrícula", "cancelamento", "avulso", "outros"],
+      tipo_item: [
+        "plano",
+        "material",
+        "matrícula",
+        "cancelamento",
+        "outros",
+        "avulso",
+      ],
       tipo_notificacao: ["boleto", "presenca", "lembrete", "geral"],
       tipo_turma: ["Turma particular", "Turma"],
     },

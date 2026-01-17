@@ -234,9 +234,18 @@ const ClassesList = () => {
     exitSelectionMode,
     getSelectedItems
   } = useMultipleSelection<AulaComDetalhes>({
-    items: aulasPaginadas,
+    items: sortedAulas,
     getItemId: (aula) => aula.id
   });
+
+  const toggleGroupByDay = (base: AulaComDetalhes) => {
+    const group = sortedAulas.filter(a => a.turma_id === base.turma_id && a.data === base.data);
+    const allSelected = group.every(item => isSelected(item));
+    for (const item of group) {
+      const shouldToggle = allSelected ? isSelected(item) : !isSelected(item);
+      if (shouldToggle) toggleSelection(item);
+    }
+  };
 
   /**
    * Manipula ordenação por coluna
@@ -593,14 +602,17 @@ const ClassesList = () => {
                   >
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex items-start gap-3 flex-1">
-                        <SelectionCheckbox
-                          isSelected={isSelected(aula)}
-                          onChange={() => toggleSelection(aula)}
-                        />
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-gray-900 text-base">
-                            {aula.titulo || 'Sem título'}
-                          </h3>
+                      <SelectionCheckbox
+                        isSelected={isSelected(aula)}
+                        onChange={() => {
+                          if (!isSelectionMode) enterSelectionMode();
+                          toggleGroupByDay(aula);
+                        }}
+                      />
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-900 text-base">
+                          {aula.titulo || 'Sem título'}
+                        </h3>
                           <p className="text-sm text-gray-600 mt-1">
                             {aula.turmas?.nome || 'Turma não definida'}
                           </p>
@@ -748,7 +760,10 @@ const ClassesList = () => {
                     <TableCell>
                       <SelectionCheckbox
                         isSelected={isSelected(aula)}
-                        onChange={() => toggleSelection(aula)}
+                        onChange={() => {
+                          if (!isSelectionMode) enterSelectionMode();
+                          toggleGroupByDay(aula);
+                        }}
                       />
                     </TableCell>
                     <TableCell className="font-medium">
@@ -803,7 +818,10 @@ const ClassesList = () => {
                         <Button 
                           variant="outline" 
                           size="sm"
-                          onClick={() => handleDelete(aula)}
+                          onClick={() => {
+                            if (!isSelectionMode) enterSelectionMode();
+                            toggleGroupByDay(aula);
+                          }}
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
                           <Trash2 className="h-3 w-3" />

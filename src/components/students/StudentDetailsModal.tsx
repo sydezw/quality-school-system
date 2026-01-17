@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/integrations/supabase/types';
@@ -201,6 +202,10 @@ export const StudentDetailsModal: React.FC<StudentDetailsModalProps> = ({
   const [matriculaObservacoes, setMatriculaObservacoes] = useState<string>('');
   const [matriculaIdAtual, setMatriculaIdAtual] = useState<string | null>(null);
   const [salvandoObservacoes, setSalvandoObservacoes] = useState(false);
+  const [historicoOpen, setHistoricoOpen] = useState(false);
+  const [historicoLoading, setHistoricoLoading] = useState(false);
+  const [historicoPage, setHistoricoPage] = useState(0);
+  const [historicoRows, setHistoricoRows] = useState<Array<{ data: string; listening?: number | null; speaking?: number | null; writing?: number | null; reading?: number | null; book?: string | null; turma_nome_snapshot?: string | null }>>([]);
 
   const [turmaAtual, setTurmaAtual] = useState<{
     id: string;
@@ -498,6 +503,64 @@ export const StudentDetailsModal: React.FC<StudentDetailsModalProps> = ({
       setCarregandoFaltas(false);
     }
   }, [isOpen]);
+
+  const carregarHistorico = useCallback(async (alunoId: string, page: number) => {
+    try {
+      setHistoricoLoading(true);
+      type HistoricoRow = {
+        aluno_id: string;
+        aula_id?: string | null;
+        data: string;
+        turma_nome_snapshot?: string | null;
+        book?: string | null;
+        listening?: number | null;
+        speaking?: number | null;
+        writing?: number | null;
+        reading?: number | null;
+      };
+      type DatabaseExt = Database & {
+        public: {
+          Tables: Database['public']['Tables'] & {
+            view_avaliacoes_aula_historico: {
+              Row: HistoricoRow;
+            };
+          };
+        };
+      };
+      const sp = supabase as unknown as SupabaseClient<DatabaseExt>;
+      const pageSize = 20;
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+      const { data } = await sp
+        .from('view_avaliacoes_aula_historico')
+        .select('data, turma_nome_snapshot, book, listening, speaking, writing, reading')
+        .eq('aluno_id', alunoId)
+        .order('data', { ascending: false })
+        .range(from, to);
+      const rows = (data || []) as HistoricoRow[];
+      const mapped = rows.map(r => ({
+        data: r.data,
+        listening: r.listening ?? null,
+        speaking: r.speaking ?? null,
+        writing: r.writing ?? null,
+        reading: r.reading ?? null,
+        book: r.book ?? null,
+        turma_nome_snapshot: r.turma_nome_snapshot ?? null,
+      }));
+      setHistoricoRows(prev => (page === 0 ? mapped : [...prev, ...mapped]));
+    } finally {
+      setHistoricoLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const id = deferredStudent?.id || student?.id;
+    if (historicoOpen && id) {
+      setHistoricoRows([]);
+      setHistoricoPage(0);
+      carregarHistorico(id, 0);
+    }
+  }, [historicoOpen, deferredStudent?.id, student?.id, carregarHistorico]);
 
   const buscarTurmaAtual = useCallback(async (alunoId: string) => {
     if (!alunoId) {
@@ -1543,6 +1606,19 @@ export const StudentDetailsModal: React.FC<StudentDetailsModalProps> = ({
                   <div className="text-xs text-gray-500">{turmaAtual?.nome || 'Sem turma'}</div>
                 )}
               </div>
+              <div className="ml-auto">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setHistoricoRows([]);
+                    setHistoricoPage(0);
+                    setHistoricoOpen(true);
+                  }}
+                  className="bg-gradient-to-r from-gray-200 to-gray-300 text-gray-800 hover:from-gray-300 hover:to-gray-400"
+                >
+                  Histórico
+                </Button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-6">
@@ -1666,10 +1742,80 @@ export const StudentDetailsModal: React.FC<StudentDetailsModalProps> = ({
             console.log('[PERF] DesempenhoSection TRUE render ms =', perfEnd - perfStart);
             return node3;
           })()}
-         </div>
-       </DialogContent>
-     </Dialog>
-   );
- };
+          
+          <Dialog open={historicoOpen} onOpenChange={setHistoricoOpen}>
+            <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden">
+              <DialogHeader>
+                <DialogTitle>Histórico de Aulas Avaliativas</DialogTitle>
+              </DialogHeader>
+              <div className="flex-1 overflow-y-auto">
+                {historicoLoading && historicoRows.length === 0 ? (
+                  <div className="p-6 text-center text-gray-600">Carregando...</div>
+                ) : (
+                  <div className="space-y-4">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Data</TableHead>
+                          <TableHead>Listening</TableHead>
+                          <TableHead>Speaking</TableHead>
+                          <TableHead>Writing</TableHead>
+                          <TableHead>Reading</TableHead>
+                          <TableHead>Book</TableHead>
+                          <TableHead>Turma</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {historicoRows.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center text-gray-500">Sem registros</TableCell>
+                          </TableRow>
+                        ) : (
+                          historicoRows.map((r, idx) => (
+                            <TableRow key={`${r.data}-${idx}`}>
+                              <TableCell>{formatDate(r.data)}</TableCell>
+                              <TableCell>{r.listening != null ? r.listening.toFixed(1) : 'N/A'}</TableCell>
+                              <TableCell>{r.speaking != null ? r.speaking.toFixed(1) : 'N/A'}</TableCell>
+                              <TableCell>{r.writing != null ? r.writing.toFixed(1) : 'N/A'}</TableCell>
+                              <TableCell>{r.reading != null ? r.reading.toFixed(1) : 'N/A'}</TableCell>
+                              <TableCell>{r.book || 'N/A'}</TableCell>
+                              <TableCell>{r.turma_nome_snapshot || 'N/A'}</TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setHistoricoOpen(false)}
+                        className="bg-neutral-100 hover:bg-neutral-200"
+                      >
+                        Fechar
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          const id = deferredStudent?.id || student?.id;
+                          if (!id) return;
+                          const nextPage = historicoPage + 1;
+                          setHistoricoPage(nextPage);
+                          carregarHistorico(id, nextPage);
+                        }}
+                        disabled={historicoLoading}
+                        className="bg-gray-700 hover:bg-gray-800 text-white"
+                      >
+                        {historicoLoading ? 'Carregando...' : 'Carregar mais'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
  
  export default StudentDetailsModal;
