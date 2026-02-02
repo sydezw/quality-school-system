@@ -15,6 +15,8 @@ interface Responsible {
   endereco: string | null;
   numero_endereco: string | null;
   telefone: string | null;
+  email: string | null;
+  data_nascimento?: string | null;
 }
 
 interface ResponsibleFormProps {
@@ -32,6 +34,7 @@ const ResponsibleForm = ({ editingResponsible, onSubmit, onCancel }: Responsible
   const [loadingCep, setLoadingCep] = useState(false);
   const cpfValue = watch('cpf');
   const cepValue = watch('cep');
+  const dobValue = watch('data_nascimento');
   const [hasExportedAddress, setHasExportedAddress] = useState(false);
 
   useEffect(() => {
@@ -45,6 +48,8 @@ const ResponsibleForm = ({ editingResponsible, onSubmit, onCancel }: Responsible
       setValue('endereco', editingResponsible.endereco || '');
       setValue('numero_endereco', editingResponsible.numero_endereco || '');
       setValue('telefone', editingResponsible.telefone || '');
+      setValue('email', editingResponsible.email || '');
+      setValue('data_nascimento', editingResponsible.data_nascimento ? new Date(editingResponsible.data_nascimento).toISOString().split('T')[0] : '');
 
       let cep = '';
       if (editingResponsible.endereco) {
@@ -55,7 +60,7 @@ const ResponsibleForm = ({ editingResponsible, onSubmit, onCancel }: Responsible
       }
       setValue('cep', cep);
     } else {
-      reset({ nome: '', cpf: '', endereco: '', telefone: '', cep: '', numero_endereco: '' });
+      reset({ nome: '', cpf: '', endereco: '', telefone: '', email: '', cep: '', numero_endereco: '', data_nascimento: '' });
     }
   }, [editingResponsible, setValue, reset]);
 
@@ -158,7 +163,9 @@ const ResponsibleForm = ({ editingResponsible, onSubmit, onCancel }: Responsible
       cpf: data.cpf ? data.cpf.replace(/\D/g, '') : null,
       endereco: data.endereco || null,
       numero_endereco: data.numero_endereco || null,
-      telefone: data.telefone || null
+      telefone: data.telefone || null,
+      email: data.email || null,
+      data_nascimento: data.data_nascimento || null
     };
     console.log('Dados sendo enviados:', submitData);
     onSubmit(submitData);
@@ -186,6 +193,17 @@ const ResponsibleForm = ({ editingResponsible, onSubmit, onCancel }: Responsible
           onChange={handleCPFChange}
           placeholder="000.000.000-00"
           maxLength={14}
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="data_nascimento">Data de Nascimento</Label>
+        <Input
+          id="data_nascimento"
+          type="date"
+          value={dobValue || ''}
+          onChange={(e) => setValue('data_nascimento', e.target.value)}
+          placeholder="dd/mm/aaaa"
         />
       </div>
 
@@ -235,6 +253,16 @@ const ResponsibleForm = ({ editingResponsible, onSubmit, onCancel }: Responsible
             setValue('telefone', formatted);
           }}
           maxLength={15}
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="email">E-mail</Label>
+        <Input
+          id="email"
+          type="email"
+          {...register('email')}
+          placeholder="email@exemplo.com"
         />
       </div>
 

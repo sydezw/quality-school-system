@@ -326,6 +326,74 @@ const StudentContractGeneratorModal: React.FC<StudentContractGeneratorModalProps
   }
   const resumoFormaPagamento = partesPagamento.length > 0 ? partesPagamento.join(' + ') : '<span class="placeholder-text">forma de pagamento e parcelas</span>';
 
+  const mkDateKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const easterSunday = (year: number) => {
+    const a = year % 19;
+    const b = Math.floor(year / 100);
+    const c = year % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31);
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(year, month - 1, day);
+  };
+  const goodFridayDate = (year: number) => {
+    const e = easterSunday(year);
+    const gf = new Date(e.getFullYear(), e.getMonth(), e.getDate());
+    gf.setDate(gf.getDate() - 2);
+    return gf;
+  };
+  const brazilNationalHolidays = (year: number) => {
+    const m = new Map<string, string>();
+    m.set(`${year}-01-01`, 'Confraternização Universal');
+    m.set(`${year}-04-21`, 'Tiradentes');
+    m.set(`${year}-05-01`, 'Dia do Trabalho');
+    m.set(`${year}-09-07`, 'Independência do Brasil');
+    m.set(`${year}-10-12`, 'Nossa Senhora Aparecida');
+    m.set(`${year}-11-02`, 'Finados');
+    m.set(`${year}-11-20`, 'Consciência Negra');
+    m.set(`${year}-11-15`, 'Proclamação da República');
+    m.set(`${year}-12-25`, 'Natal');
+    const gf = goodFridayDate(year);
+    m.set(mkDateKey(gf), 'Paixão de Cristo');
+    return m;
+  };
+  const saoPauloStateHolidays = (year: number) => {
+    const m = new Map<string, string>();
+    m.set(`${year}-07-09`, 'Revolução Constitucionalista (SP)');
+    return m;
+  };
+  const saoPauloCityHolidays = (year: number) => {
+    const m = new Map<string, string>();
+    m.set(`${year}-01-25`, 'Aniversário de São Paulo');
+    return m;
+  };
+  const normalizeNoAccents = (s: string) => s ? s.normalize('NFD').replace(/[ -\u036f]/g, '').toLowerCase() : '';
+  const formatDateWithHoliday = (d: Date) => {
+    const base = d.toLocaleDateString('pt-BR');
+    const year = d.getFullYear();
+    const map = brazilNationalHolidays(year);
+    const isSP = String(estado || '').toUpperCase() === 'SP';
+    const isSaoPauloCity = normalizeNoAccents(String(cidade || '')) === 'sao paulo';
+    if (isSP) {
+      const spH = saoPauloStateHolidays(year);
+      for (const [k, v] of spH.entries()) map.set(k, v);
+    }
+    if (isSaoPauloCity) {
+      const spcH = saoPauloCityHolidays(year);
+      for (const [k, v] of spcH.entries()) map.set(k, v);
+    }
+    const name = map.get(mkDateKey(d));
+    return name ? base + ' (' + name + ')' : base;
+  };
+
   // Cronograma de Aulas - baseado em data_inicio, data_fim e dias_da_semana da turma
   const cronogramaHtml = (() => {
     const startStr = (turmaAtual as any)?.data_inicio || contractData?.data_inicio || null;
@@ -359,7 +427,7 @@ const StudentContractGeneratorModal: React.FC<StudentContractGeneratorModalProps
     const endDate = endStr ? new Date(endStr) : null;
     if (!startDate || diasIndices.length === 0) return '';
 
-    const fmtBR = (d: Date) => d.toLocaleDateString('pt-BR');
+    const fmtBR = (d: Date) => formatDateWithHoliday(d);
     const matches: string[] = [];
     const totalAulasTurma = (turmaAtual as any)?.total_aulas;
     const isPlanoAnual = Number(numeroAulas) === 72;
@@ -407,7 +475,8 @@ const StudentContractGeneratorModal: React.FC<StudentContractGeneratorModalProps
     const left = matches.slice(0, mid);
     const right = matches.slice(mid);
 
-    const header = '<tr><td style="width: 25%; padding: 5px; border: 1px solid #000; font-weight: bold; text-align: center;">Aula nº</td><td style="width: 75%; padding: 5px; border: 1px solid #000; font-weight: bold; text-align: center;">Data Estimada</td></tr>';
+    const headerLabel = turmaTipo === 'Turma Regular' ? 'Encontros nº' : 'Aula nº';
+    const header = '<tr><td style="width: 25%; padding: 5px; border: 1px solid #000; font-weight: bold; text-align: center;">' + headerLabel + '</td><td style="width: 75%; padding: 5px; border: 1px solid #000; font-weight: bold; text-align: center;">Data Estimada</td></tr>';
     const makePairLabel = (index: number) => ((index * 2 + 1) + '–' + (index * 2 + 2));
     const leftRows = left.map((date, i) => '<tr><td style="padding: 5px; border: 1px solid #000; text-align: center;">' + (isPlano36 ? makePairLabel(i) : (i+1)) + '</td><td style="padding: 5px; border: 1px solid #000;">' + date + '</td></tr>').join('');
     const rightRows = right.map((date, i) => '<tr><td style="padding: 5px; border: 1px solid #000; text-align: center;">' + (isPlano36 ? makePairLabel(mid + i) : (mid+i+1)) + '</td><td style="padding: 5px; border: 1px solid #000;">' + date + '</td></tr>').join('');
@@ -453,7 +522,7 @@ const StudentContractGeneratorModal: React.FC<StudentContractGeneratorModalProps
     const startDate = startStr ? new Date(startStr) : null;
     if (!startDate || diasIndices.length === 0) return '';
 
-    const fmtBR = (d: Date) => d.toLocaleDateString('pt-BR');
+    const fmtBR = (d: Date) => formatDateWithHoliday(d);
     const matches: string[] = [];
     const maxLessons = 72;
     const daySet = new Set(diasIndices);
@@ -488,7 +557,8 @@ const StudentContractGeneratorModal: React.FC<StudentContractGeneratorModalProps
     const left = matches.slice(0, mid);
     const right = matches.slice(mid);
 
-    const header = '<tr><td style="width: 25%; padding: 5px; border: 1px solid #000; font-weight: bold; text-align: center;">Aula nº</td><td style="width: 75%; padding: 5px; border: 1px solid #000; font-weight: bold; text-align: center;">Data Estimada</td></tr>';
+    const headerLabel = turmaTipo === 'Turma Regular' ? 'Encontro nº' : 'Aula nº';
+    const header = '<tr><td style="width: 25%; padding: 5px; border: 1px solid #000; font-weight: bold; text-align: center;">' + headerLabel + '</td><td style="width: 75%; padding: 5px; border: 1px solid #000; font-weight: bold; text-align: center;">Data Estimada</td></tr>';
     const makePairLabel = (index: number) => ((index * 2 + 1) + '–' + (index * 2 + 2));
     const leftRows = left.map((date, i) => '<tr><td style="padding: 5px; border: 1px solid #000; text-align: center;">' + makePairLabel(i) + '</td><td style="padding: 5px; border: 1px solid #000;">' + date + '</td></tr>').join('');
     const rightRows = right.map((date, i) => '<tr><td style="padding: 5px; border: 1px solid #000; text-align: center;">' + makePairLabel(mid + i) + '</td><td style="padding: 5px; border: 1px solid #000;">' + date + '</td></tr>').join('');
@@ -535,7 +605,7 @@ const StudentContractGeneratorModal: React.FC<StudentContractGeneratorModalProps
     const endDate = endStr ? new Date(endStr) : null;
     if (!startDate || diasIndices.length === 0) return '';
 
-    const fmtBR = (d: Date) => d.toLocaleDateString('pt-BR');
+    const fmtBR = (d: Date) => formatDateWithHoliday(d);
     const matches: string[] = [];
     const lessonsPerMeeting = 2;
     const maxMeetings = Math.floor(36 / lessonsPerMeeting); // 18 encontros para 36 aulas
@@ -572,7 +642,8 @@ const StudentContractGeneratorModal: React.FC<StudentContractGeneratorModalProps
     const left = matches.slice(0, mid);
     const right = matches.slice(mid);
 
-    const header = '<tr><td style="width: 25%; padding: 5px; border: 1px solid #000; font-weight: bold; text-align: center;">Aula nº</td><td style="width: 75%; padding: 5px; border: 1px solid #000; font-weight: bold; text-align: center;">Data Estimada</td></tr>';
+    const headerLabel = turmaTipo === 'Turma Regular' ? 'Encontro nº' : 'Aula nº';
+    const header = '<tr><td style="width: 25%; padding: 5px; border: 1px solid #000; font-weight: bold; text-align: center;">' + headerLabel + '</td><td style="width: 75%; padding: 5px; border: 1px solid #000; font-weight: bold; text-align: center;">Data Estimada</td></tr>';
     const leftRows = left.map((date, i) => '<tr><td style="padding: 5px; border: 1px solid #000; text-align: center;">' + (i+1) + '</td><td style="padding: 5px; border: 1px solid #000;">' + date + '</td></tr>').join('');
     const rightRows = right.map((date, i) => '<tr><td style="padding: 5px; border: 1px solid #000; text-align: center;">' + (mid+i+1) + '</td><td style="padding: 5px; border: 1px solid #000;">' + date + '</td></tr>').join('');
 

@@ -10,6 +10,8 @@ interface Responsible {
   endereco: string | null;
   numero_endereco: string | null;
   telefone: string | null;
+  email: string | null;
+  data_nascimento?: string | null;
 }
 
 export const useResponsibles = () => {
@@ -25,7 +27,7 @@ export const useResponsibles = () => {
         .order('nome');
 
       if (error) throw error;
-      setResponsibles(data || []);
+      setResponsibles((data || []) as Responsible[]);
     } catch (error) {
       console.error('Erro ao buscar responsáveis:', error);
       toast({

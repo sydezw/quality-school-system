@@ -11,6 +11,8 @@ interface Responsible {
   endereco: string | null;
   numero_endereco: string | null;
   telefone: string | null;
+  email: string | null;
+  data_nascimento?: string | null;
 }
 
 interface ResponsibleDialogProps {

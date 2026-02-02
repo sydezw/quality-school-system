@@ -59,7 +59,6 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose }) => {
     { path: '/materials', label: 'Materiais', icon: BookCopy, roles: ['admin'] },
     { path: '/plans', label: 'Planos', icon: Package, roles: ['admin'] },
     { path: '/financial', label: 'Financeiro', icon: DollarSign, roles: ['admin'] },
-    { path: '/reports', label: 'Relatórios', icon: BarChart3, roles: ['admin'] },
     { path: '/agenda', label: 'Agenda', icon: Calendar, roles: ['admin'] },
     { path: '/contracts', label: 'Contratos', icon: FileSignature, roles: ['admin'] },
     { path: '/responsibles', label: 'Responsáveis', icon: UserCheck, roles: ['admin'] },

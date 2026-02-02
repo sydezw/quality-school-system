@@ -5,7 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Search, Edit, Trash2, Phone, MapPin, FileText, Users, UserPlus } from 'lucide-react';
 import { useResponsibles } from '@/hooks/useResponsibles';
-import { Responsible } from '@/integrations/supabase/types';
+import { Tables } from '@/integrations/supabase/types';
+type Responsible = Tables<'responsaveis'> & { data_nascimento?: string | null };
+type StudentBrief = Pick<Tables<'alunos'>, 'id' | 'nome' | 'responsavel_id' | 'status'>;
 import ResponsibleDialog from '@/components/students/ResponsibleDialog';
 import { DeleteResponsibleDialog } from '@/components/responsibles/DeleteResponsibleDialog';
 import AttachStudentModal from '@/components/responsibles/AttachStudentModal';
@@ -22,9 +24,11 @@ const Responsibles = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [attachStudentModalOpen, setAttachStudentModalOpen] = useState(false);
   const [responsibleForAttachment, setResponsibleForAttachment] = useState<Responsible | null>(null);
-  const [studentsData, setStudentsData] = useState<Record<string, any[]>>({});
+  const [studentsData, setStudentsData] = useState<Record<string, StudentBrief[]>>({});
   const [filterType, setFilterType] = useState<'all' | 'with_students' | 'without_students'>('all');
   const { toast } = useToast();
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 15;
 
   // Buscar alunos vinculados a cada responsável
   const fetchStudentsForResponsibles = async () => {
@@ -37,8 +41,8 @@ const Responsibles = () => {
       if (error) throw error;
 
       // Agrupar alunos por responsável
-      const groupedStudents: Record<string, any[]> = {};
-      students?.forEach(student => {
+      const groupedStudents: Record<string, StudentBrief[]> = {};
+      (students as StudentBrief[] | null)?.forEach((student) => {
         if (student.responsavel_id) {
           if (!groupedStudents[student.responsavel_id]) {
             groupedStudents[student.responsavel_id] = [];
@@ -77,6 +81,27 @@ const Responsibles = () => {
     return true;
   });
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterType, responsibles]);
+
+  const totalItems = filteredResponsibles.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+  const paginatedResponsibles = filteredResponsibles.slice(startIndex, endIndex);
+  const goToPage = (page: number) => setCurrentPage(Math.min(Math.max(page, 1), totalPages));
+  const prevPage = () => goToPage(currentPage - 1);
+  const nextPage = () => goToPage(currentPage + 1);
+  const visiblePages = (() => {
+    const pages: number[] = [];
+    let start = Math.max(1, currentPage - 2);
+    const end = Math.min(totalPages, start + 4);
+    start = Math.max(1, end - 4);
+    for (let p = start; p <= end; p++) pages.push(p);
+    return pages;
+  })();
+
   const handleCreateResponsible = () => {
     setEditingResponsible(null);
     setIsDialogOpen(true);
@@ -106,7 +131,7 @@ const Responsibles = () => {
     });
   };
 
-  const handleResponsibleSubmit = async (data: any) => {
+  const handleResponsibleSubmit = async (data: unknown) => {
     const success = await saveResponsible(data, editingResponsible);
     if (success) {
       setIsDialogOpen(false);
@@ -269,7 +294,7 @@ const Responsibles = () => {
             <p className="text-gray-500">Nenhum responsável encontrado.</p>
           </div>
         ) : (
-          filteredResponsibles.map((responsible) => (
+          paginatedResponsibles.map((responsible) => (
             <Card key={responsible.id} className="hover:shadow-md transition-shadow">
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
@@ -352,6 +377,23 @@ const Responsibles = () => {
           ))
         )}
       </div>
+
+      {totalItems > 0 && (
+        <div className="flex items-center justify-between mt-4">
+          <div className="text-sm text-gray-600">
+            Mostrando {startIndex + 1} a {endIndex} de {totalItems} responsáveis
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={prevPage} disabled={currentPage === 1}>Anterior</Button>
+            {visiblePages.map((p) => (
+              <Button key={p} variant={p === currentPage ? 'default' : 'outline'} size="sm" onClick={() => goToPage(p)}>
+                {p}
+              </Button>
+            ))}
+            <Button variant="outline" size="sm" onClick={nextPage} disabled={currentPage === totalPages}>Próxima</Button>
+          </div>
+        </div>
+      )}
 
       <ResponsibleDialog
         isOpen={isDialogOpen}

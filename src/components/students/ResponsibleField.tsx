@@ -33,7 +33,8 @@ import { Control } from "react-hook-form";
 import { StudentFormValues } from "@/lib/validators/student";
 import { useResponsibles } from "@/hooks/useResponsibles";
 import { DeleteResponsibleDialog } from "@/components/responsibles/DeleteResponsibleDialog";
-import { Responsible } from "@/integrations/supabase/types";
+import { Tables } from "@/integrations/supabase/types";
+type Responsible = Tables<'responsaveis'> & { data_nascimento?: string | null };
 
 interface ResponsibleFieldProps {
   control: Control<StudentFormValues>;

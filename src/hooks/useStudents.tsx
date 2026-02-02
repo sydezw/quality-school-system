@@ -56,7 +56,7 @@ export const useStudents = () => {
           aulas_turma,
           turma_regular:turmas!turma_id(nome, idioma),
           turma_particular:turmas!turma_particular_id(nome, idioma),
-          responsaveis(nome, telefone, email, cpf)
+          responsaveis(nome, telefone, email, cpf, endereco, numero_endereco, data_nascimento)
         `);
       
       // Remover o filtro de status - mostrar todos os alunos
@@ -106,7 +106,10 @@ export const useStudents = () => {
           nome: item.responsaveis.nome,
           telefone: item.responsaveis.telefone || '',
           email: item.responsaveis.email || '',
-          cpf: item.responsaveis.cpf || ''
+          cpf: item.responsaveis.cpf || '',
+          endereco: item.responsaveis.endereco || '',
+          numero_endereco: item.responsaveis.numero_endereco || '',
+          data_nascimento: item.responsaveis.data_nascimento || null
         } : undefined
       }));
       

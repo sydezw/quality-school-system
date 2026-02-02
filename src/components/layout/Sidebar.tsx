@@ -61,8 +61,7 @@ const getAllMenuItems = (permissions: ReturnType<typeof usePermissions>) => {
     { icon: DollarSign, label: 'Financeiro', path: '/financial', visible: permissions.canAccessFinancial },
     { icon: Calendar, label: 'Agenda', path: '/agenda', visible: permissions.canAccessAgenda },
     { icon: Package, label: 'Materiais', path: '/materials', visible: permissions.canAccessMaterials },
-    { icon: BarChart3, label: 'Relatórios', path: '/reports', visible: permissions.canAccessReports },
-    { icon: FileText, label: 'Documentos', path: '/documents', visible: permissions.canAccessDocuments },
+    
     { icon: UserCheck, label: 'Responsáveis', path: '/responsibles', visible: permissions.canAccessResponsibles },
     { icon: Cake, label: 'Aniversariantes do Mês', path: '/birthdays', visible: permissions.canAccessBirthdays },
     { icon: ApproveLoginIcon, label: 'Aprovar Logins', path: '/approve-logins', visible: permissions.canAccessApproveLogins }

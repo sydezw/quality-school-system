@@ -20,5 +20,8 @@ export interface StudentWithRelations extends Student {
     telefone: string;
     email?: string;
     cpf?: string;
+    endereco?: string;
+    numero_endereco?: string;
+    data_nascimento?: string | null;
   };
 }

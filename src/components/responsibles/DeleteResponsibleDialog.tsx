@@ -9,7 +9,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Responsible } from '@/integrations/supabase/types';
+import { Tables } from '@/integrations/supabase/types';
+type Responsible = Tables<'responsaveis'> & { data_nascimento?: string | null };
 
 interface DeleteResponsibleDialogProps {
   isOpen: boolean;
